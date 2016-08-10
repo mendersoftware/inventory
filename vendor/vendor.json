@@ -1,0 +1,13 @@
+{
+	"comment": "",
+	"ignore": "test",
+	"package": [
+		{
+			"checksumSHA1": "lA/w0gs5wMIsk60b4mQyP0TpRz8=",
+			"path": "github.com/mendersoftware/mendertesting",
+			"revision": "e216de3a257f3bbfe239877cf7674d471a0e1708",
+			"revisionTime": "2016-08-10T11:58:52Z"
+		}
+	],
+	"rootPath": "github.com/mendersoftware/inventory"
+}
