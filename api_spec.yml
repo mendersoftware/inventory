@@ -1,0 +1,587 @@
+swagger: '2.0'
+info:
+  version: "0.1.0"
+  title: Mender Device Inventory API
+  description: |
+    The Inventory API allows devices to upload almost arbitrary attributes (software/hardware info, health checks, metrics, etc.) of various data types to the backend. This data can be used by the administrator to monitor the state of registered devices.
+
+    Attribute data is searchable, and can be indirectly used to create and manage groups of devices (e.g. based on attribute values) for the purpose of deployment scheduling.
+
+    **Supported Attribute Types**
+
+    Attribute types are implicit, derived from JSON type. Supported types are:
+      - number
+      - string
+      - array of either numbers or strings (no mixed arrays)
+      - dates (integer representation - unix time) - supported only for internal
+      Mender attributes, whose names are well known
+
+paths:
+  /attributes:
+    patch:
+      summary: Upload a set of attributes for a device.
+      tags: ["attributes", "devices"]
+      description: |
+        Attribute values are uploaded as a collection of attribute-value entries.
+
+        Attribute names are human readable, unique IDs, e.g. 'device_type', 'ip_addr', 'cpu_load', etc.
+
+        The method has upsert semantics:
+          - values of exisiting attributes are overwritten,
+          - attributes uploaded for the first time are simply created,
+          - the Device resource will also be created if necessary
+
+        In other words, no special initialization of attributes is required.
+
+        This is a device-only endpoint. The requesting device ID is extracted from the provided auth token.
+
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          type: string
+          format: Bearer [token]
+          description: issued by device auth service
+        - name: attributes
+          in: body
+          description: List of attribute values.
+          required: true
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/AttributeNew'
+      responses:
+        200:
+          description: Attributes updated successfully.
+        401:
+          description: Device is not authenticated.
+        403:
+          description: Device is not authenticated (expired token).
+        400:
+          description: Bad request.
+          schema:
+            $ref: '#/definitions/Error'
+        500:
+          description: Internal error.
+          schema:
+            $ref: '#/definitions/Error'
+  /devices:
+    post:
+      summary: Create a device resource with a supplied set of attributes.
+      tags: ["devices"]
+      parameters:
+        - name: device
+          in: body
+          required: true
+          schema:
+            $ref: "#/definitions/DeviceNew"
+      responses:
+        201:
+          description: Device created succesfully.
+          headers:
+            Location:
+              type: string
+              description: URI for the newly created Device.
+        400:
+          description: Bad request.
+          schema:
+            $ref: '#/definitions/Error'
+        500:
+          description: Internal error.
+          schema:
+            $ref: '#/definitions/Error'
+    get:
+      summary: List devices.
+      description:  |
+        In the simplest case, returns a paged collection of devices. Optionally accepts searching
+        and sorting parameters, described below.
+
+        **Searching**
+
+        Search is performed by passing a set of attribute name/filter pairs specified with a query mini-language, e.g.:
+
+        ```
+        GET /devices?attr_name_1=eq:foo&           //exactly equals 'foo'
+                     attr_name_2=100&              //exactly equals 100 - alternate form
+                     attr_name_3=gt:100&           //greater than 100
+
+        ```
+
+        Filters are combined with logical AND - currently no advanced logical operations are supported.
+
+        Supported comparison operators:
+        - eq (equals; can be omitted for brevity)
+        - gt (greater than)
+        - gte (greater or equal)
+        - lt (less than)
+        - lte (less than or equal)
+
+        **Sorting**
+
+        Sorting is enabled with a dedicated `sort` parameter, which specifies attribute names
+        to sort on, each with an optional direction (default - `desc`), e.g.:
+
+        ```
+          GET /devices? sort=attr_name_1:asc, attr_name_2:desc, ...
+
+        ```
+
+        which sorts by attr_name_1 ascending, then by attr_name_2 descending.
+
+        Simplified form:
+
+        ```
+          GET /devices? sort=attr_name_1:asc, attr_name_2, ...
+
+        ```
+
+      tags: ["devices"]
+      parameters:
+        - name: page
+          in: query
+          description: Starting page
+          required: false
+          type: number
+          format: integer
+          default: 1
+        - name: per_page
+          in: query
+          description: Number of results per page
+          required: false
+          type: number
+          format: integer
+          default: 10
+        - name: sort
+          in: query
+          description: Supports sorting by attribute values (see description).
+          required: false
+          type: string
+        - name: has_group
+          in: query
+          description: If present, limits the results only to devices assigned/not assigned to a group.
+          required: false
+          type: boolean
+
+      responses:
+        200:
+          description: Successful response
+          headers:
+            Link:
+              type: string
+              description: Standard header, we support 'first', 'next', and 'prev'.
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/Device'
+        400:
+          description: Bad request.
+          schema:
+            $ref: '#/definitions/Error'
+        500:
+          description: Internal error.
+          schema:
+            $ref: '#/definitions/Error'
+  /devices/{id}:
+    get:
+      summary: Get a selected device
+      tags: ["devices"]
+      parameters:
+        - name: id
+          in: path
+          description: Device identifier
+          required: true
+          type: string
+      responses:
+        200:
+          description: Device found.
+          schema:
+            $ref: "#/definitions/Device"
+        404:
+          description: Device not found
+          schema:
+            $ref: "#/definitions/Error"
+        500:
+          description: Internal error
+          schema:
+            $ref: "#/definitions/Error"
+  /devices/{id}/group:
+    get:
+      summary: Get a selected device's group.
+      tags: ["devices", "groups"]
+      parameters:
+        - name: id
+          in: path
+          description: Device identifier
+          required: true
+          type: string
+      responses:
+        200:
+          description: Device's group found.
+          schema:
+            $ref: "#/definitions/Group"
+        404:
+          description: Device or group not found
+          schema:
+            $ref: "#/definitions/Error"
+        500:
+          description: Internal error
+          schema:
+            $ref: "#/definitions/Error"
+  /devices/{id}/attributes:
+    patch:
+      summary: Upload a set of attribute values for a device.
+      description: |
+        Attribute values are uploaded as a collection of attribute-value entries.
+
+        Attribute names are human readable, unique IDs, e.g. 'device_type', 'ip_addr', 'cpu_load', etc.
+
+        The method has upsert semantics:
+          - values of exisiting attributes are overwritten,
+          - attributes uploaded for the first time are simply created
+
+        In other words, no special initialization of attributes is required.
+
+        This is a user- and system-facing endpoint only. The device has a dedicated counterpart.
+
+      tags: ["devices", "attributes"]
+      parameters:
+        - name: id
+          in: path
+          description: Device identifier
+          required: true
+          type: string
+        - name: attributes
+          in: body
+          description: List of attribute values.
+          required: true
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/AttributeNew'
+      responses:
+        200:
+          description: Attributes updated successfully.
+        400:
+          description: Bad request.
+          schema:
+            $ref: '#/definitions/Error'
+        404:
+          description: Device not found.
+          schema:
+            $ref: '#/definitions/Error'
+        500:
+          description: Internal error.
+          schema:
+            $ref: '#/definitions/Error'
+  /groups:
+    post:
+      summary: |
+        Create a new device group.
+
+        The method accepts a set of device IDs that will make up the group.
+      tags: ["groups"]
+      parameters:
+        - name: device_ids
+          in: body
+          description: List of device IDs.
+          required: true
+          schema:
+            type: array
+            items:
+              type: string
+      responses:
+        201:
+          description: Group created succesfully.
+          headers:
+            Location:
+              type: string
+              description: URI for the newly created Group.
+        400:
+          description: Bad request.
+          schema:
+            $ref: '#/definitions/Error'
+        500:
+          description: Internal error.
+          schema:
+            $ref: '#/definitions/Error'
+
+    get:
+      summary: List groups, with paging.
+      tags: ["groups"]
+      parameters:
+        - name: page
+          in: query
+          description: Starting page
+          required: false
+          type: number
+          format: integer
+          default: 1
+        - name: per_page
+          in: query
+          description: Number of results per page
+          required: false
+          type: number
+          format: integer
+          default: 10
+      responses:
+        200:
+          description: Successful response
+          headers:
+            Link:
+              type: string
+              description: Standard header, we support 'first', 'next', and 'prev'.
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/Group'
+        400:
+          description: Bad request.
+          schema:
+            $ref: '#/definitions/Error'
+        500:
+          description: Internal error.
+          schema:
+            $ref: '#/definitions/Error'
+
+  /groups/{id}:
+    get:
+      summary: Get a selected group.
+      description: |
+        Note that the group's devices are listed via `GET /groups/{id}/devices` as
+        a paged collection.
+      tags: ["groups"]
+      parameters:
+        - name: id
+          in: path
+          description: Group identifier
+          required: true
+          type: string
+      responses:
+        200:
+          description: Group found.
+          schema:
+            $ref: "#/definitions/Group"
+        404:
+          description: Group not found
+          schema:
+            $ref: "#/definitions/Error"
+        500:
+          description: Internal error
+          schema:
+            $ref: "#/definitions/Error"
+
+    patch:
+      summary: Edit a group.
+      description: |
+        Supports both simple group edition (name, description) as well as adding/removing devices.
+        For this purpose, the body contains a special PATCH update document, following the convention of JSON Patch described in https://tools.ietf.org/html/rfc6902.
+
+        Relevant examples of a patch document:
+
+        ```
+        //edit group name and description
+        [
+          {"op": "add", "path": "/name", "new name"},
+          {"op": "add", "path": "/description", "new description"}
+        ]
+
+        ```
+
+        ```
+        //add/remove devices
+        [
+          {"op": "add", "path": "/devices", ["device_id_1", "device_id_2", ...]},
+          {"op": "remove", "path": "/devices",["device_id_3", ...]}
+        ]
+        ```
+      parameters:
+        - name: patch
+          in: body
+          description: Update document RFC6902.
+          required: true
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/PatchOperation'
+        - name: id
+          in: path
+          description: Group identifier
+          required: true
+          type: string
+      responses:
+        200:
+          description: Successful response
+        400:
+          description: Bad request.
+          schema:
+            $ref: '#/definitions/Error'
+        404:
+          description: Group or device not found.
+          schema:
+            $ref: '#/definitions/Error'
+        500:
+          description: Internal error.
+          schema:
+            $ref: '#/definitions/Error'
+
+    delete:
+      summary: Delete a group.
+      parameters:
+        - name: id
+          in: path
+          description: Group identifier.
+          required: true
+          type: string
+      responses:
+        200:
+          description: Group deleted successfully.
+        404:
+          description: Group not found.
+          schema:
+            $ref: '#/definitions/Error'
+        500:
+          description: Internal error.
+          schema:
+            $ref: '#/definitions/Error'
+
+  /groups/{id}/devices:
+    get:
+      summary: List group's devices (paged collection).
+      tags: ["groups"]
+      parameters:
+        - name: page
+          in: query
+          description: Starting page
+          required: false
+          type: number
+          format: integer
+          default: 1
+        - name: per_page
+          in: query
+          description: Number of results per page
+          required: false
+          type: number
+          format: integer
+          default: 10
+        - name: id
+          in: path
+          description: Group identifier
+          required: true
+          type: string
+      responses:
+        200:
+          description: Successful response
+          headers:
+            Link:
+              type: string
+              description: Standard header, we support 'first', 'next', and 'prev'.
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/Device'
+        400:
+          description: Bad request.
+          schema:
+            $ref: '#/definitions/Error'
+        404:
+          description: Group not found.
+          schema:
+            $ref: '#/definitions/Error'
+        500:
+          description: Internal error.
+          schema:
+            $ref: '#/definitions/Error'
+
+definitions:
+  AttributeNew:
+    type: object
+    required:
+      - name
+      - value
+    properties:
+      name:
+        type: string
+        description: Unique name.
+      description:
+        type: string
+      value:
+        type: object
+        description: The actual current value of the attribute (see Supported Attribute Types in API description).
+  Attribute:
+    type: object
+    properties:
+      name:
+        type: string
+        description: Unique name.
+      description:
+        type: string
+      value:
+        type: object
+        description: The actual current value of the attribute (see Supported Attribute Types in API description).
+  Device:
+    type: object
+    properties:
+      id:
+        type: string
+        description: Mender-assigned unique ID.
+      updated_ts:
+        type: string
+        description: Timestamp of the last attribute update.
+      attributes:
+        type: array
+        items:
+          $ref: '#/definitions/Attribute'
+        description: A list of attributes and their values.
+  DeviceNew:
+    type: object
+    required:
+      - id
+    properties:
+      id:
+        type: string
+        description: Mender-assigned unique ID.
+      updated_ts:
+        type: string
+        description: Timestamp of the last attribute update.
+      attributes:
+        type: array
+        items:
+          $ref: '#/definitions/Attribute'
+        description: A list of attributes and their values.
+  Group:
+    type: object
+    properties:
+      id:
+        type: string
+        description: Group's UUID.
+      name:
+        type: string
+        description: Human-readable name of the group.
+      description:
+        type: string
+        description: User's description of the group.
+  Error:
+    description: Error descriptor
+    type: object
+    properties:
+      error:
+        description: Description of the error
+        type: string
+  PatchOperation:
+    description: RFC6902 JSON Patch operation document.
+    type: object
+    required:
+      - op
+      - path
+      - value
+    properties:
+      op:
+        type: string
+        description: Operation
+      path:
+        type: string
+        description: Operation target.
+      value:
+        type: object
+        description: Operation value.
+
