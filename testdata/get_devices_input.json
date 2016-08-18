@@ -1,0 +1,35 @@
+[
+    {
+        "id":"0002",
+        "attributes":{
+            "mac": { "value": "0002-mac", "description": "description" }
+        }
+    },
+    {
+        "id":"0003",
+        "attributes":{
+            "mac": { "value": "0002-mac", "description": "description" },
+            "sn": { "value": ["003-sn"], "description": "description" }
+        }
+    },
+    {
+        "id":"0004",
+        "attributes":{
+            "mac": {  "description": "description" },
+            "sn": { "value": "004-sn"}
+        }
+    },
+    {
+        "id":"0006",
+        "attributes":null
+    },
+    {
+        "id":"0007"
+    },
+    {
+        "id":"0008",
+        "attributes":{
+            "sn": { "value": 4 }
+        }
+    }
+]
