@@ -11,13 +11,46 @@
 //    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
-
 package main
 
 import (
-	"fmt"
+	"flag"
+	"github.com/mendersoftware/inventory/config"
+	"github.com/mendersoftware/inventory/log"
 )
 
 func main() {
-	fmt.Println("Hello, will you help me be useful somehow?")
+	var configPath string
+	var printVersion bool
+	var devSetup bool
+	var debug bool
+
+	flag.StringVar(&configPath, "config",
+		"config.yaml",
+		"Configuration file path. Supports JSON, TOML, YAML and HCL formatted configs.")
+	flag.BoolVar(&printVersion, "version",
+		false, "Show version")
+	flag.BoolVar(&devSetup, "dev",
+		false, "Use development setup")
+	flag.BoolVar(&debug, "debug",
+		false, "Enable debug logging")
+
+	flag.Parse()
+
+	log.Setup(debug)
+
+	l := log.New(log.Ctx{})
+
+	err := config.FromConfigFile(configPath, configDefaults)
+	if err != nil {
+		l.Fatalf("error loading configuration: %s", err)
+	}
+
+	if devSetup == true {
+		l.Infof("setting up development configuration")
+		config.Config.Set(SettingMiddleware, EnvDev)
+	}
+
+	l.Printf("Inventory Service, version %s starting up",
+		CreateVersionString())
 }
