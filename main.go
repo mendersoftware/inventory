@@ -53,4 +53,6 @@ func main() {
 
 	l.Printf("Inventory Service, version %s starting up",
 		CreateVersionString())
+
+	l.Fatal(RunServer(config.Config))
 }
