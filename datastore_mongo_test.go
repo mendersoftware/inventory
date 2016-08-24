@@ -17,6 +17,7 @@ import (
 	"errors"
 	. "github.com/mendersoftware/inventory"
 	"github.com/stretchr/testify/assert"
+	"reflect"
 	"testing"
 )
 
@@ -180,4 +181,357 @@ func TestNewDataStoreMongo(t *testing.T) {
 
 	assert.Nil(t, ds)
 	assert.EqualError(t, err, "failed to open mgo session")
+}
+
+func TestMongoUpsertAttributes(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping TestMongoUpsertAttributes in short mode.")
+	}
+
+	testCases := map[string]struct {
+		devs []Device
+
+		inDevId DeviceID
+		inAttrs DeviceAttributes
+
+		outAttrs DeviceAttributes
+	}{
+		"dev exists, attributes exist, update both attrs (descr + val)": {
+			devs: []Device{
+				{
+					ID: DeviceID("0003"),
+					Attributes: map[string]DeviceAttribute{
+						"mac": {
+							Name:        "mac",
+							Value:       "0003-mac",
+							Description: strPtr("descr"),
+						},
+						"sn": {
+							Name:        "sn",
+							Value:       "0003-sn",
+							Description: strPtr("descr"),
+						},
+					},
+				},
+			},
+			inDevId: DeviceID("0003"),
+			inAttrs: map[string]DeviceAttribute{
+				"mac": DeviceAttribute{
+					Description: strPtr("mac description"),
+					Value:       "0003-newmac",
+				},
+				"sn": DeviceAttribute{
+					Description: strPtr("sn description"),
+					Value:       "0003-newsn",
+				},
+			},
+
+			outAttrs: map[string]DeviceAttribute{
+				"mac": DeviceAttribute{
+					Description: strPtr("mac description"),
+					Value:       "0003-newmac",
+				},
+				"sn": DeviceAttribute{
+					Description: strPtr("sn description"),
+					Value:       "0003-newsn",
+				},
+			},
+		},
+		"dev exists, attributes exist, update one attr (descr + val)": {
+			devs: []Device{
+				{
+					ID: DeviceID("0003"),
+					Attributes: map[string]DeviceAttribute{
+						"mac": {
+							Name:        "mac",
+							Value:       "0003-mac",
+							Description: strPtr("descr"),
+						},
+						"sn": {
+							Name:        "sn",
+							Value:       "0003-sn",
+							Description: strPtr("descr"),
+						},
+					},
+				},
+			},
+			inDevId: DeviceID("0003"),
+			inAttrs: map[string]DeviceAttribute{
+				"sn": DeviceAttribute{
+					Description: strPtr("sn description"),
+					Value:       "0003-newsn",
+				},
+			},
+
+			outAttrs: map[string]DeviceAttribute{
+				"mac": DeviceAttribute{
+					Description: strPtr("descr"),
+					Value:       "0003-mac",
+				},
+				"sn": DeviceAttribute{
+					Description: strPtr("sn description"),
+					Value:       "0003-newsn",
+				},
+			},
+		},
+
+		"dev exists, attributes exist, update one attr (descr only)": {
+			devs: []Device{
+				{
+					ID: DeviceID("0003"),
+					Attributes: map[string]DeviceAttribute{
+						"mac": {
+							Name:        "mac",
+							Value:       "0003-mac",
+							Description: strPtr("descr"),
+						},
+						"sn": {
+							Name:        "sn",
+							Value:       "0003-sn",
+							Description: strPtr("descr"),
+						},
+					},
+				},
+			},
+			inDevId: DeviceID("0003"),
+			inAttrs: map[string]DeviceAttribute{
+				"sn": DeviceAttribute{
+					Description: strPtr("sn description"),
+				},
+			},
+
+			outAttrs: map[string]DeviceAttribute{
+				"mac": DeviceAttribute{
+					Description: strPtr("descr"),
+					Value:       "0003-mac",
+				},
+				"sn": DeviceAttribute{
+					Description: strPtr("sn description"),
+					Value:       "0003-sn",
+				},
+			},
+		},
+		"dev exists, attributes exist, update one attr (value only)": {
+			devs: []Device{
+				{
+					ID: DeviceID("0003"),
+					Attributes: map[string]DeviceAttribute{
+						"mac": {
+							Name:        "mac",
+							Value:       "0003-mac",
+							Description: strPtr("descr"),
+						},
+						"sn": {
+							Name:        "sn",
+							Value:       "0003-sn",
+							Description: strPtr("descr"),
+						},
+					},
+				},
+			},
+			inDevId: DeviceID("0003"),
+			inAttrs: map[string]DeviceAttribute{
+				"sn": DeviceAttribute{
+					Value: "0003-newsn",
+				},
+			},
+
+			outAttrs: map[string]DeviceAttribute{
+				"mac": DeviceAttribute{
+					Description: strPtr("descr"),
+					Value:       "0003-mac",
+				},
+				"sn": DeviceAttribute{
+					Description: strPtr("descr"),
+					Value:       "0003-newsn",
+				},
+			},
+		},
+		"dev exists, attributes exist, update one attr (value only, change type)": {
+			devs: []Device{
+				{
+					ID: DeviceID("0003"),
+					Attributes: map[string]DeviceAttribute{
+						"mac": {
+							Name:        "mac",
+							Value:       "0003-mac",
+							Description: strPtr("descr"),
+						},
+						"sn": {
+							Name:        "sn",
+							Value:       "0003-sn",
+							Description: strPtr("descr"),
+						},
+					},
+				},
+			},
+			inDevId: DeviceID("0003"),
+			inAttrs: map[string]DeviceAttribute{
+				"sn": DeviceAttribute{
+					Value: []string{"0003-sn-1", "0003-sn-2"},
+				},
+			},
+
+			outAttrs: map[string]DeviceAttribute{
+				"mac": DeviceAttribute{
+					Description: strPtr("descr"),
+					Value:       "0003-mac",
+				},
+				"sn": DeviceAttribute{
+					Description: strPtr("descr"),
+					//[]interface{} instead of []string - otherwise DeepEquals fails where it really shouldn't
+					Value: []interface{}{"0003-sn-1", "0003-sn-2"},
+				},
+			},
+		},
+		"dev exists, no attributes exist, upsert new attrs (val + descr)": {
+			devs: []Device{
+				{
+					ID: DeviceID("0003"),
+				},
+			},
+			inDevId: DeviceID("0003"),
+			inAttrs: map[string]DeviceAttribute{
+				"ip": DeviceAttribute{
+					Value:       []string{"1.2.3.4", "1.2.3.5"},
+					Description: strPtr("ip addr array"),
+				},
+				"mac": DeviceAttribute{
+					Value:       "0006-mac",
+					Description: strPtr("mac addr"),
+				},
+			},
+
+			outAttrs: map[string]DeviceAttribute{
+				"ip": DeviceAttribute{
+					Value:       []interface{}{"1.2.3.4", "1.2.3.5"},
+					Description: strPtr("ip addr array"),
+				},
+				"mac": DeviceAttribute{
+					Value:       "0006-mac",
+					Description: strPtr("mac addr"),
+				},
+			},
+		},
+		"dev doesn't exist, upsert new attr (descr + val)": {
+			devs:    []Device{},
+			inDevId: DeviceID("0099"),
+			inAttrs: map[string]DeviceAttribute{
+				"ip": DeviceAttribute{
+					Description: strPtr("ip addr array"),
+					Value:       []string{"1.2.3.4", "1.2.3.5"},
+				},
+			},
+
+			outAttrs: map[string]DeviceAttribute{
+				"ip": DeviceAttribute{
+					Description: strPtr("ip addr array"),
+					Value:       []interface{}{"1.2.3.4", "1.2.3.5"},
+				},
+			},
+		},
+		"dev doesn't exist, upsert new attr (val only)": {
+			devs:    []Device{},
+			inDevId: DeviceID("0099"),
+			inAttrs: map[string]DeviceAttribute{
+				"ip": DeviceAttribute{
+					Value: []string{"1.2.3.4", "1.2.3.5"},
+				},
+			},
+
+			outAttrs: map[string]DeviceAttribute{
+				"ip": DeviceAttribute{
+					Value: []interface{}{"1.2.3.4", "1.2.3.5"},
+				},
+			},
+		},
+		"dev doesn't exist, upsert with new attrs (val + descr)": {
+			inDevId: DeviceID("0099"),
+			inAttrs: map[string]DeviceAttribute{
+				"ip": DeviceAttribute{
+					Value:       []string{"1.2.3.4", "1.2.3.5"},
+					Description: strPtr("ip addr array"),
+				},
+				"mac": DeviceAttribute{
+					Value:       "0099-mac",
+					Description: strPtr("mac addr"),
+				},
+			},
+
+			outAttrs: map[string]DeviceAttribute{
+				"ip": DeviceAttribute{
+					Value:       []interface{}{"1.2.3.4", "1.2.3.5"},
+					Description: strPtr("ip addr array"),
+				},
+				"mac": DeviceAttribute{
+					Value:       "0099-mac",
+					Description: strPtr("mac addr"),
+				},
+			},
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Logf("%s", name)
+		//setup
+		db.Wipe()
+
+		s := db.Session()
+
+		for _, d := range tc.devs {
+			err := s.DB(DbName).C(DbDevicesColl).Insert(d)
+			assert.NoError(t, err, "failed to setup input data")
+		}
+
+		//test
+		d := NewDataStoreMongoWithSession(s)
+		err := d.UpsertAttributes(tc.inDevId, tc.inAttrs)
+		assert.NoError(t, err, "UpsertAttributes failed")
+
+		//get the device back
+		var dev Device
+		err = s.DB(DbName).C(DbDevicesColl).FindId(tc.inDevId).One(&dev)
+		assert.NoError(t, err, "error getting device")
+
+		if !compare(dev.Attributes, tc.outAttrs) {
+			t.Errorf("attributes mismatch, have: %v\nwant: %v", dev.Attributes, tc.outAttrs)
+		}
+
+		s.Close()
+	}
+
+	//wipe(d)
+}
+
+func strPtr(s string) *string {
+	return &s
+}
+
+func compare(a, b DeviceAttributes) bool {
+	if len(a) != len(b) {
+		return false
+	}
+
+	for k, va := range a {
+		vb := b[k]
+
+		if !reflect.DeepEqual(va.Value, vb.Value) {
+			return false
+		}
+
+		if va.Description == nil &&
+			vb.Description == nil {
+			return true
+		}
+
+		if va.Description != nil &&
+			vb.Description != nil &&
+			*va.Description == *vb.Description {
+			return true
+		} else {
+			return false
+		}
+	}
+
+	return true
 }
