@@ -228,7 +228,7 @@ deploy:
         upload-dir: $DEPLOY_REPO/latest/$TRAVIS_BRANCH
         local_dir: docs
         skip_cleanup: true
-        acl: $AWS_S3_ACL
+        acl: public_read
         on:
             repo: $DEPLOY_REPO
             all_branches: true
