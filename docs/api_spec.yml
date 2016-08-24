@@ -54,8 +54,6 @@ paths:
           description: Attributes updated successfully.
         401:
           description: Device is not authenticated.
-        403:
-          description: Device is not authenticated (expired token).
         400:
           description: Bad request.
           schema:
