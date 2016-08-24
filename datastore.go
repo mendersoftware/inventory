@@ -34,4 +34,8 @@ type DataStore interface {
 	// 	Attributes: map[string]string{"token": "123"),
 	// })
 	AddDevice(dev *Device) error
+
+	// Updates the device attributes in a differential manner.
+	// Nonexistent attributes are created, existing are overwritten; the device resource is also created if necessary.
+	UpsertAttributes(id DeviceID, attrs DeviceAttributes) error
 }
