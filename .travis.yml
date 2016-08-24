@@ -81,6 +81,10 @@ before_install:
     # Install cyclomatic dependency analysis tool
     - go get -u github.com/fzipp/gocyclo
 
+    # Install swagger-cli
+    - sudo apt-get -qq update && sudo apt-get -qq install -y npm
+    - sudo npm install -g swagger-cli
+
 before_script:
     # Print build info that binary is compiled with.
     - echo $TRAVIS_COMMIT
@@ -100,7 +104,8 @@ before_script:
     # Fail builds when the cyclomatic complexity reaches 15 or more
     - gocyclo -over 15 `find . -iname '*.go' | grep -v 'vendor' | grep -v '_test.go'`
 
-
+    # Verify that the Swagger docs are valid
+    - swagger validate docs/*.yml
 
 script:
     # go list supply import paths for all sub directories.
