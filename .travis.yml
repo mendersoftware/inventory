@@ -29,6 +29,9 @@ env:
         # Can be overridden by travis private variable set in travis settings: AWS_BUCKET_OVERRIDE
         - AWS_BUCKET_DEFAULT=mender-buildsystem
 
+        # AWS S3 bucket name, to store updated docs
+        - AWS_BUCKET_DOCS=mender-docs
+
         # AWS region.
         # Can be overridden by travis private variable set in travis settings: AWS_REGION_OVERRIDE
         - AWS_REGION_DEFAULT=eu-west-1
@@ -125,6 +128,9 @@ after_success:
     - mkdir build
     - cp $BUILD_ARTIFATS $CONFIG_FILE build/
 
+    # Check if api docs have changed
+    - git diff --name-status ${TRAVIS_COMMIT_RANGE} | grep -E "(A|M)\s+docs/.+\.yml" && export API_DOCS_CHANGED=true
+
 before_deploy:
     # Master is always lastest
     - if [ ! -z "$TRAVIS_TAG" ]; then export IMAGE_TAG=$TRAVIS_TAG; else export IMAGE_TAG=$TRAVIS_BRANCH; fi
@@ -197,3 +203,19 @@ deploy:
         acl: $AWS_S3_ACL
         on:
             repo: $DEPLOY_REPO
+
+    # Store docs for auto-deployment script
+    -
+        provider: s3
+        access_key_id: $AWS_ACCESS_KEY_ID
+        secret_access_key: $AWS_SECRET_ACCESS_KEY
+        bucket: $AWS_BUCKET_DOCS
+        region: $AWS_REGION
+        upload-dir: $DEPLOY_REPO/latest/$TRAVIS_BRANCH
+        local_dir: docs
+        skip_cleanup: true
+        acl: $AWS_S3_ACL
+        on:
+            repo: $DEPLOY_REPO
+            all_branches: true
+            condition: $API_DOCS_CHANGED = true
