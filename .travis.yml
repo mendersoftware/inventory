@@ -197,3 +197,17 @@ deploy:
         acl: $AWS_S3_ACL
         on:
             repo: $DEPLOY_REPO
+
+    # Store docs for auto-deployment script
+    -
+        provider: s3
+        access_key_id: $AWS_ACCESS_KEY_ID
+        secret_access_key: $AWS_SECRET_ACCESS_KEY
+        bucket: $AWS_BUCKET
+        region: $AWS_REGION
+        upload-dir: $DEPLOY_REPO/latest/$TRAVIS_BRANCH/docs
+        local_dir: docs
+        skip_cleanup: true
+        acl: $AWS_S3_ACL
+        on:
+            repo: $DEPLOY_REPO
