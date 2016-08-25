@@ -45,28 +45,12 @@ func GetInventory(c config.Reader, l *log.Logger) (InventoryApp, error) {
 }
 
 func (i *Inventory) AddDevice(dev *Device) error {
-	dd := createDeviceDb(dev)
-	err := i.db.AddDevice(dd)
+	now := time.Now()
+	dev.CreatedTs = now
+	dev.UpdatedTs = now
+	err := i.db.AddDevice(dev)
 	if err != nil {
 		return errors.Wrap(err, "failed to add device")
 	}
 	return nil
-}
-
-func createDeviceDb(dev *Device) *DeviceDb {
-	now := time.Now()
-	return &DeviceDb{
-		ID:         dev.ID,
-		Attributes: createDbAttributes(dev.Attributes),
-		CreatedTs:  now,
-		UpdatedTs:  now,
-	}
-}
-
-func createDbAttributes(attributes []DeviceAttribute) DeviceDbAttributes {
-	dbAttrs := make(DeviceDbAttributes)
-	for _, attr := range attributes {
-		dbAttrs[attr.Name] = attr
-	}
-	return dbAttrs
 }

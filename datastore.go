@@ -25,7 +25,7 @@ var (
 type DataStore interface {
 	// find a device with given `id`, returns the device or nil,
 	// if device was not found, error is set to ErrDevNotFound
-	GetDevice(id DeviceID) (*DeviceDb, error)
+	GetDevice(id DeviceID) (*Device, error)
 
 	// insert device into data store
 	//
@@ -33,5 +33,5 @@ type DataStore interface {
 	// 	ID: "foo",
 	// 	Attributes: map[string]string{"token": "123"),
 	// })
-	AddDevice(dev *DeviceDb) error
+	AddDevice(dev *Device) error
 }

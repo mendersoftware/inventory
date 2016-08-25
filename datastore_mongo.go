@@ -53,12 +53,12 @@ func NewDataStoreMongo(host string) (*DataStoreMongo, error) {
 	return db, nil
 }
 
-func (db *DataStoreMongo) GetDevice(id DeviceID) (*DeviceDb, error) {
+func (db *DataStoreMongo) GetDevice(id DeviceID) (*Device, error) {
 	s := db.session.Copy()
 	defer s.Close()
 	c := s.DB(DbName).C(DbDevicesColl)
 
-	res := DeviceDb{}
+	res := Device{}
 
 	err := c.FindId(id).One(&res)
 
@@ -73,7 +73,7 @@ func (db *DataStoreMongo) GetDevice(id DeviceID) (*DeviceDb, error) {
 	return &res, nil
 }
 
-func (db *DataStoreMongo) AddDevice(dev *DeviceDb) error {
+func (db *DataStoreMongo) AddDevice(dev *Device) error {
 	s := db.session.Copy()
 	defer s.Close()
 	c := s.DB(DbName).C(DbDevicesColl)

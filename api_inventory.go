@@ -125,7 +125,7 @@ func parseDevice(r *rest.Request) (*Device, error) {
 	return &dev, nil
 }
 
-func validateDeviceAttributes(attributes []DeviceAttribute) error {
+func validateDeviceAttributes(attributes DeviceAttributes) error {
 	for _, attr := range attributes {
 		if attr.Name == "" {
 			return errors.New("attribute 'name' field required")

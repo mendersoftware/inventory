@@ -76,13 +76,13 @@ func wipe(db *DataStoreMongo) error {
 	return nil
 }
 
-func parseDevs(dataset string) ([]DeviceDb, error) {
+func parseDevs(dataset string) ([]Device, error) {
 	f, err := os.Open(filepath.Join(testDataFolder, dataset))
 	if err != nil {
 		return nil, err
 	}
 
-	var devs []DeviceDb
+	var devs []Device
 
 	j := json.NewDecoder(f)
 	if err = j.Decode(&devs); err != nil {

@@ -23,23 +23,23 @@ import (
 //allows monkey patching the methods without
 //redefining the struct for each case
 type TestDataStore struct {
-	MockAddDevice func(dev *DeviceDb) error
-	MockGetDevice func(id DeviceID) (*DeviceDb, error)
+	MockAddDevice func(dev *Device) error
+	MockGetDevice func(id DeviceID) (*Device, error)
 }
 
-func (ds *TestDataStore) AddDevice(dev *DeviceDb) error {
+func (ds *TestDataStore) AddDevice(dev *Device) error {
 	return ds.MockAddDevice(dev)
 }
 
-func (ds *TestDataStore) GetDevice(id DeviceID) (*DeviceDb, error) {
+func (ds *TestDataStore) GetDevice(id DeviceID) (*Device, error) {
 	return ds.MockGetDevice(id)
 }
 
-func addDevice(dev *DeviceDb) error {
+func addDevice(dev *Device) error {
 	return nil
 }
 
-func addDeviceErr(dev *DeviceDb) error {
+func addDeviceErr(dev *Device) error {
 	return errors.New("db connection failed")
 }
 

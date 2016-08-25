@@ -15,6 +15,7 @@ package main
 
 import (
 	"time"
+	"encoding/json"
 )
 
 type DeviceID string
@@ -23,7 +24,7 @@ type DeviceID string
 type GroupID string
 
 type DeviceAttribute struct {
-	Name        string      `json:"name" bson:"-"`
+	Name        string      `json:"name" bson:",omitempty"`
 	Description *string     `json:"description" bson:",omitempty"`
 	Value       interface{} `json:"value" bson:",omitempty"`
 }
@@ -33,23 +34,8 @@ type Device struct {
 	//system-generated device ID
 	ID DeviceID `json:"id" bson:"_id,omitempty"`
 
-	//list of attributes
-	Attributes []DeviceAttribute `json:"attributes" bson:"-"`
-
-	//Timestamp of the last attribute update.
-	UpdatedTs time.Time `json:"updated_ts" bson:"updated_ts,omitempty"`
-}
-
-// wrapper for device attributes names and values
-type DeviceDbAttributes map[string]DeviceAttribute
-
-// Device wrapper
-type DeviceDb struct {
-	//system-generated device ID
-	ID DeviceID `json:"id" bson:"_id,omitempty"`
-
 	//a map of attributes names and their values.
-	Attributes DeviceDbAttributes `json:"attributes" bson:",omitempty"`
+	Attributes DeviceAttributes `json:"attributes" bson:",omitempty"`
 
 	//device's group id
 	Group *GroupID `json:"group" bson:",omitempty"`
@@ -61,4 +47,22 @@ type DeviceDb struct {
 
 func (did DeviceID) String() string {
 	return string(did)
+}
+
+// wrapper for device attributes names and values
+type DeviceAttributes map[string]DeviceAttribute
+
+func (d *DeviceAttributes) UnmarshalJSON(b []byte) error {
+	var attrsArray []DeviceAttribute
+	err := json.Unmarshal(b, &attrsArray)
+	if err != nil {
+		return err
+	}
+	if len(attrsArray) > 0 {
+		*d = DeviceAttributes{}
+		for _, attr := range attrsArray {
+			(*d)[attr.Name] = attr
+		}
+	}
+	return nil
 }
