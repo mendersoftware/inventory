@@ -14,8 +14,9 @@
 package main
 
 import (
-	"time"
 	"encoding/json"
+	"github.com/asaskevich/govalidator"
+	"time"
 )
 
 type DeviceID string
@@ -24,21 +25,21 @@ type DeviceID string
 type GroupID string
 
 type DeviceAttribute struct {
-	Name        string      `json:"name" bson:",omitempty"`
-	Description *string     `json:"description" bson:",omitempty"`
-	Value       interface{} `json:"value" bson:",omitempty"`
+	Name        string      `json:"name" bson:",omitempty"  valid:"length(1|4096),required"`
+	Description *string     `json:"description" bson:",omitempty"  valid:"optional"`
+	Value       interface{} `json:"value" bson:",omitempty"  valid:"length(1|4096),required,deviceAttributeValueValidator"`
 }
 
 // Device wrapper
 type Device struct {
 	//system-generated device ID
-	ID DeviceID `json:"id" bson:"_id,omitempty"`
+	ID DeviceID `json:"id" bson:"_id,omitempty" valid:"length(1|4096),required"`
 
 	//a map of attributes names and their values.
-	Attributes DeviceAttributes `json:"attributes" bson:",omitempty"`
+	Attributes DeviceAttributes `json:"attributes" bson:",omitempty" valid:"optional"`
 
 	//device's group id
-	Group *GroupID `json:"group" bson:",omitempty"`
+	Group *GroupID `json:"group" bson:",omitempty" valid:"optional"`
 
 	CreatedTs time.Time `json:"created_ts" bson:"created_ts,omitempty"`
 	//Timestamp of the last attribute update.
@@ -63,6 +64,52 @@ func (d *DeviceAttributes) UnmarshalJSON(b []byte) error {
 		for _, attr := range attrsArray {
 			(*d)[attr.Name] = attr
 		}
+	}
+	return nil
+}
+
+var deviceAttributeValueValidator = govalidator.CustomTypeValidator(func(i interface{}, context interface{}) bool {
+	switch v := i.(type) {
+	case float64:
+		return true
+	case string:
+		return true
+	case []interface{}:
+		return validateDeviceAttributeValueArray(v)
+	default:
+		return false
+	}
+})
+
+func init() {
+	govalidator.CustomTypeTagMap.Set("deviceAttributeValueValidator", deviceAttributeValueValidator)
+}
+
+// device attributes value array can not have mixed types
+func validateDeviceAttributeValueArray(arr []interface{}) bool {
+	var firstValueString, firstValueFloat64 bool
+	for i, v := range arr {
+		_, isstring := v.(string)
+		_, isfloat64 := v.(float64)
+		if i == 0 {
+			if isstring {
+				firstValueString = true
+			} else if isfloat64 {
+				firstValueFloat64 = true
+			} else {
+				return false
+			}
+		} else if (firstValueString && !isstring) || (firstValueFloat64 && !isfloat64) {
+			return false
+		}
+	}
+	return true
+}
+
+// Validate checkes structure according to valid tags
+func (d *Device) Validate() error {
+	if _, err := govalidator.ValidateStruct(d); err != nil {
+		return err
 	}
 	return nil
 }

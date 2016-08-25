@@ -158,7 +158,7 @@ func TestApiInventoryAddDevice(t *testing.T) {
 			),
 			inventoryErr: "",
 			outCode:      400,
-			outBody:      RestError("'id' field required"),
+			outBody:      RestError("ID: non zero value required;"),
 		},
 		"body formatted ok, incorrect attribute value": {
 			inReq: test.MakeSimpleRequest("POST",
@@ -173,7 +173,7 @@ func TestApiInventoryAddDevice(t *testing.T) {
 			),
 			inventoryErr: "",
 			outCode:      400,
-			outBody:      RestError("invalid attribute value provided"),
+			outBody:      RestError("Value: [asd 123] does not validate as deviceAttributeValueValidator;;;"),
 		},
 		"body formatted ok, attribute name missing": {
 			inReq: test.MakeSimpleRequest("POST",
@@ -187,7 +187,7 @@ func TestApiInventoryAddDevice(t *testing.T) {
 			),
 			inventoryErr: "",
 			outCode:      400,
-			outBody:      RestError("attribute 'name' field required"),
+			outBody:      RestError("Name: non zero value required;;"),
 		},
 		"body formatted ok, inv error": {
 			inReq: test.MakeSimpleRequest("POST",

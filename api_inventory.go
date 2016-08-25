@@ -111,64 +111,11 @@ func parseDevice(r *rest.Request) (*Device, error) {
 		return nil, errors.Wrap(err, "failed to decode request body")
 	}
 
-	//validate id
-	if dev.ID == DeviceID("") {
-		return nil, errors.New("'id' field required")
+	if err := dev.Validate(); err != nil {
+		return nil, err
 	}
 
-	//validate attributes
-	if len(dev.Attributes) > 0 {
-		if err := validateDeviceAttributes(dev.Attributes); err != nil {
-			return nil, err
-		}
-	}
 	return &dev, nil
-}
-
-func validateDeviceAttributes(attributes DeviceAttributes) error {
-	for _, attr := range attributes {
-		if attr.Name == "" {
-			return errors.New("attribute 'name' field required")
-		}
-		if attr.Value == nil {
-			continue
-		}
-		switch attr.Value.(type) {
-		case float64:
-			break
-		case string:
-			break
-		case []interface{}:
-			arr := attr.Value.([]interface{})
-			if !validateDeviceAttributeValueArray(arr) {
-				return errors.New("invalid attribute value provided")
-			}
-		default:
-			return errors.New("invalid attribute value provided")
-		}
-	}
-	return nil
-}
-
-// device attributes value array can not have mixed types
-func validateDeviceAttributeValueArray(arr []interface{}) bool {
-	var firstValueString, firstValueFloat64 bool
-	for i, v := range arr {
-		_, isstring := v.(string)
-		_, isfloat64 := v.(float64)
-		if i == 0 {
-			if isstring {
-				firstValueString = true
-			} else if isfloat64 {
-				firstValueFloat64 = true
-			} else {
-				return false
-			}
-		} else if (firstValueString && !isstring) || (firstValueFloat64 && !isfloat64) {
-			return false
-		}
-	}
-	return true
 }
 
 // return selected http code + error message directly taken from error

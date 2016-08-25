@@ -77,7 +77,7 @@ func TestInventoryAddDeviceErr(t *testing.T) {
 
 func TestNewInventory(t *testing.T) {
 	t.Parallel()
-	
+
 	i := NewInventory(&TestDataStore{})
 
 	assert.NotNil(t, i)
