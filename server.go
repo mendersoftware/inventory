@@ -40,10 +40,18 @@ func RunServer(c config.Reader) error {
 
 	l := log.New(log.Ctx{})
 
+	invapi := NewInventoryApiHandlers(GetInventory)
+
 	api, err := SetupAPI(c.GetString(SettingMiddleware))
 	if err != nil {
 		return errors.Wrap(err, "API setup failed")
 	}
+
+	apph, err := invapi.GetApp()
+	if err != nil {
+		return errors.Wrap(err, "inventory API handlers setup failed")
+	}
+	api.SetApp(apph)
 
 	addr := c.GetString(SettingListen)
 	l.Printf("listening on %s", addr)
