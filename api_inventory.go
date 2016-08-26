@@ -71,22 +71,21 @@ func (i *InventoryHandlers) GetApp() (rest.App, error) {
 func (i *InventoryHandlers) AddDeviceHandler(w rest.ResponseWriter, r *rest.Request) {
 	l := requestlog.GetRequestLogger(r.Env)
 
-	inv, err := i.createInventory(config.Config, l)
-	if err != nil {
-		restErrWithLogInternal(w, l, err)
-		return
-	}
-
 	dev, err := parseDevice(r)
 	if err != nil {
 		restErrWithLog(w, l, err, http.StatusBadRequest)
 		return
 	}
 
+	inv, err := i.createInventory(config.Config, l)
+	if err != nil {
+		restErrWithLogInternal(w, l, err)
+		return
+	}
+
 	err = inv.AddDevice(dev)
 	if err != nil {
-		cause := errors.Cause(err)
-		if cause != nil && cause == ErrDuplicatedDeviceId {
+		if cause := errors.Cause(err); cause != nil && cause == ErrDuplicatedDeviceId {
 			restErrWithLogMsg(w, l, err, http.StatusBadRequest, "device with specified ID already exists")
 			return
 		}
@@ -94,7 +93,6 @@ func (i *InventoryHandlers) AddDeviceHandler(w rest.ResponseWriter, r *rest.Requ
 		return
 	}
 
-	l.F(log.Ctx{LogHttpCode: http.StatusCreated}).Info("ok")
 	devurl := utils.BuildURL(r, uriDevice, map[string]string{
 		":id": dev.ID.String(),
 	})
