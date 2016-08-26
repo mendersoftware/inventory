@@ -81,6 +81,16 @@ before_install:
     # Install cyclomatic dependency analysis tool
     - go get -u github.com/fzipp/gocyclo
 
+    # Install swagger-cli
+    - sudo apt-get -qq update && sudo apt-get -qq install -y npm
+    - sudo npm install -g swagger-cli
+
+    # Install yaml python module
+    - pip install pyyaml
+
+    # Get our own Swagger verifier
+    - wget https://raw.githubusercontent.com/mendersoftware/autodocs/master/verify_docs.py
+
 before_script:
     # Print build info that binary is compiled with.
     - echo $TRAVIS_COMMIT
@@ -100,7 +110,11 @@ before_script:
     # Fail builds when the cyclomatic complexity reaches 15 or more
     - gocyclo -over 15 `find . -iname '*.go' | grep -v 'vendor' | grep -v '_test.go'`
 
+    # Verify that the Swagger docs are valid
+    - swagger validate docs/*.yml
 
+    # Verify that the Swagger docs follow the autodeployment requirements
+    - python2.7 verify_docs.py `find docs -name "*.yml"`
 
 script:
     # go list supply import paths for all sub directories.
@@ -214,7 +228,7 @@ deploy:
         upload-dir: $DEPLOY_REPO/latest/$TRAVIS_BRANCH
         local_dir: docs
         skip_cleanup: true
-        acl: $AWS_S3_ACL
+        acl: public_read
         on:
             repo: $DEPLOY_REPO
             all_branches: true
