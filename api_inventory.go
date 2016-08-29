@@ -87,8 +87,7 @@ func (i *InventoryHandlers) AddDeviceHandler(w rest.ResponseWriter, r *rest.Requ
 	if err != nil {
 		cause := errors.Cause(err)
 		if cause != nil && cause == ErrDuplicatedDeviceId {
-			//http.StatusUnprocessableEntity
-			restErrWithLogMsg(w, l, err, 422, "device with specified ID already exists")
+			restErrWithLogMsg(w, l, err, http.StatusBadRequest, "device with specified ID already exists")
 			return
 		}
 		restErrWithLogInternal(w, l, err)
