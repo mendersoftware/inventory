@@ -106,7 +106,7 @@ func TestApiInventoryAddDevice(t *testing.T) {
 				"http://1.2.3.4/api/0.1.0/devices",
 				nil),
 			inventoryErr: nil,
-			outCode:      400,
+			outCode:      http.StatusBadRequest,
 			outBody:      RestError("failed to decode request body: JSON payload is empty"),
 		},
 		"garbled body": {
@@ -114,7 +114,7 @@ func TestApiInventoryAddDevice(t *testing.T) {
 				"http://1.2.3.4/api/0.1.0/devices",
 				"foo bar"),
 			inventoryErr: nil,
-			outCode:      400,
+			outCode:      http.StatusBadRequest,
 			outBody:      RestError("failed to decode request body: json: cannot unmarshal string into Go value of type main.Device"),
 		},
 		"body formatted ok, all fields present": {
@@ -130,7 +130,7 @@ func TestApiInventoryAddDevice(t *testing.T) {
 				},
 			),
 			inventoryErr: nil,
-			outCode:      201,
+			outCode:      http.StatusCreated,
 			outBody:      "",
 		},
 		"body formatted ok, wrong attributes type": {
@@ -142,7 +142,7 @@ func TestApiInventoryAddDevice(t *testing.T) {
 				},
 			),
 			inventoryErr: nil,
-			outCode:      400,
+			outCode:      http.StatusBadRequest,
 			outBody:      RestError("failed to decode request body: json: cannot unmarshal number into Go value of type []main.DeviceAttribute"),
 		},
 		"body formatted ok, 'id' missing": {
@@ -151,7 +151,7 @@ func TestApiInventoryAddDevice(t *testing.T) {
 				map[string]interface{}{},
 			),
 			inventoryErr: nil,
-			outCode:      400,
+			outCode:      http.StatusBadRequest,
 			outBody:      RestError("ID: non zero value required;"),
 		},
 		"body formatted ok, incorrect attribute value": {
@@ -166,7 +166,7 @@ func TestApiInventoryAddDevice(t *testing.T) {
 				},
 			),
 			inventoryErr: nil,
-			outCode:      400,
+			outCode:      http.StatusBadRequest,
 			outBody:      RestError("Value: [asd 123] does not validate as deviceAttributeValueValidator;;;"),
 		},
 		"body formatted ok, attribute name missing": {
@@ -180,7 +180,7 @@ func TestApiInventoryAddDevice(t *testing.T) {
 				},
 			),
 			inventoryErr: nil,
-			outCode:      400,
+			outCode:      http.StatusBadRequest,
 			outBody:      RestError("Name: non zero value required;;"),
 		},
 		"body formatted ok, inv error": {
@@ -197,7 +197,7 @@ func TestApiInventoryAddDevice(t *testing.T) {
 				},
 			),
 			inventoryErr: errors.New("internal error"),
-			outCode:      500,
+			outCode:      http.StatusInternalServerError,
 			outBody:      RestError("internal error"),
 		},
 	}
