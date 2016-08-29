@@ -90,6 +90,7 @@ func makeJson(t *testing.T, d interface{}) string {
 }
 
 func TestApiInventoryAddDevice(t *testing.T) {
+	t.Parallel()
 	rest.ErrorFieldName = "error"
 
 	testCases := map[string]struct {
