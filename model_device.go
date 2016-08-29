@@ -26,7 +26,7 @@ type GroupID string
 
 type DeviceAttribute struct {
 	Name        string      `json:"name" bson:",omitempty"  valid:"length(1|4096),required"`
-	Description *string     `json:"description" bson:",omitempty"  valid:"optional"`
+	Description *string     `json:"description,omitempty" bson:",omitempty"  valid:"optional"`
 	Value       interface{} `json:"value" bson:",omitempty"  valid:"length(1|4096),required,deviceAttributeValueValidator"`
 }
 
@@ -39,7 +39,7 @@ type Device struct {
 	Attributes DeviceAttributes `json:"attributes" bson:",omitempty" valid:"optional"`
 
 	//device's group id
-	Group *GroupID `json:"group" bson:",omitempty" valid:"optional"`
+	Group *GroupID `json:"-" bson:",omitempty" valid:"optional"`
 
 	CreatedTs time.Time `json:"created_ts" bson:"created_ts,omitempty"`
 	//Timestamp of the last attribute update.
