@@ -16,32 +16,9 @@ package main
 import (
 	"errors"
 	"github.com/stretchr/testify/assert"
+	. "github.com/stretchr/testify/mock"
 	"testing"
 )
-
-//mock db with interface methods as fields
-//allows monkey patching the methods without
-//redefining the struct for each case
-type TestDataStore struct {
-	MockAddDevice func(dev *Device) error
-	MockGetDevice func(id DeviceID) (*Device, error)
-}
-
-func (ds *TestDataStore) AddDevice(dev *Device) error {
-	return ds.MockAddDevice(dev)
-}
-
-func (ds *TestDataStore) GetDevice(id DeviceID) (*Device, error) {
-	return ds.MockGetDevice(id)
-}
-
-func addDevice(dev *Device) error {
-	return nil
-}
-
-func addDeviceErr(dev *Device) error {
-	return errors.New("db connection failed")
-}
 
 func invForTest(d DataStore) InventoryApp {
 	return &Inventory{db: d}
@@ -50,9 +27,9 @@ func invForTest(d DataStore) InventoryApp {
 func TestInventoryAddDevice(t *testing.T) {
 	t.Parallel()
 
-	db := &TestDataStore{
-		MockAddDevice: addDevice,
-	}
+	db := &MockDataStore{}
+	db.On("AddDevice", AnythingOfType("*main.Device")).
+		Return(nil)
 	i := invForTest(db)
 
 	err := i.AddDevice(&Device{})
@@ -63,9 +40,9 @@ func TestInventoryAddDevice(t *testing.T) {
 func TestInventoryAddDeviceErr(t *testing.T) {
 	t.Parallel()
 
-	db := &TestDataStore{
-		MockAddDevice: addDeviceErr,
-	}
+	db := &MockDataStore{}
+	db.On("AddDevice", AnythingOfType("*main.Device")).
+		Return(errors.New("db connection failed"))
 	i := invForTest(db)
 
 	err := i.AddDevice(&Device{})
@@ -78,7 +55,7 @@ func TestInventoryAddDeviceErr(t *testing.T) {
 func TestNewInventory(t *testing.T) {
 	t.Parallel()
 
-	i := NewInventory(&TestDataStore{})
+	i := NewInventory(&MockDataStore{})
 
 	assert.NotNil(t, i)
 }

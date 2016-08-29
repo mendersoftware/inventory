@@ -23,17 +23,10 @@ import (
 	"github.com/mendersoftware/inventory/requestid"
 	"github.com/mendersoftware/inventory/requestlog"
 	"github.com/stretchr/testify/assert"
+	. "github.com/stretchr/testify/mock"
 	"net/http"
 	"testing"
 )
-
-type MockInventory struct {
-	mockAddDevice func(d *Device) error
-}
-
-func (mi *MockInventory) AddDevice(dev *Device) error {
-	return mi.mockAddDevice(dev)
-}
 
 func ToJson(data interface{}) string {
 	j, _ := json.Marshal(data)
@@ -102,7 +95,7 @@ func TestApiInventoryAddDevice(t *testing.T) {
 	testCases := map[string]struct {
 		inReq *http.Request
 
-		inventoryErr string
+		inventoryErr error
 
 		outCode int
 		outBody string
@@ -111,7 +104,7 @@ func TestApiInventoryAddDevice(t *testing.T) {
 			inReq: test.MakeSimpleRequest("POST",
 				"http://1.2.3.4/api/0.1.0/devices",
 				nil),
-			inventoryErr: "",
+			inventoryErr: nil,
 			outCode:      400,
 			outBody:      RestError("failed to decode request body: JSON payload is empty"),
 		},
@@ -119,7 +112,7 @@ func TestApiInventoryAddDevice(t *testing.T) {
 			inReq: test.MakeSimpleRequest("POST",
 				"http://1.2.3.4/api/0.1.0/devices",
 				"foo bar"),
-			inventoryErr: "",
+			inventoryErr: nil,
 			outCode:      400,
 			outBody:      RestError("failed to decode request body: json: cannot unmarshal string into Go value of type main.Device"),
 		},
@@ -135,7 +128,7 @@ func TestApiInventoryAddDevice(t *testing.T) {
 					},
 				},
 			),
-			inventoryErr: "",
+			inventoryErr: nil,
 			outCode:      201,
 			outBody:      "",
 		},
@@ -147,7 +140,7 @@ func TestApiInventoryAddDevice(t *testing.T) {
 					"attributes": 123,
 				},
 			),
-			inventoryErr: "",
+			inventoryErr: nil,
 			outCode:      400,
 			outBody:      RestError("failed to decode request body: json: cannot unmarshal number into Go value of type []main.DeviceAttribute"),
 		},
@@ -156,7 +149,7 @@ func TestApiInventoryAddDevice(t *testing.T) {
 				"http://1.2.3.4/api/0.1.0/devices",
 				map[string]interface{}{},
 			),
-			inventoryErr: "",
+			inventoryErr: nil,
 			outCode:      400,
 			outBody:      RestError("ID: non zero value required;"),
 		},
@@ -171,7 +164,7 @@ func TestApiInventoryAddDevice(t *testing.T) {
 					},
 				},
 			),
-			inventoryErr: "",
+			inventoryErr: nil,
 			outCode:      400,
 			outBody:      RestError("Value: [asd 123] does not validate as deviceAttributeValueValidator;;;"),
 		},
@@ -185,7 +178,7 @@ func TestApiInventoryAddDevice(t *testing.T) {
 					},
 				},
 			),
-			inventoryErr: "",
+			inventoryErr: nil,
 			outCode:      400,
 			outBody:      RestError("Name: non zero value required;;"),
 		},
@@ -202,7 +195,7 @@ func TestApiInventoryAddDevice(t *testing.T) {
 					},
 				},
 			),
-			inventoryErr: "internal error",
+			inventoryErr: errors.New("internal error"),
 			outCode:      500,
 			outBody:      RestError("internal error"),
 		},
@@ -210,14 +203,8 @@ func TestApiInventoryAddDevice(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Logf("test case: %s", name)
-		inv := MockInventory{
-			mockAddDevice: func(d *Device) error {
-				if tc.inventoryErr != "" {
-					return errors.New(tc.inventoryErr)
-				}
-				return nil
-			},
-		}
+		inv := MockInventoryApp{}
+		inv.On("AddDevice", AnythingOfType("*main.Device")).Return(tc.inventoryErr)
 
 		factory := func(c config.Reader, l *log.Logger) (InventoryApp, error) {
 			return &inv, nil

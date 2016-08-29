@@ -40,7 +40,6 @@ func GetInventory(c config.Reader, l *log.Logger) (InventoryApp, error) {
 	}
 
 	inv := NewInventory(d)
-	// TODO inv .UserLog(l)
 	return inv, nil
 }
 
