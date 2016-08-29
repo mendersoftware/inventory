@@ -7,7 +7,7 @@ listen: :8080
     # Format: [mongodb://][user:pass@]host1[:port1][,host2[:port2],...][?options]
     # Format doc: https://docs.mongodb.com/manual/reference/connection-string/
     #
-    # Defaults to: "mongo-deployments"
+    # Defaults to: "mongo-inventory"
 mongo: mongo-inventory:27017
 
     # HTTP Server middleware environment
