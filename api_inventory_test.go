@@ -98,8 +98,9 @@ func TestApiInventoryAddDevice(t *testing.T) {
 
 		inventoryErr error
 
-		outCode int
-		outBody string
+		outCode        int
+		outBody        string
+		outLocationHdr string
 	}{
 		"empty body": {
 			inReq: test.MakeSimpleRequest("POST",
@@ -129,9 +130,10 @@ func TestApiInventoryAddDevice(t *testing.T) {
 					},
 				},
 			),
-			inventoryErr: nil,
-			outCode:      http.StatusCreated,
-			outBody:      "",
+			inventoryErr:   nil,
+			outCode:        http.StatusCreated,
+			outBody:        "",
+			outLocationHdr: "http://1.2.3.4/api/0.1.0/devices/id-0001",
 		},
 		"body formatted ok, wrong attributes type": {
 			inReq: test.MakeSimpleRequest("POST",
@@ -215,5 +217,6 @@ func TestApiInventoryAddDevice(t *testing.T) {
 		recorded := test.RunRequest(t, apih, tc.inReq)
 		recorded.CodeIs(tc.outCode)
 		recorded.BodyIs(tc.outBody)
+		assert.Equal(t, tc.outLocationHdr, ExtractHeader("Location", tc.outLocationHdr, recorded))
 	}
 }
