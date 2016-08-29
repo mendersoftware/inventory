@@ -69,6 +69,43 @@ func TestInventoryAddDevice(t *testing.T) {
 	}
 }
 
+func TestInventoryUpsertAttributes(t *testing.T) {
+	t.Parallel()
+
+	testCases := map[string]struct {
+		datastoreError error
+		outError       error
+	}{
+		"datastore success": {
+			datastoreError: nil,
+			outError:       nil,
+		},
+		"datastore error": {
+			datastoreError: errors.New("db connection failed"),
+			outError:       errors.New("failed to upsert attributes in db: db connection failed"),
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Logf("test case: %s", name)
+
+		db := &MockDataStore{}
+		db.On("UpsertAttributes", AnythingOfType("main.DeviceID"), AnythingOfType("main.DeviceAttributes")).
+			Return(tc.datastoreError)
+		i := invForTest(db)
+
+		err := i.UpsertAttributes("devid", DeviceAttributes{})
+
+		if tc.outError != nil {
+			if assert.Error(t, err) {
+				assert.EqualError(t, err, tc.outError.Error())
+			}
+		} else {
+			assert.NoError(t, err)
+		}
+	}
+}
+
 func TestNewInventory(t *testing.T) {
 	t.Parallel()
 
