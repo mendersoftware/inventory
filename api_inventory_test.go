@@ -22,6 +22,7 @@ import (
 	"github.com/mendersoftware/inventory/log"
 	"github.com/mendersoftware/inventory/requestid"
 	"github.com/mendersoftware/inventory/requestlog"
+	"github.com/mendersoftware/inventory/utils"
 	"github.com/stretchr/testify/assert"
 	. "github.com/stretchr/testify/mock"
 	"net/http"
@@ -57,9 +58,8 @@ func ExtractHeader(hdr, val string, r *test.Recorded) string {
 	return ""
 }
 
-func RestError(status string) string {
-	msg, _ := json.Marshal(map[string]string{"error": status})
-	return string(msg)
+func RestError(status string) map[string]interface{} {
+	return map[string]interface{}{"error": status}
 }
 
 func makeMockApiHandler(t *testing.T, f InventoryFactory) http.Handler {
@@ -94,29 +94,31 @@ func TestApiInventoryAddDevice(t *testing.T) {
 	rest.ErrorFieldName = "error"
 
 	testCases := map[string]struct {
+		utils.JSONResponseParams
+
 		inReq *http.Request
 
 		inventoryErr error
-
-		outCode        int
-		outBody        string
-		outLocationHdr string
 	}{
 		"empty body": {
 			inReq: test.MakeSimpleRequest("POST",
 				"http://1.2.3.4/api/0.1.0/devices",
 				nil),
 			inventoryErr: nil,
-			outCode:      http.StatusBadRequest,
-			outBody:      RestError("failed to decode request body: JSON payload is empty"),
+			JSONResponseParams: utils.JSONResponseParams{
+				OutputStatus:     http.StatusBadRequest,
+				OutputBodyObject: RestError("failed to decode request body: JSON payload is empty"),
+			},
 		},
 		"garbled body": {
 			inReq: test.MakeSimpleRequest("POST",
 				"http://1.2.3.4/api/0.1.0/devices",
 				"foo bar"),
 			inventoryErr: nil,
-			outCode:      http.StatusBadRequest,
-			outBody:      RestError("failed to decode request body: json: cannot unmarshal string into Go value of type main.Device"),
+			JSONResponseParams: utils.JSONResponseParams{
+				OutputStatus:     http.StatusBadRequest,
+				OutputBodyObject: RestError("failed to decode request body: json: cannot unmarshal string into Go value of type main.Device"),
+			},
 		},
 		"body formatted ok, all fields present": {
 			inReq: test.MakeSimpleRequest("POST",
@@ -130,10 +132,12 @@ func TestApiInventoryAddDevice(t *testing.T) {
 					},
 				},
 			),
-			inventoryErr:   nil,
-			outCode:        http.StatusCreated,
-			outBody:        "",
-			outLocationHdr: "http://1.2.3.4/api/0.1.0/devices/id-0001",
+			inventoryErr: nil,
+			JSONResponseParams: utils.JSONResponseParams{
+				OutputStatus:     http.StatusCreated,
+				OutputBodyObject: nil,
+				OutputHeaders:    map[string]string{"Location": "http://1.2.3.4/api/0.1.0/devices/id-0001"},
+			},
 		},
 		"body formatted ok, wrong attributes type": {
 			inReq: test.MakeSimpleRequest("POST",
@@ -144,8 +148,10 @@ func TestApiInventoryAddDevice(t *testing.T) {
 				},
 			),
 			inventoryErr: nil,
-			outCode:      http.StatusBadRequest,
-			outBody:      RestError("failed to decode request body: json: cannot unmarshal number into Go value of type []main.DeviceAttribute"),
+			JSONResponseParams: utils.JSONResponseParams{
+				OutputStatus:     http.StatusBadRequest,
+				OutputBodyObject: RestError("failed to decode request body: json: cannot unmarshal number into Go value of type []main.DeviceAttribute"),
+			},
 		},
 		"body formatted ok, 'id' missing": {
 			inReq: test.MakeSimpleRequest("POST",
@@ -153,8 +159,10 @@ func TestApiInventoryAddDevice(t *testing.T) {
 				map[string]interface{}{},
 			),
 			inventoryErr: nil,
-			outCode:      http.StatusBadRequest,
-			outBody:      RestError("ID: non zero value required;"),
+			JSONResponseParams: utils.JSONResponseParams{
+				OutputStatus:     http.StatusBadRequest,
+				OutputBodyObject: RestError("ID: non zero value required;"),
+			},
 		},
 		"body formatted ok, incorrect attribute value": {
 			inReq: test.MakeSimpleRequest("POST",
@@ -168,8 +176,10 @@ func TestApiInventoryAddDevice(t *testing.T) {
 				},
 			),
 			inventoryErr: nil,
-			outCode:      http.StatusBadRequest,
-			outBody:      RestError("Value: [asd 123] does not validate as deviceAttributeValueValidator;;;"),
+			JSONResponseParams: utils.JSONResponseParams{
+				OutputStatus:     http.StatusBadRequest,
+				OutputBodyObject: RestError("Value: [asd 123] does not validate as deviceAttributeValueValidator;;;"),
+			},
 		},
 		"body formatted ok, attribute name missing": {
 			inReq: test.MakeSimpleRequest("POST",
@@ -182,8 +192,10 @@ func TestApiInventoryAddDevice(t *testing.T) {
 				},
 			),
 			inventoryErr: nil,
-			outCode:      http.StatusBadRequest,
-			outBody:      RestError("Name: non zero value required;;"),
+			JSONResponseParams: utils.JSONResponseParams{
+				OutputStatus:     http.StatusBadRequest,
+				OutputBodyObject: RestError("Name: non zero value required;;"),
+			},
 		},
 		"body formatted ok, inv error": {
 			inReq: test.MakeSimpleRequest("POST",
@@ -199,8 +211,10 @@ func TestApiInventoryAddDevice(t *testing.T) {
 				},
 			),
 			inventoryErr: errors.New("internal error"),
-			outCode:      http.StatusInternalServerError,
-			outBody:      RestError("internal error"),
+			JSONResponseParams: utils.JSONResponseParams{
+				OutputStatus:     http.StatusInternalServerError,
+				OutputBodyObject: RestError("internal error"),
+			},
 		},
 	}
 
@@ -215,8 +229,6 @@ func TestApiInventoryAddDevice(t *testing.T) {
 		apih := makeMockApiHandler(t, factory)
 
 		recorded := test.RunRequest(t, apih, tc.inReq)
-		recorded.CodeIs(tc.outCode)
-		recorded.BodyIs(tc.outBody)
-		assert.Equal(t, tc.outLocationHdr, ExtractHeader("Location", tc.outLocationHdr, recorded))
+		utils.CheckRecordedResponse(t, recorded, tc.JSONResponseParams)
 	}
 }
