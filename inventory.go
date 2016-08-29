@@ -44,6 +44,9 @@ func GetInventory(c config.Reader, l *log.Logger) (InventoryApp, error) {
 }
 
 func (i *Inventory) AddDevice(dev *Device) error {
+	if dev == nil {
+		return errors.New("no device given")
+	}
 	now := time.Now()
 	dev.CreatedTs = now
 	dev.UpdatedTs = now

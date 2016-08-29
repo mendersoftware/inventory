@@ -27,28 +27,45 @@ func invForTest(d DataStore) InventoryApp {
 func TestInventoryAddDevice(t *testing.T) {
 	t.Parallel()
 
-	db := &MockDataStore{}
-	db.On("AddDevice", AnythingOfType("*main.Device")).
-		Return(nil)
-	i := invForTest(db)
+	testCases := map[string]struct {
+		inDevice       *Device
+		datastoreError error
+		outError       error
+	}{
+		"nil device": {
+			inDevice:       nil,
+			datastoreError: nil,
+			outError:       errors.New("no device given"),
+		},
+		"datastore success": {
+			inDevice:       &Device{},
+			datastoreError: nil,
+			outError:       nil,
+		},
+		"datastore error": {
+			inDevice:       &Device{},
+			datastoreError: errors.New("db connection failed"),
+			outError:       errors.New("failed to add device: db connection failed"),
+		},
+	}
 
-	err := i.AddDevice(&Device{})
+	for name, tc := range testCases {
+		t.Logf("test case: %s", name)
 
-	assert.NoError(t, err)
-}
+		db := &MockDataStore{}
+		db.On("AddDevice", AnythingOfType("*main.Device")).
+			Return(tc.datastoreError)
+		i := invForTest(db)
 
-func TestInventoryAddDeviceErr(t *testing.T) {
-	t.Parallel()
+		err := i.AddDevice(tc.inDevice)
 
-	db := &MockDataStore{}
-	db.On("AddDevice", AnythingOfType("*main.Device")).
-		Return(errors.New("db connection failed"))
-	i := invForTest(db)
-
-	err := i.AddDevice(&Device{})
-
-	if assert.Error(t, err) {
-		assert.EqualError(t, err, "failed to add device: db connection failed")
+		if tc.outError != nil {
+			if assert.Error(t, err) {
+				assert.EqualError(t, err, tc.outError.Error())
+			}
+		} else {
+			assert.NoError(t, err)
+		}
 	}
 }
 
