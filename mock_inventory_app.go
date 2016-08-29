@@ -33,3 +33,17 @@ func (_m *MockInventoryApp) AddDevice(d *Device) error {
 
 	return r0
 }
+
+// UpsertAttributes provides a mock function with given fields: id, attrs
+func (_m *MockInventoryApp) UpsertAttributes(id DeviceID, attrs DeviceAttributes) error {
+	ret := _m.Called(id, attrs)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(DeviceID, DeviceAttributes) error); ok {
+		r0 = rf(id, attrs)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
