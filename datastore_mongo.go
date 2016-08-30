@@ -23,6 +23,7 @@ import (
 const (
 	DbName        = "inventory"
 	DbDevicesColl = "devices"
+	DbGroupsColl  = "groups"
 )
 
 var (
@@ -88,6 +89,18 @@ func (db *DataStoreMongo) AddDevice(dev *Device) error {
 			return ErrDuplicatedDeviceId
 		}
 		return errors.Wrap(err, "failed to store device")
+	}
+	return nil
+}
+
+func (db *DataStoreMongo) AddGroup(group *Group) error {
+	s := db.session.Copy()
+	defer s.Close()
+	c := s.DB(DbName).C(DbGroupsColl)
+
+	err := c.Insert(group)
+	if err != nil {
+		return errors.Wrap(err, "failed to store group")
 	}
 	return nil
 }

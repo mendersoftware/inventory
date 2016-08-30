@@ -11,31 +11,19 @@
 //    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
-
 package main
 
-import (
-	"errors"
-)
+type GroupID string
 
-var (
-	ErrDuplicatedDeviceId = errors.New("Duplicated device id")
-	// device not found
-	ErrDevNotFound   = errors.New("not found")
-	ErrGroupNotFound = errors.New("not found")
-)
+// Group wrapper
+type Group struct {
+	//system-generated group ID
+	ID          GroupID  `json:"id" bson:"_id,omitempty"`
+	Name        string   `json:"name" bson:"name,omitempty"`
+	Description string   `json:"description" bson:"description,omitempty"`
+	DeviceIDs   []string `json:"device_ids" bson:"device_ids,omitempty"`
+}
 
-type DataStore interface {
-	// find a device with given `id`, returns the device or nil,
-	// if device was not found, error is set to ErrDevNotFound
-	GetDevice(id DeviceID) (*Device, error)
-
-	// insert device into data store
-	//
-	// ds.AddDevice(&Device{
-	// 	ID: "foo",
-	// 	Attributes: map[string]string{"token": "123"),
-	// })
-	AddDevice(dev *Device) error
-	AddGroup(group *Group) error
+func (gid GroupID) String() string {
+	return string(gid)
 }

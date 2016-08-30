@@ -56,3 +56,17 @@ func (_m *MockDataStore) GetDevice(id DeviceID) (*Device, error) {
 
 	return r0, r1
 }
+
+// AddGroup provides a mock function with given fields: group
+func (_m *MockDataStore) AddGroup(group *Group) error {
+	ret := _m.Called(group)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(*Group) error); ok {
+		r0 = rf(group)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
