@@ -171,6 +171,63 @@ func TestMongoAddDevice(t *testing.T) {
 	}
 }
 
+func TestMongoAddGroup(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping TestMongoAddGroup in short mode.")
+	}
+
+	description := "Some description"
+
+	testCases := map[string]struct {
+		InputGroup  *Group
+		OutputError error
+	}{
+		"no group given": {
+			InputGroup:  nil,
+			OutputError: errors.New("failed to store group: error parsing element 0 of field documents :: caused by :: wrong type for '0' field, expected object, found 0: null"),
+		},
+		"valid group , no error": {
+			InputGroup: &Group{
+				Name:        "Group name",
+				Description: &description,
+				DeviceIDs:   []DeviceID{"1", "2"},
+			},
+			OutputError: nil,
+		},
+	}
+
+	for name, testCase := range testCases {
+		t.Logf("test case: %s", name)
+
+		// Make sure we start test with empty database
+		db.Wipe()
+
+		session := db.Session()
+		store := NewDataStoreMongoWithSession(session)
+
+		err := store.AddGroup(testCase.InputGroup)
+
+		if testCase.OutputError != nil {
+			assert.EqualError(t, err, testCase.OutputError.Error())
+		} else {
+			assert.NoError(t, err, "expected no error inserting to data store")
+
+			var dbgroup *Group
+			groupsColl := session.DB(DbName).C(DbGroupsColl)
+			err := groupsColl.Find(nil).One(&dbgroup)
+
+			assert.NoError(t, err, "expected no error")
+
+			assert.NotNil(t, dbgroup, "expected to group with name: %s to be found", testCase.InputGroup.Name)
+
+			assert.Equal(t, testCase.InputGroup.Name, dbgroup.Name)
+		}
+
+		// Need to close all sessions to be able to call wipe at next test case
+		session.Close()
+	}
+}
+
 func TestNewDataStoreMongo(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping TestNewDataStoreMongo in short mode.")
