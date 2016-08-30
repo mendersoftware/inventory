@@ -27,6 +27,8 @@ const (
 	uriDevices     = "/api/0.1.0/devices"
 	uriDevice      = "/api/0.1.0/devices/:id"
 	uriDeviceGroup = "/api/0.1.0/devices/:id/group"
+	uriGroups      = "/api/0.1.0/groups"
+	uriGroup       = "/api/0.1.0/groups/:id"
 
 	LogHttpCode = "http_code"
 )
@@ -52,6 +54,7 @@ func NewInventoryApiHandlers(invF InventoryFactory) ApiHandler {
 func (i *InventoryHandlers) GetApp() (rest.App, error) {
 	routes := []*rest.Route{
 		rest.Post(uriDevices, i.AddDeviceHandler),
+		rest.Post(uriGroups, i.AddGroupHandler),
 	}
 
 	routes = append(routes)
@@ -116,10 +119,16 @@ func parseDevice(r *rest.Request) (*Device, error) {
 	return &dev, nil
 }
 
-// return selected http code + error message directly taken from error
-// log error
-func restErrWithLog(w rest.ResponseWriter, l *log.Logger, e error, code int) {
-	restErrWithLogMsg(w, l, e, code, e.Error())
+func parseGroup(r *rest.Request) (*Group, error) {
+	group := Group{}
+
+	//decode body
+	err := r.DecodeJsonPayload(&group)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to decode request body")
+	}
+
+	return &group, nil
 }
 
 // return http 500, with an "internal error" message
@@ -135,4 +144,48 @@ func restErrWithLogInternal(w rest.ResponseWriter, l *log.Logger, e error) {
 func restErrWithLogMsg(w rest.ResponseWriter, l *log.Logger, e error, code int, msg string) {
 	rest.Error(w, msg, code)
 	l.F(log.Ctx{LogHttpCode: code}).Error(errors.Wrap(e, msg).Error())
+}
+
+func (i *InventoryHandlers) AddGroupHandler(w rest.ResponseWriter, r *rest.Request) {
+	l := requestlog.GetRequestLogger(r.Env)
+
+	inv, err := i.createInventory(config.Config, l)
+	if err != nil {
+		msg := "internal error"
+		err = errors.Wrap(err, msg)
+		rest.Error(w,
+			msg,
+			http.StatusInternalServerError)
+		l.F(log.Ctx{LogHttpCode: http.StatusInternalServerError}).
+			Error(err.Error())
+		return
+	}
+
+	group, err := parseGroup(r)
+	if err != nil {
+		restErrWithLog(w, l, err, http.StatusBadRequest)
+		return
+	}
+
+	id, err := inv.AddGroup(group)
+	if err != nil {
+		msg := "internal error"
+		err = errors.Wrap(err, msg)
+		rest.Error(w,
+			msg,
+			http.StatusInternalServerError)
+		l.F(log.Ctx{LogHttpCode: http.StatusInternalServerError}).
+			Error(err.Error())
+		return
+	}
+
+	l.F(log.Ctx{LogHttpCode: http.StatusCreated}).Info("ok")
+	groupUrl := utils.BuildURL(r, uriGroup, map[string]string{":id": id.String()})
+	w.Header().Add("Location", groupUrl.String())
+	w.WriteHeader(http.StatusCreated)
+}
+
+func restErrWithLog(w rest.ResponseWriter, l *log.Logger, e error, code int) {
+	rest.Error(w, e.Error(), code)
+	l.F(log.Ctx{LogHttpCode: code}).Error(e.Error())
 }
