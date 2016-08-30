@@ -69,6 +69,51 @@ func TestInventoryAddDevice(t *testing.T) {
 	}
 }
 
+func TestInventoryAddGroup(t *testing.T) {
+	t.Parallel()
+
+	testCases := map[string]struct {
+		inGroup        *Group
+		datastoreError error
+		outError       error
+	}{
+		"nil group": {
+			inGroup:        nil,
+			datastoreError: nil,
+			outError:       errors.New("no group given"),
+		},
+		"datastore success": {
+			inGroup:        &Group{},
+			datastoreError: nil,
+			outError:       nil,
+		},
+		"datastore error": {
+			inGroup:        &Group{},
+			datastoreError: errors.New("db connection failed"),
+			outError:       errors.New("failed to add group: db connection failed"),
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Logf("test case: %s", name)
+
+		db := &MockDataStore{}
+		db.On("AddGroup", AnythingOfType("*main.Group")).
+			Return(tc.datastoreError)
+		i := invForTest(db)
+
+		_, err := i.AddGroup(tc.inGroup)
+
+		if tc.outError != nil {
+			if assert.Error(t, err) {
+				assert.EqualError(t, err, tc.outError.Error())
+			}
+		} else {
+			assert.NoError(t, err)
+		}
+	}
+}
+
 func TestNewInventory(t *testing.T) {
 	t.Parallel()
 
