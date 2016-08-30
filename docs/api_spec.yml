@@ -274,14 +274,11 @@ paths:
 
         The method accepts a set of device IDs that will make up the group.
       parameters:
-        - name: device_ids
+        - name: group
           in: body
-          description: List of device IDs.
           required: true
           schema:
-            type: array
-            items:
-              type: string
+            $ref: "#/definitions/GroupNew"
       responses:
         201:
           description: Group created succesfully.
@@ -550,6 +547,23 @@ definitions:
       description:
         type: string
         description: User's description of the group.
+  GroupNew:
+      type: object
+      required:
+          - name
+          - device_ids
+      properties:
+        name:
+          description: Human readable group name.
+          type: string
+        description:
+          description: Group description.
+          type: string
+        device_ids:
+          description: List of device IDs.
+          type: array
+          items:
+            type: string
   Error:
     description: Error descriptor
     type: object
