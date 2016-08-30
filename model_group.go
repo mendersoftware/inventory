@@ -13,17 +13,35 @@
 //    limitations under the License.
 package main
 
+import (
+	"github.com/asaskevich/govalidator"
+)
+
 type GroupID string
 
 // Group wrapper
 type Group struct {
 	//system-generated group ID
-	ID          GroupID  `json:"id" bson:"_id,omitempty"`
-	Name        string   `json:"name" bson:"name,omitempty"`
-	Description string   `json:"description" bson:"description,omitempty"`
-	DeviceIDs   []string `json:"device_ids" bson:"device_ids,omitempty"`
+	ID GroupID `json:"id" bson:"_id,omitempty"`
+
+	// Group name assigned by the user
+	Name string `json:"name" bson:"name,omitempty" valid:"required"`
+
+	// Optional group description provided by the user
+	Description *string `json:"description,omitempty" bson:"description,omitempty" valid:"optional"`
+
+	// List of device IDs
+	DeviceIDs []DeviceID `json:"device_ids" bson:"device_ids,omitempty" valid:"required"`
 }
 
 func (gid GroupID) String() string {
 	return string(gid)
+}
+
+// Validate checkes structure according to valid tags
+func (g *Group) Validate() error {
+	if _, err := govalidator.ValidateStruct(g); err != nil {
+		return err
+	}
+	return nil
 }

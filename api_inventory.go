@@ -128,6 +128,10 @@ func parseGroup(r *rest.Request) (*Group, error) {
 		return nil, errors.Wrap(err, "failed to decode request body")
 	}
 
+	if err := group.Validate(); err != nil {
+		return nil, err
+	}
+
 	return &group, nil
 }
 
