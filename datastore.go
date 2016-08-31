@@ -20,6 +20,8 @@ import (
 
 var (
 	ErrDuplicatedDeviceId = errors.New("Duplicated device id")
+	// device not found
+	ErrDevNotFound = errors.New("not found")
 )
 
 type DataStore interface {
@@ -40,4 +42,7 @@ type DataStore interface {
 	// Updates the device attributes in a differential manner.
 	// Nonexistent attributes are created, existing are overwritten; the device resource is also created if necessary.
 	UpsertAttributes(id DeviceID, attrs DeviceAttributes) error
+
+	// Unset group in device with `id`
+	UnsetDeviceGroup(id DeviceID, groupName GroupName) error
 }

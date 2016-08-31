@@ -191,3 +191,31 @@ func mongoOperator(co ComparisonOperator) string {
 	}
 	return ""
 }
+
+func (db *DataStoreMongo) UnsetDeviceGroup(id DeviceID, groupName GroupName) error {
+	s := db.session.Copy()
+	defer s.Close()
+
+	query := bson.M{
+		"_id":   id,
+		"group": groupName,
+	}
+	update := mgo.Change{
+		Update: bson.M{
+			"$unset": bson.M{
+				"group": 1,
+			},
+		},
+	}
+	if _, err := s.DB(DbName).C(DbDevicesColl).Find(query).Apply(update, nil); err != nil {
+		if err.Error() == mgo.ErrNotFound.Error() {
+			if devCount, findIdErr := s.DB(DbName).C(DbDevicesColl).FindId(id).Count(); devCount == 0 {
+				return ErrDevNotFound
+			} else if findIdErr == nil {
+				return ErrDevNotInGivenGroup
+			}
+		}
+		return err
+	}
+	return nil
+}

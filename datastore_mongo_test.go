@@ -17,6 +17,7 @@ import (
 	"errors"
 	. "github.com/mendersoftware/inventory"
 	"github.com/stretchr/testify/assert"
+	"gopkg.in/mgo.v2/bson"
 	"reflect"
 	"testing"
 )
@@ -674,4 +675,73 @@ func compare(a, b DeviceAttributes) bool {
 	}
 
 	return true
+}
+
+func TestMongoUnsetDevicesGroupWithGroupName(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping TestMongoUnsetDevicesGroupWithGroupName in short mode.")
+	}
+
+	testCases := map[string]struct {
+		InputDeviceID  DeviceID
+		InputGroupName GroupName
+		InputDevice    *Device
+		OutputError    error
+	}{
+		"unset group for device with group id, device not found": {
+			InputDeviceID:  DeviceID("1"),
+			InputGroupName: GroupName("e16c71ec"),
+			InputDevice:    nil,
+			OutputError:    ErrDevNotFound,
+		},
+		"unset group for device, ok": {
+			InputDeviceID:  DeviceID("1"),
+			InputGroupName: GroupName("e16c71ec"),
+			InputDevice: &Device{
+				ID:    DeviceID("1"),
+				Group: GroupName("e16c71ec"),
+			},
+		},
+		"unset group for device with incorrect group name provided": {
+			InputDeviceID:  DeviceID("1"),
+			InputGroupName: GroupName("other-group-name"),
+			InputDevice: &Device{
+				ID:    DeviceID("1"),
+				Group: GroupName("e16c71ec"),
+			},
+			OutputError: ErrDevNotInGivenGroup,
+		},
+	}
+
+	for name, testCase := range testCases {
+		t.Logf("test case: %s", name)
+
+		// Make sure we start test with empty database
+		db.Wipe()
+
+		session := db.Session()
+		store := NewDataStoreMongoWithSession(session)
+
+		if testCase.InputDevice != nil {
+			session.DB(DbName).C(DbDevicesColl).Insert(testCase.InputDevice)
+		}
+
+		err := store.UnsetDeviceGroup(testCase.InputDeviceID, testCase.InputGroupName)
+		if testCase.OutputError != nil {
+			assert.Error(t, err, "expected error")
+
+			assert.EqualError(t, err, testCase.OutputError.Error())
+		} else {
+			assert.NoError(t, err, "expected no error")
+
+			groupsColl := session.DB(DbName).C(DbDevicesColl)
+			count, err := groupsColl.Find(bson.M{"group": GroupName("e16c71ec")}).Count()
+			assert.NoError(t, err, "expected no error")
+
+			assert.Equal(t, 0, count)
+		}
+
+		// Need to close all sessions to be able to call wipe at next test case
+		session.Close()
+	}
 }
