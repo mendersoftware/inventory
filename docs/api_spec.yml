@@ -84,6 +84,10 @@ paths:
           description: Bad request.
           schema:
             $ref: '#/definitions/Error'
+        409:
+          description: Conflict
+          schema:
+            $ref: '#/definitions/Error'
         500:
           description: Internal error.
           schema:
