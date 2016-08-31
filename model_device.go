@@ -21,9 +21,6 @@ import (
 
 type DeviceID string
 
-//TODO move to model_group.go
-type GroupID string
-
 type DeviceAttribute struct {
 	Name        string      `json:"name" bson:",omitempty"  valid:"length(1|4096),required"`
 	Description *string     `json:"description,omitempty" bson:",omitempty"  valid:"optional"`

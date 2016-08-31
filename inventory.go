@@ -17,12 +17,14 @@ import (
 	"github.com/mendersoftware/inventory/config"
 	"github.com/mendersoftware/inventory/log"
 	"github.com/pkg/errors"
+	"github.com/satori/go.uuid"
 	"time"
 )
 
 // this inventory service interface
 type InventoryApp interface {
 	AddDevice(d *Device) error
+	AddGroup(g *Group) (GroupID, error)
 }
 
 type Inventory struct {
@@ -41,6 +43,27 @@ func GetInventory(c config.Reader, l *log.Logger) (InventoryApp, error) {
 
 	inv := NewInventory(d)
 	return inv, nil
+}
+
+func (i *Inventory) AddGroup(group *Group) (GroupID, error) {
+	if group == nil {
+		return "", errors.New("no group given")
+	}
+	group.ID = GroupID(uuid.NewV4().String())
+	err := i.db.AddGroup(group)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to add group")
+	}
+	return group.ID, nil
+}
+
+func createGroup(group *Group) *Group {
+	return &Group{
+		ID:          GroupID(uuid.NewV4().String()),
+		Name:        group.Name,
+		Description: group.Description,
+		DeviceIDs:   group.DeviceIDs,
+	}
 }
 
 func (i *Inventory) AddDevice(dev *Device) error {

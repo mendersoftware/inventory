@@ -20,6 +20,9 @@ import (
 
 var (
 	ErrDuplicatedDeviceId = errors.New("Duplicated device id")
+	// device not found
+	ErrDevNotFound   = errors.New("not found")
+	ErrGroupNotFound = errors.New("not found")
 )
 
 type DataStore interface {
@@ -34,4 +37,5 @@ type DataStore interface {
 	// 	Attributes: map[string]string{"token": "123"),
 	// })
 	AddDevice(dev *Device) error
+	AddGroup(group *Group) error
 }

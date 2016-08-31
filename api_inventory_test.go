@@ -232,3 +232,125 @@ func TestApiInventoryAddDevice(t *testing.T) {
 		utils.CheckRecordedResponse(t, recorded, tc.JSONResponseParams)
 	}
 }
+
+func TestApiInventoryAddGroup(t *testing.T) {
+	t.Parallel()
+	rest.ErrorFieldName = "error"
+
+	testCases := map[string]struct {
+		utils.JSONResponseParams
+
+		inReq *http.Request
+
+		inventoryErr error
+	}{
+		"empty body": {
+			inReq: test.MakeSimpleRequest("POST",
+				"http://1.2.3.4/api/0.1.0/groups",
+				nil),
+			inventoryErr: nil,
+			JSONResponseParams: utils.JSONResponseParams{
+				OutputStatus:     http.StatusBadRequest,
+				OutputBodyObject: RestError("failed to decode request body: JSON payload is empty"),
+			},
+		},
+		"garbled body": {
+			inReq: test.MakeSimpleRequest("POST",
+				"http://1.2.3.4/api/0.1.0/groups",
+				"foo bar"),
+			inventoryErr: nil,
+			JSONResponseParams: utils.JSONResponseParams{
+				OutputStatus:     http.StatusBadRequest,
+				OutputBodyObject: RestError("failed to decode request body: json: cannot unmarshal string into Go value of type main.Group"),
+			},
+		},
+		"body formatted ok, all fields present": {
+			inReq: test.MakeSimpleRequest("POST",
+				"http://1.2.3.4/api/0.1.0/groups",
+				map[string]interface{}{
+					"name":        "group name",
+					"description": "group description",
+					"device_ids":  []string{"1", "2"},
+				},
+			),
+			inventoryErr: nil,
+			JSONResponseParams: utils.JSONResponseParams{
+				OutputStatus:     http.StatusCreated,
+				OutputBodyObject: nil,
+				OutputHeaders:    map[string]string{"Location": "http://1.2.3.4/api/0.1.0/groups/e16c71ec-1462-40ae-847d-8850f5ddffd2"},
+			},
+		},
+		"body formatted ok, description field missing": {
+			inReq: test.MakeSimpleRequest("POST",
+				"http://1.2.3.4/api/0.1.0/groups",
+				map[string]interface{}{
+					"name":       "group name",
+					"device_ids": []string{"1", "2"},
+				},
+			),
+			inventoryErr: nil,
+			JSONResponseParams: utils.JSONResponseParams{
+				OutputStatus:     http.StatusCreated,
+				OutputBodyObject: nil,
+				OutputHeaders:    map[string]string{"Location": "http://1.2.3.4/api/0.1.0/groups/e16c71ec-1462-40ae-847d-8850f5ddffd2"},
+			},
+		},
+		"body formatted ok, name field missing": {
+			inReq: test.MakeSimpleRequest("POST",
+				"http://1.2.3.4/api/0.1.0/groups",
+				map[string]interface{}{
+					"description": "group description",
+					"device_ids":  []string{"1", "2"},
+				},
+			),
+			inventoryErr: nil,
+			JSONResponseParams: utils.JSONResponseParams{
+				OutputStatus:     http.StatusBadRequest,
+				OutputBodyObject: RestError("Name: non zero value required;"),
+			},
+		},
+		"body formatted ok, device_ids field missing": {
+			inReq: test.MakeSimpleRequest("POST",
+				"http://1.2.3.4/api/0.1.0/groups",
+				map[string]interface{}{
+					"name":        "group name",
+					"description": "group description",
+				},
+			),
+			inventoryErr: nil,
+			JSONResponseParams: utils.JSONResponseParams{
+				OutputStatus:     http.StatusBadRequest,
+				OutputBodyObject: RestError("DeviceIDs: non zero value required;"),
+			},
+		},
+		"body formatted ok, device IDs list empty": {
+			inReq: test.MakeSimpleRequest("POST",
+				"http://1.2.3.4/api/0.1.0/groups",
+				map[string]interface{}{
+					"name":        "group name",
+					"description": "group description",
+					"device_ids":  []string{},
+				},
+			),
+			inventoryErr: nil,
+			JSONResponseParams: utils.JSONResponseParams{
+				OutputStatus:     http.StatusBadRequest,
+				OutputBodyObject: RestError("DeviceIDs: non zero value required;"),
+			},
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Logf("test case: %s", name)
+		inv := MockInventoryApp{}
+		inv.On("AddGroup", AnythingOfType("*main.Group")).Return(tc.inventoryErr)
+
+		factory := func(c config.Reader, l *log.Logger) (InventoryApp, error) {
+			return &inv, nil
+		}
+		apih := makeMockApiHandler(t, factory)
+
+		recorded := test.RunRequest(t, apih, tc.inReq)
+		utils.CheckRecordedResponse(t, recorded, tc.JSONResponseParams)
+	}
+}

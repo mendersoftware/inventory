@@ -33,3 +33,17 @@ func (_m *MockInventoryApp) AddDevice(d *Device) error {
 
 	return r0
 }
+
+// AddGroup provides a mock function with given fields: g
+func (_m *MockInventoryApp) AddGroup(g *Group) (GroupID, error) {
+	ret := _m.Called(g)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(*Group) error); ok {
+		r0 = rf(g)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return GroupID("e16c71ec-1462-40ae-847d-8850f5ddffd2"), r0
+}
