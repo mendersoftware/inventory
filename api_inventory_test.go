@@ -15,7 +15,6 @@ package main
 
 import (
 	"encoding/json"
-	"errors"
 	"github.com/ant0ine/go-json-rest/rest"
 	"github.com/ant0ine/go-json-rest/rest/test"
 	"github.com/mendersoftware/inventory/config"
@@ -23,6 +22,7 @@ import (
 	"github.com/mendersoftware/inventory/requestid"
 	"github.com/mendersoftware/inventory/requestlog"
 	"github.com/mendersoftware/inventory/utils"
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	. "github.com/stretchr/testify/mock"
 	"net/http"
@@ -214,6 +214,19 @@ func TestApiInventoryAddDevice(t *testing.T) {
 			JSONResponseParams: utils.JSONResponseParams{
 				OutputStatus:     http.StatusInternalServerError,
 				OutputBodyObject: RestError("internal error"),
+			},
+		},
+		"device ID already exists error": {
+			inReq: test.MakeSimpleRequest("POST",
+				"http://1.2.3.4/api/0.1.0/devices",
+				map[string]interface{}{
+					"id": "id-0001",
+				},
+			),
+			inventoryErr: errors.Wrap(ErrDuplicatedDeviceId, "failed to add device"),
+			JSONResponseParams: utils.JSONResponseParams{
+				OutputStatus:     http.StatusConflict,
+				OutputBodyObject: RestError("device with specified ID already exists"),
 			},
 		},
 	}

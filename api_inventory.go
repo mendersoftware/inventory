@@ -86,7 +86,7 @@ func (i *InventoryHandlers) AddDeviceHandler(w rest.ResponseWriter, r *rest.Requ
 	err = inv.AddDevice(dev)
 	if err != nil {
 		if cause := errors.Cause(err); cause != nil && cause == ErrDuplicatedDeviceId {
-			restErrWithLogMsg(w, l, err, http.StatusBadRequest, "device with specified ID already exists")
+			restErrWithLogMsg(w, l, err, http.StatusConflict, "device with specified ID already exists")
 			return
 		}
 		restErrWithLogInternal(w, l, err)
