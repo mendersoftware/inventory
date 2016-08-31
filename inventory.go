@@ -23,6 +23,7 @@ import (
 // this inventory service interface
 type InventoryApp interface {
 	AddDevice(d *Device) error
+	UpsertAttributes(id DeviceID, attrs DeviceAttributes) error
 }
 
 type Inventory struct {
@@ -54,5 +55,13 @@ func (i *Inventory) AddDevice(dev *Device) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to add device")
 	}
+	return nil
+}
+
+func (i *Inventory) UpsertAttributes(id DeviceID, attrs DeviceAttributes) error {
+	if err := i.db.UpsertAttributes(id, attrs); err != nil {
+		return errors.Wrap(err, "failed to upsert attributes in db")
+	}
+
 	return nil
 }

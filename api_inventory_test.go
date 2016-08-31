@@ -14,7 +14,9 @@
 package main
 
 import (
+	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"github.com/ant0ine/go-json-rest/rest"
 	"github.com/ant0ine/go-json-rest/rest/test"
 	"github.com/mendersoftware/inventory/config"
@@ -244,4 +246,230 @@ func TestApiInventoryAddDevice(t *testing.T) {
 		recorded := test.RunRequest(t, apih, tc.inReq)
 		utils.CheckRecordedResponse(t, recorded, tc.JSONResponseParams)
 	}
+}
+
+func TestApiInventoryUpsertAttributes(t *testing.T) {
+	t.Parallel()
+
+	rest.ErrorFieldName = "error"
+
+	testCases := map[string]struct {
+		inReq  *http.Request
+		inHdrs map[string]string
+
+		inventoryErr error
+
+		resp utils.JSONResponseParams
+	}{
+		"no auth": {
+			inReq: test.MakeSimpleRequest("PATCH",
+				"http://1.2.3.4/api/0.1.0/attributes",
+				nil),
+			inventoryErr: nil,
+			resp: utils.JSONResponseParams{
+				OutputStatus:     http.StatusUnauthorized,
+				OutputBodyObject: RestError("unauthorized"),
+			},
+		},
+
+		"invalid auth": {
+			inReq: test.MakeSimpleRequest("PATCH",
+				"http://1.2.3.4/api/0.1.0/attributes",
+				nil),
+			inHdrs: map[string]string{
+				"Authorization:": "foobar",
+			},
+			inventoryErr: nil,
+			resp: utils.JSONResponseParams{
+				OutputStatus:     http.StatusUnauthorized,
+				OutputBodyObject: RestError("unauthorized"),
+			},
+		},
+
+		"empty body": {
+			inReq: test.MakeSimpleRequest("PATCH",
+				"http://1.2.3.4/api/0.1.0/attributes",
+				nil),
+			inHdrs: map[string]string{
+				"Authorization": makeDeviceAuthHeader(`{"sub": "fakeid"}`),
+			},
+			inventoryErr: nil,
+			resp: utils.JSONResponseParams{
+				OutputStatus:     http.StatusBadRequest,
+				OutputBodyObject: RestError("failed to decode request body: JSON payload is empty"),
+			},
+		},
+
+		"garbled body": {
+			inReq: test.MakeSimpleRequest("PATCH",
+				"http://1.2.3.4/api/0.1.0/attributes",
+				`{"foo": "bar"}`),
+			inHdrs: map[string]string{
+				"Authorization": makeDeviceAuthHeader(`{"sub": "fakeid"}`),
+			},
+			inventoryErr: nil,
+			resp: utils.JSONResponseParams{
+				OutputStatus:     http.StatusBadRequest,
+				OutputBodyObject: RestError("failed to decode request body: json: cannot unmarshal string into Go value of type []main.DeviceAttribute"),
+			},
+		},
+
+		"body formatted ok, attribute name missing": {
+			inReq: test.MakeSimpleRequest("PATCH",
+				"http://1.2.3.4/api/0.1.0/attributes",
+				[]DeviceAttribute{
+					{
+						Name:        "name1",
+						Value:       "value1",
+						Description: strPtr("descr1"),
+					},
+					{
+						Value:       2,
+						Description: strPtr("descr2"),
+					},
+				},
+			),
+			inHdrs: map[string]string{
+				"Authorization": makeDeviceAuthHeader(`{"sub": "fakeid"}`),
+			},
+			inventoryErr: nil,
+			resp: utils.JSONResponseParams{
+				OutputStatus:     http.StatusBadRequest,
+				OutputBodyObject: RestError("Name: non zero value required;"),
+			},
+		},
+
+		"body formatted ok, attributes ok (all fields)": {
+			inReq: test.MakeSimpleRequest("PATCH",
+				"http://1.2.3.4/api/0.1.0/attributes",
+				[]DeviceAttribute{
+					{
+						Name:        "name1",
+						Value:       "value1",
+						Description: strPtr("descr1"),
+					},
+					{
+						Name:        "name2",
+						Value:       2,
+						Description: strPtr("descr2"),
+					},
+				},
+			),
+			inHdrs: map[string]string{
+				"Authorization": makeDeviceAuthHeader(`{"sub": "fakeid"}`),
+			},
+			inventoryErr: nil,
+			resp: utils.JSONResponseParams{
+				OutputStatus:     http.StatusOK,
+				OutputBodyObject: nil,
+			},
+		},
+
+		"body formatted ok, attributes ok (all fields, arrays)": {
+			inReq: test.MakeSimpleRequest("PATCH",
+				"http://1.2.3.4/api/0.1.0/attributes",
+				[]DeviceAttribute{
+					{
+						Name:        "name1",
+						Value:       []interface{}{"foo", "bar"},
+						Description: strPtr("descr1"),
+					},
+					{
+						Name:        "name2",
+						Value:       []interface{}{1, 2, 3},
+						Description: strPtr("descr2"),
+					},
+				},
+			),
+			inHdrs: map[string]string{
+				"Authorization": makeDeviceAuthHeader(`{"sub": "fakeid"}`),
+			},
+			inventoryErr: nil,
+			resp: utils.JSONResponseParams{
+				OutputStatus:     http.StatusOK,
+				OutputBodyObject: nil,
+			},
+		},
+
+		"body formatted ok, attributes ok (values only)": {
+			inReq: test.MakeSimpleRequest("PATCH",
+				"http://1.2.3.4/api/0.1.0/attributes",
+				[]DeviceAttribute{
+					{
+						Name:  "name1",
+						Value: "value1",
+					},
+					{
+						Name:  "name2",
+						Value: 2,
+					},
+				},
+			),
+			inHdrs: map[string]string{
+				"Authorization": makeDeviceAuthHeader(`{"sub": "fakeid"}`),
+			},
+			inventoryErr: nil,
+			resp: utils.JSONResponseParams{
+				OutputStatus:     http.StatusOK,
+				OutputBodyObject: nil,
+			},
+		},
+
+		"body formatted ok, attributes ok (all fields), inventory err": {
+			inReq: test.MakeSimpleRequest("PATCH",
+				"http://1.2.3.4/api/0.1.0/attributes",
+				[]DeviceAttribute{
+					{
+						Name:        "name1",
+						Value:       "value1",
+						Description: strPtr("descr1"),
+					},
+					{
+						Name:        "name2",
+						Value:       2,
+						Description: strPtr("descr2"),
+					},
+				},
+			),
+			inHdrs: map[string]string{
+				"Authorization": makeDeviceAuthHeader(`{"sub": "fakeid"}`),
+			},
+			inventoryErr: errors.New("internal error"),
+			resp: utils.JSONResponseParams{
+				OutputStatus:     http.StatusInternalServerError,
+				OutputBodyObject: RestError("internal error"),
+			},
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Logf("test case: %s", name)
+		inv := MockInventoryApp{}
+
+		inv.On("UpsertAttributes", AnythingOfType("main.DeviceID"), AnythingOfType("main.DeviceAttributes")).Return(tc.inventoryErr)
+
+		factory := func(c config.Reader, l *log.Logger) (InventoryApp, error) {
+			return &inv, nil
+		}
+		apih := makeMockApiHandler(t, factory)
+
+		rest.ErrorFieldName = "error"
+
+		for k, v := range tc.inHdrs {
+			tc.inReq.Header.Set(k, v)
+		}
+
+		recorded := test.RunRequest(t, apih, tc.inReq)
+
+		utils.CheckRecordedResponse(t, recorded, tc.resp)
+	}
+}
+
+func makeDeviceAuthHeader(claim string) string {
+	return fmt.Sprintf("Bearer foo.%s.bar",
+		base64.StdEncoding.EncodeToString([]byte(claim)))
+}
+
+func strPtr(s string) *string {
+	return &s
 }

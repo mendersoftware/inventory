@@ -15,10 +15,12 @@ package main
 
 import (
 	"github.com/ant0ine/go-json-rest/rest"
+	"github.com/asaskevich/govalidator"
 	"github.com/mendersoftware/inventory/config"
 	"github.com/mendersoftware/inventory/log"
 	"github.com/mendersoftware/inventory/requestlog"
 	"github.com/mendersoftware/inventory/utils"
+	"github.com/mendersoftware/inventory/utils/identity"
 	"github.com/pkg/errors"
 	"net/http"
 )
@@ -27,6 +29,7 @@ const (
 	uriDevices     = "/api/0.1.0/devices"
 	uriDevice      = "/api/0.1.0/devices/:id"
 	uriDeviceGroup = "/api/0.1.0/devices/:id/group"
+	uriAttributes  = "/api/0.1.0/attributes"
 
 	LogHttpCode = "http_code"
 )
@@ -52,6 +55,7 @@ func NewInventoryApiHandlers(invF InventoryFactory) ApiHandler {
 func (i *InventoryHandlers) GetApp() (rest.App, error) {
 	routes := []*rest.Route{
 		rest.Post(uriDevices, i.AddDeviceHandler),
+		rest.Patch(uriAttributes, i.PatchDeviceAttributesHandler),
 	}
 
 	routes = append(routes)
@@ -100,6 +104,39 @@ func (i *InventoryHandlers) AddDeviceHandler(w rest.ResponseWriter, r *rest.Requ
 	w.WriteHeader(http.StatusCreated)
 }
 
+func (i *InventoryHandlers) PatchDeviceAttributesHandler(w rest.ResponseWriter, r *rest.Request) {
+	l := requestlog.GetRequestLogger(r.Env)
+
+	//get device ID from JWT token
+	idata, err := identity.ExtractIdentityFromHeaders(r.Header)
+	if err != nil {
+		restErrWithLogMsg(w, l, err, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	//extract attributes from body
+	attrs, err := parseAttributes(r)
+	if err != nil {
+		restErrWithLog(w, l, err, http.StatusBadRequest)
+		return
+	}
+
+	//upsert the attributes
+	inv, err := i.createInventory(config.Config, l)
+	if err != nil {
+		restErrWithLogInternal(w, l, err)
+		return
+	}
+
+	err = inv.UpsertAttributes(DeviceID(idata.Subject), attrs)
+	if err != nil {
+		restErrWithLogInternal(w, l, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
 func parseDevice(r *rest.Request) (*Device, error) {
 	dev := Device{}
 
@@ -114,6 +151,23 @@ func parseDevice(r *rest.Request) (*Device, error) {
 	}
 
 	return &dev, nil
+}
+
+func parseAttributes(r *rest.Request) (DeviceAttributes, error) {
+	var attrs DeviceAttributes
+
+	err := r.DecodeJsonPayload(&attrs)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to decode request body")
+	}
+
+	for _, a := range attrs {
+		if _, err = govalidator.ValidateStruct(a); err != nil {
+			return nil, err
+		}
+	}
+
+	return attrs, nil
 }
 
 // return selected http code + error message directly taken from error

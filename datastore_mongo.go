@@ -15,14 +15,20 @@
 package main
 
 import (
+	"fmt"
 	"github.com/pkg/errors"
 	"gopkg.in/mgo.v2"
+	"gopkg.in/mgo.v2/bson"
 	"sync"
 )
 
 const (
 	DbName        = "inventory"
 	DbDevicesColl = "devices"
+
+	DbDevAttributes      = "attributes"
+	DbDevAttributesDesc  = "description"
+	DbDevAttributesValue = "value"
 )
 
 var (
@@ -90,4 +96,40 @@ func (db *DataStoreMongo) AddDevice(dev *Device) error {
 		return errors.Wrap(err, "failed to store device")
 	}
 	return nil
+}
+
+func (db *DataStoreMongo) UpsertAttributes(id DeviceID, attrs DeviceAttributes) error {
+	s := db.session.Copy()
+	defer s.Close()
+	c := s.DB(DbName).C(DbDevicesColl)
+
+	update := makeAttrUpsert(attrs)
+	update = bson.M{"$set": update}
+
+	_, err := c.UpsertId(id, update)
+
+	return err
+}
+
+// prepare an attribute upsert doc based on DeviceAttributes map
+func makeAttrUpsert(attrs DeviceAttributes) interface{} {
+	var fieldName string
+	upsert := map[string]interface{}{}
+
+	for name, a := range attrs {
+		if a.Description != nil {
+			fieldName =
+				fmt.Sprintf("%s.%s.%s", DbDevAttributes, name, DbDevAttributesDesc)
+			upsert[fieldName] = a.Description
+
+		}
+
+		if a.Value != nil {
+			fieldName =
+				fmt.Sprintf("%s.%s.%s", DbDevAttributes, name, DbDevAttributesValue)
+			upsert[fieldName] = a.Value
+		}
+	}
+
+	return upsert
 }
