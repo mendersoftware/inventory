@@ -38,6 +38,10 @@ type DataStoreMongo struct {
 	session *mgo.Session
 }
 
+func NewDataStoreMongoWithSession(session *mgo.Session) *DataStoreMongo {
+	return &DataStoreMongo{session: session}
+}
+
 func NewDataStoreMongo(host string) (*DataStoreMongo, error) {
 	//init master session
 	var err error
