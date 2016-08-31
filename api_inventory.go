@@ -30,7 +30,7 @@ import (
 const (
 	uriDevices     = "/api/0.1.0/devices"
 	uriDevice      = "/api/0.1.0/devices/:id"
-	uriDeviceGroup = "/api/0.1.0/devices/:id/group"
+	uriDeviceGroup = "/api/0.1.0/devices/:id/group/:name"
 	uriAttributes  = "/api/0.1.0/attributes"
 
 	LogHttpCode = "http_code"
@@ -69,6 +69,7 @@ func (i *InventoryHandlers) GetApp() (rest.App, error) {
 	routes := []*rest.Route{
 		rest.Get(uriDevices, i.GetDevicesHandler),
 		rest.Post(uriDevices, i.AddDeviceHandler),
+		rest.Delete(uriDeviceGroup, i.DeleteDeviceGroupHandler),
 		rest.Patch(uriAttributes, i.PatchDeviceAttributesHandler),
 	}
 
@@ -269,6 +270,37 @@ func (i *InventoryHandlers) PatchDeviceAttributesHandler(w rest.ResponseWriter, 
 	}
 
 	w.WriteHeader(http.StatusOK)
+}
+
+func (i *InventoryHandlers) DeleteDeviceGroupHandler(w rest.ResponseWriter, r *rest.Request) {
+	l := requestlog.GetRequestLogger(r.Env)
+
+	deviceID := r.PathParam("id")
+	groupName := r.PathParam("name")
+
+	inv, err := i.createInventory(config.Config, l)
+	if err != nil {
+		restErrWithLogInternal(w, l, err)
+		return
+	}
+
+	err = inv.UnsetDeviceGroup(DeviceID(deviceID), GroupName(groupName))
+	if err != nil {
+		cause := errors.Cause(err)
+		if cause != nil {
+			if cause.Error() == ErrDevNotFound.Error() {
+				restErrWithLog(w, l, err, http.StatusNotFound)
+				return
+			} else if cause.Error() == ErrDevNotInGivenGroup.Error() {
+				restErrWithLog(w, l, err, http.StatusBadRequest)
+				return
+			}
+		}
+		restErrWithLogInternal(w, l, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func parseDevice(r *rest.Request) (*Device, error) {

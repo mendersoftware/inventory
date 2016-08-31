@@ -648,3 +648,65 @@ func makeDeviceAuthHeader(claim string) string {
 func strPtr(s string) *string {
 	return &s
 }
+
+func TestApiInventoryDeleteDeviceGroup(t *testing.T) {
+	rest.ErrorFieldName = "error"
+
+	tcases := map[string]struct {
+		utils.JSONResponseParams
+
+		inReq *http.Request
+
+		inventoryErr error
+	}{
+		"ok": {
+			inReq: test.MakeSimpleRequest("DELETE",
+				"http://1.2.3.4/api/0.1.0/devices/123/group/g1", nil),
+			JSONResponseParams: utils.JSONResponseParams{
+				OutputStatus:     http.StatusNoContent,
+				OutputBodyObject: nil,
+			},
+		},
+		"device not found": {
+			inReq: test.MakeSimpleRequest("DELETE",
+				"http://1.2.3.4/api/0.1.0/devices/123/group/g1", nil),
+			JSONResponseParams: utils.JSONResponseParams{
+				OutputStatus:     http.StatusNotFound,
+				OutputBodyObject: RestError(ErrDevNotFound.Error()),
+			},
+			inventoryErr: ErrDevNotFound,
+		},
+		"device not in given group": {
+			inReq: test.MakeSimpleRequest("DELETE",
+				"http://1.2.3.4/api/0.1.0/devices/123/group/g1", nil),
+			JSONResponseParams: utils.JSONResponseParams{
+				OutputStatus:     http.StatusBadRequest,
+				OutputBodyObject: RestError(ErrDevNotInGivenGroup.Error()),
+			},
+			inventoryErr: ErrDevNotInGivenGroup,
+		},
+		"internal error": {
+			inReq: test.MakeSimpleRequest("DELETE",
+				"http://1.2.3.4/api/0.1.0/devices/123/group/g1", nil),
+			JSONResponseParams: utils.JSONResponseParams{
+				OutputStatus:     http.StatusInternalServerError,
+				OutputBodyObject: RestError("internal error"),
+			},
+			inventoryErr: errors.New("internal error"),
+		},
+	}
+
+	for name, tc := range tcases {
+		t.Logf("test case: %s", name)
+		inv := MockInventoryApp{}
+		inv.On("UnsetDeviceGroup", AnythingOfType("main.DeviceID"), AnythingOfType("main.GroupName")).Return(tc.inventoryErr)
+
+		factory := func(c config.Reader, l *log.Logger) (InventoryApp, error) {
+			return &inv, nil
+		}
+		apih := makeMockApiHandler(t, factory)
+
+		recorded := test.RunRequest(t, apih, tc.inReq)
+		utils.CheckRecordedResponse(t, recorded, tc.JSONResponseParams)
+	}
+}
