@@ -138,7 +138,7 @@ func TestApiInventoryAddDevice(t *testing.T) {
 			JSONResponseParams: utils.JSONResponseParams{
 				OutputStatus:     http.StatusCreated,
 				OutputBodyObject: nil,
-				OutputHeaders:    map[string]string{"Location": "http://1.2.3.4/api/0.1.0/devices/id-0001"},
+				OutputHeaders:    map[string][]string{"Location": []string{"http://1.2.3.4/api/0.1.0/devices/id-0001"}},
 			},
 		},
 		"body formatted ok, wrong attributes type": {

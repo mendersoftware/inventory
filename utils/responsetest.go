@@ -25,7 +25,7 @@ import (
 type JSONResponseParams struct {
 	OutputStatus     int
 	OutputBodyObject interface{}
-	OutputHeaders    map[string]string
+	OutputHeaders    map[string][]string
 }
 
 func CheckRecordedResponse(t *testing.T, recorded *test.Recorded, params JSONResponseParams) {
@@ -43,7 +43,9 @@ func CheckRecordedResponse(t *testing.T, recorded *test.Recorded, params JSONRes
 		assert.Empty(t, recorded.Recorder.Body.String())
 	}
 
-	for name, value := range params.OutputHeaders {
-		assert.Equal(t, value, recorded.Recorder.HeaderMap.Get(name))
+	for name, valueArr := range params.OutputHeaders {
+		for _, value := range valueArr {
+			assert.True(t, ContainsString(value, recorded.Recorder.HeaderMap[name]), "not found header with value: "+value)
+		}
 	}
 }
