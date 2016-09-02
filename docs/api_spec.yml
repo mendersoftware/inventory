@@ -224,6 +224,62 @@ paths:
           description: Internal error
           schema:
             $ref: "#/definitions/Error"
+    put:
+      summary: Add device to group.
+      parameters:
+        - name: id
+          in: path
+          description: Device identifier
+          required: true
+          type: string
+        - name: group
+          in: body
+          description: Group
+          required: true
+          schema:
+            $ref: '#/definitions/Group'
+      responses:
+        204:
+          description: Device added to group.
+        404:
+          description: Device not found
+          schema:
+            $ref: "#/definitions/Error"
+        500:
+          description: Internal error
+          schema:
+            $ref: "#/definitions/Error"
+
+  /devices/{id}/group/{name}:
+    delete:
+      summary: Remove device from group.
+      parameters:
+        - name: id
+          in: path
+          description: Device identifier
+          required: true
+          type: string
+        - name: name
+          in: path
+          description: Group name.
+          required: true
+          type: string
+      responses:
+        204:
+          description: Device removed from group successfully.
+        400:
+          description: Device not in given group.
+          schema:
+            $ref: '#/definitions/Error'
+        404:
+          description: Device not found.
+          schema:
+            $ref: '#/definitions/Error'
+        500:
+          description: Internal error.
+          schema:
+            $ref: '#/definitions/Error'
+
   /devices/{id}/attributes:
     patch:
       summary: Upload a set of attribute values for a device.
@@ -270,33 +326,6 @@ paths:
           schema:
             $ref: '#/definitions/Error'
   /groups:
-    post:
-      summary: |
-        Create a new device group.
-
-        The method accepts a set of device IDs that will make up the group.
-      parameters:
-        - name: group
-          in: body
-          required: true
-          schema:
-            $ref: "#/definitions/GroupNew"
-      responses:
-        201:
-          description: Group created succesfully.
-          headers:
-            Location:
-              type: string
-              description: URI for the newly created Group.
-        400:
-          description: Bad request.
-          schema:
-            $ref: '#/definitions/Error'
-        500:
-          description: Internal error.
-          schema:
-            $ref: '#/definitions/Error'
-
     get:
       summary: List groups, with paging.
       parameters:
@@ -334,92 +363,13 @@ paths:
           schema:
             $ref: '#/definitions/Error'
 
-  /groups/{id}:
-    get:
-      summary: Get a selected group.
-      description: |
-        Note that the group's devices are listed via `GET /groups/{id}/devices` as
-        a paged collection.
-      parameters:
-        - name: id
-          in: path
-          description: Group identifier
-          required: true
-          type: string
-      responses:
-        200:
-          description: Group found.
-          schema:
-            $ref: "#/definitions/Group"
-        404:
-          description: Group not found
-          schema:
-            $ref: "#/definitions/Error"
-        500:
-          description: Internal error
-          schema:
-            $ref: "#/definitions/Error"
-
-    patch:
-      summary: Edit a group.
-      description: |
-        Supports both simple group edition (name, description) as well as adding/removing devices.
-        For this purpose, the body contains a special PATCH update document, following the convention of JSON Patch described in https://tools.ietf.org/html/rfc6902.
-
-        Relevant examples of a patch document:
-
-        ```
-        //edit group name and description
-        [
-          {"op": "add", "path": "/name", "new name"},
-          {"op": "add", "path": "/description", "new description"}
-        ]
-
-        ```
-
-        ```
-        //add/remove devices
-        [
-          {"op": "add", "path": "/devices", ["device_id_1", "device_id_2", ...]},
-          {"op": "remove", "path": "/devices",["device_id_3", ...]}
-        ]
-        ```
-      parameters:
-        - name: patch
-          in: body
-          description: Update document RFC6902.
-          required: true
-          schema:
-            type: array
-            items:
-              $ref: '#/definitions/PatchOperation'
-        - name: id
-          in: path
-          description: Group identifier
-          required: true
-          type: string
-      responses:
-        200:
-          description: Successful response
-        400:
-          description: Bad request.
-          schema:
-            $ref: '#/definitions/Error'
-        404:
-          description: Group or device not found.
-          schema:
-            $ref: '#/definitions/Error'
-        500:
-          description: Internal error.
-          schema:
-            $ref: '#/definitions/Error'
-
+  /groups/{name}:
     delete:
       summary: Delete a group.
       parameters:
-        - name: id
+        - name: name
           in: path
-          description: Group identifier.
+          description: Group name.
           required: true
           type: string
       responses:
@@ -434,7 +384,7 @@ paths:
           schema:
             $ref: '#/definitions/Error'
 
-  /groups/{id}/devices:
+  /groups/{name}/devices:
     get:
       summary: List group's devices (paged collection).
       parameters:
@@ -452,9 +402,9 @@ paths:
           type: number
           format: integer
           default: 10
-        - name: id
+        - name: name
           in: path
-          description: Group identifier
+          description: Group name
           required: true
           type: string
       responses:
@@ -538,34 +488,13 @@ definitions:
           $ref: '#/definitions/Attribute'
         description: A list of attributes and their values.
   Group:
+    description: Device group
     type: object
     properties:
-      id:
+      group:
         type: string
-        description: Group's UUID.
-      name:
-        type: string
-        description: Human-readable name of the group.
-      description:
-        type: string
-        description: User's description of the group.
-  GroupNew:
-      type: object
-      required:
-          - name
-          - device_ids
-      properties:
-        name:
-          description: Human readable group name.
-          type: string
-        description:
-          description: Group description.
-          type: string
-        device_ids:
-          description: List of device IDs.
-          type: array
-          items:
-            type: string
+    required:
+      - group
   Error:
     description: Error descriptor
     type: object
