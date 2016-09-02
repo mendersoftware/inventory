@@ -27,6 +27,7 @@ const (
 	DbDevicesColl = "devices"
 
 	DbDevAttributes      = "attributes"
+	DbDevGroup           = "group"
 	DbDevAttributesDesc  = "description"
 	DbDevAttributesValue = "value"
 )
@@ -61,6 +62,55 @@ func NewDataStoreMongo(host string) (*DataStoreMongo, error) {
 	db := &DataStoreMongo{session: masterSession}
 
 	return db, nil
+}
+
+func (db *DataStoreMongo) GetDevices(skip int, limit int, filters []Filter, sort *Sort, hasGroup *bool) ([]Device, error) {
+	s := db.session.Copy()
+	defer s.Close()
+	c := s.DB(DbName).C(DbDevicesColl)
+	res := []Device{}
+
+	findQuery := make(bson.M, 0)
+	for _, filter := range filters {
+		op := mongoOperator(filter.Operator)
+		field := fmt.Sprintf("%s.%s.%s", DbDevAttributes, filter.AttrName, DbDevAttributesValue)
+		switch filter.Operator {
+		default:
+			if filter.ValueFloat != nil {
+				findQuery["$or"] = []bson.M{
+					bson.M{field: bson.M{op: filter.Value}},
+					bson.M{field: bson.M{op: filter.ValueFloat}},
+				}
+			} else {
+				findQuery[field] = bson.M{op: filter.Value}
+			}
+		}
+	}
+
+	if hasGroup != nil {
+		if *hasGroup {
+			findQuery[DbDevGroup] = bson.M{"$exists": true}
+		} else {
+			findQuery[DbDevGroup] = bson.M{"$exists": false}
+		}
+	}
+
+	query := c.Find(findQuery).Skip(skip).Limit(limit)
+	if sort != nil {
+		sortField := fmt.Sprintf("%s.%s.%s", DbDevAttributes, sort.AttrName, DbDevAttributesValue)
+		if sort.Ascending {
+			query.Sort(sortField)
+		} else {
+			query.Sort("-" + sortField)
+		}
+	}
+
+	err := query.All(&res)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to fetch device list")
+	}
+
+	return res, nil
 }
 
 func (db *DataStoreMongo) GetDevice(id DeviceID) (*Device, error) {
@@ -132,4 +182,12 @@ func makeAttrUpsert(attrs DeviceAttributes) interface{} {
 	}
 
 	return upsert
+}
+
+func mongoOperator(co ComparisonOperator) string {
+	switch co {
+	case Eq:
+		return "$eq"
+	}
+	return ""
 }
