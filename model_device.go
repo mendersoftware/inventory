@@ -41,7 +41,7 @@ type Device struct {
 	//device's group id
 	Group *GroupID `json:"-" bson:",omitempty" valid:"optional"`
 
-	CreatedTs time.Time `json:"created_ts" bson:"created_ts,omitempty"`
+	CreatedTs time.Time `json:"-" bson:"created_ts,omitempty"`
 	//Timestamp of the last attribute update.
 	UpdatedTs time.Time `json:"updated_ts" bson:"updated_ts,omitempty"`
 }
