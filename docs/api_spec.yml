@@ -363,27 +363,6 @@ paths:
           schema:
             $ref: '#/definitions/Error'
 
-  /groups/{name}:
-    delete:
-      summary: Delete a group.
-      parameters:
-        - name: name
-          in: path
-          description: Group name.
-          required: true
-          type: string
-      responses:
-        200:
-          description: Group deleted successfully.
-        404:
-          description: Group not found.
-          schema:
-            $ref: '#/definitions/Error'
-        500:
-          description: Internal error.
-          schema:
-            $ref: '#/definitions/Error'
-
   /groups/{name}/devices:
     get:
       summary: List group's devices (paged collection).
