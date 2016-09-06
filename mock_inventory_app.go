@@ -70,3 +70,17 @@ func (_m *MockInventoryApp) ListDevices(skip int, limit int, filters []Filter, s
 
 	return r0, r1
 }
+
+// UnsetDeviceGroup provides a mock function with given fields: id
+func (_m *MockInventoryApp) UnsetDeviceGroup(id DeviceID, groupName GroupName) error {
+	ret := _m.Called(id, groupName)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(DeviceID, GroupName) error); ok {
+		r0 = rf(id, groupName)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
