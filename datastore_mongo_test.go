@@ -27,12 +27,10 @@ func TestMongoGetDevices(t *testing.T) {
 		t.Skip("skipping TestMongoGetDevices in short mode.")
 	}
 
-	group1 := GroupID("1")
-	group2 := GroupID("2")
 	inputDevs := []Device{
 		Device{ID: DeviceID("0")},
-		Device{ID: DeviceID("1"), Group: &group1},
-		Device{ID: DeviceID("2"), Group: &group2},
+		Device{ID: DeviceID("1"), Group: GroupName("1")},
+		Device{ID: DeviceID("2"), Group: GroupName("2")},
 		Device{
 			ID: DeviceID("3"),
 			Attributes: map[string]DeviceAttribute{
@@ -53,7 +51,7 @@ func TestMongoGetDevices(t *testing.T) {
 				"attrString": DeviceAttribute{Name: "attrString", Value: "val5", Description: strPtr("desc1")},
 				"attrFloat":  DeviceAttribute{Name: "attrFloat", Value: 5.0, Description: strPtr("desc2")},
 			},
-			Group: &group2,
+			Group: GroupName("2"),
 		},
 	}
 	floatVal4 := 4.0
@@ -153,10 +151,6 @@ func TestMongoGetDevices(t *testing.T) {
 		assert.NoError(t, err, "failed to get devices")
 
 		assert.Equal(t, len(tc.expected), len(devs))
-
-		/*if !reflect.DeepEqual(expected, devs) {
-			assert.Fail(t, "expected: %v\nhave: %v", expected, devs)
-		}*/
 
 		// Need to close all sessions to be able to call wipe at next test case
 		session.Close()

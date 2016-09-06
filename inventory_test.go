@@ -31,7 +31,7 @@ func boolPtr(value bool) *bool {
 func TestInventoryListDevices(t *testing.T) {
 	t.Parallel()
 
-	groupID := GroupID("asd")
+	group := GroupName("asd")
 	testCases := map[string]struct {
 		inHasGroup      *bool
 		datastoreFilter []Filter
@@ -51,7 +51,7 @@ func TestInventoryListDevices(t *testing.T) {
 			datastoreFilter: nil,
 			datastoreError:  nil,
 			outError:        nil,
-			outDevices:      []Device{Device{ID: DeviceID("1"), Group: &groupID}},
+			outDevices:      []Device{Device{ID: DeviceID("1"), Group: group}},
 		},
 		"has group false": {
 			inHasGroup:      boolPtr(false),

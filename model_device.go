@@ -21,8 +21,7 @@ import (
 
 type DeviceID string
 
-//TODO move to model_group.go
-type GroupID string
+type GroupName string
 
 type DeviceAttribute struct {
 	Name        string      `json:"name" bson:",omitempty"  valid:"length(1|4096),required"`
@@ -38,8 +37,8 @@ type Device struct {
 	//a map of attributes names and their values.
 	Attributes DeviceAttributes `json:"attributes" bson:",omitempty" valid:"optional"`
 
-	//device's group id
-	Group *GroupID `json:"-" bson:",omitempty" valid:"optional"`
+	//device's group name
+	Group GroupName `json:"-" bson:"group,omitempty" valid:"optional"`
 
 	CreatedTs time.Time `json:"-" bson:"created_ts,omitempty"`
 	//Timestamp of the last attribute update.
@@ -48,6 +47,10 @@ type Device struct {
 
 func (did DeviceID) String() string {
 	return string(did)
+}
+
+func (gn GroupName) String() string {
+	return string(gn)
 }
 
 // wrapper for device attributes names and values
