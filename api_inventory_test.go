@@ -667,7 +667,7 @@ func TestApiInventoryDeleteDeviceGroup(t *testing.T) {
 				OutputBodyObject: nil,
 			},
 		},
-		"device not found": {
+		"device group not found (or device's group is other than requested)": {
 			inReq: test.MakeSimpleRequest("DELETE",
 				"http://1.2.3.4/api/0.1.0/devices/123/group/g1", nil),
 			JSONResponseParams: utils.JSONResponseParams{
@@ -675,15 +675,6 @@ func TestApiInventoryDeleteDeviceGroup(t *testing.T) {
 				OutputBodyObject: RestError(ErrDevNotFound.Error()),
 			},
 			inventoryErr: ErrDevNotFound,
-		},
-		"device not in given group": {
-			inReq: test.MakeSimpleRequest("DELETE",
-				"http://1.2.3.4/api/0.1.0/devices/123/group/g1", nil),
-			JSONResponseParams: utils.JSONResponseParams{
-				OutputStatus:     http.StatusBadRequest,
-				OutputBodyObject: RestError(ErrDevNotInGivenGroup.Error()),
-			},
-			inventoryErr: ErrDevNotInGivenGroup,
 		},
 		"internal error": {
 			inReq: test.MakeSimpleRequest("DELETE",

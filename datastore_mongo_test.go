@@ -709,7 +709,7 @@ func TestMongoUnsetDevicesGroupWithGroupName(t *testing.T) {
 				ID:    DeviceID("1"),
 				Group: GroupName("e16c71ec"),
 			},
-			OutputError: ErrDevNotInGivenGroup,
+			OutputError: ErrDevNotFound,
 		},
 	}
 

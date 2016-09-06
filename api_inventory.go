@@ -291,9 +291,6 @@ func (i *InventoryHandlers) DeleteDeviceGroupHandler(w rest.ResponseWriter, r *r
 			if cause.Error() == ErrDevNotFound.Error() {
 				restErrWithLog(w, l, err, http.StatusNotFound)
 				return
-			} else if cause.Error() == ErrDevNotInGivenGroup.Error() {
-				restErrWithLog(w, l, err, http.StatusBadRequest)
-				return
 			}
 		}
 		restErrWithLogInternal(w, l, err)

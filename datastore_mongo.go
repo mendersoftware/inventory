@@ -209,11 +209,7 @@ func (db *DataStoreMongo) UnsetDeviceGroup(id DeviceID, groupName GroupName) err
 	}
 	if _, err := s.DB(DbName).C(DbDevicesColl).Find(query).Apply(update, nil); err != nil {
 		if err.Error() == mgo.ErrNotFound.Error() {
-			if devCount, findIdErr := s.DB(DbName).C(DbDevicesColl).FindId(id).Count(); devCount == 0 {
-				return ErrDevNotFound
-			} else if findIdErr == nil {
-				return ErrDevNotInGivenGroup
-			}
+			return ErrDevNotFound
 		}
 		return err
 	}

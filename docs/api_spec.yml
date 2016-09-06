@@ -267,12 +267,8 @@ paths:
       responses:
         204:
           description: Device removed from group successfully.
-        400:
-          description: Device not in given group.
-          schema:
-            $ref: '#/definitions/Error'
         404:
-          description: Device not found.
+          description: Device not found or device not in given group.
           schema:
             $ref: '#/definitions/Error'
         500:

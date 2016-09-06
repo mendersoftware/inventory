@@ -98,7 +98,7 @@ func (i *Inventory) UpsertAttributes(id DeviceID, attrs DeviceAttributes) error 
 func (i *Inventory) UnsetDeviceGroup(id DeviceID, groupName GroupName) error {
 	err := i.db.UnsetDeviceGroup(id, groupName)
 	if err != nil {
-		if err.Error() == ErrDevNotFound.Error() || err.Error() == ErrDevNotInGivenGroup.Error() {
+		if err.Error() == ErrDevNotFound.Error() {
 			return err
 		}
 		return errors.Wrap(err, "failed to unassign group from device")

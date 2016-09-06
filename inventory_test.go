@@ -195,8 +195,8 @@ func TestInventoryUnsetDeviceGroup(t *testing.T) {
 		"device group name not matching": {
 			inDeviceID:     DeviceID("1"),
 			inGroupName:    GroupName("not-matching"),
-			datastoreError: ErrDevNotInGivenGroup,
-			outError:       ErrDevNotInGivenGroup,
+			datastoreError: ErrDevNotFound,
+			outError:       ErrDevNotFound,
 		},
 		"datastore success": {
 			inDeviceID:     DeviceID("1"),
