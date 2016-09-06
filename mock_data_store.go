@@ -106,3 +106,17 @@ func (_m *MockDataStore) UnsetDeviceGroup(id DeviceID, groupName GroupName) erro
 
 	return r0
 }
+
+// UpdateDeviceGroup provides a mock function with given fields: devId, group
+func (_m *MockDataStore) UpdateDeviceGroup(devId DeviceID, group GroupName) error {
+	ret := _m.Called(devId, group)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(DeviceID, GroupName) error); ok {
+		r0 = rf(devId, group)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
