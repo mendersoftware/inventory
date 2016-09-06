@@ -47,3 +47,26 @@ func (_m *MockInventoryApp) UpsertAttributes(id DeviceID, attrs DeviceAttributes
 
 	return r0
 }
+
+// ListDevices provides a mock function with given fields: skip, limit, filters, sort, hasGroup
+func (_m *MockInventoryApp) ListDevices(skip int, limit int, filters []Filter, sort *Sort, hasGroup *bool) ([]Device, error) {
+	ret := _m.Called(skip, limit, filters, sort, hasGroup)
+
+	var r0 []Device
+	if rf, ok := ret.Get(0).(func(int, int, []Filter, *Sort, *bool) []Device); ok {
+		r0 = rf(skip, limit, filters, sort, hasGroup)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]Device)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(int, int, []Filter, *Sort, *bool) error); ok {
+		r1 = rf(skip, limit, filters, sort, hasGroup)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}

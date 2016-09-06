@@ -21,6 +21,148 @@ import (
 	"testing"
 )
 
+// test funcs
+func TestMongoGetDevices(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping TestMongoGetDevices in short mode.")
+	}
+
+	group1 := GroupID("1")
+	group2 := GroupID("2")
+	inputDevs := []Device{
+		Device{ID: DeviceID("0")},
+		Device{ID: DeviceID("1"), Group: &group1},
+		Device{ID: DeviceID("2"), Group: &group2},
+		Device{
+			ID: DeviceID("3"),
+			Attributes: map[string]DeviceAttribute{
+				"attrString": DeviceAttribute{Name: "attrString", Value: "val3", Description: strPtr("desc1")},
+				"attrFloat":  DeviceAttribute{Name: "attrFloat", Value: 3.0, Description: strPtr("desc2")},
+			},
+		},
+		Device{
+			ID: DeviceID("4"),
+			Attributes: map[string]DeviceAttribute{
+				"attrString": DeviceAttribute{Name: "attrString", Value: "val4", Description: strPtr("desc1")},
+				"attrFloat":  DeviceAttribute{Name: "attrFloat", Value: 4.0, Description: strPtr("desc2")},
+			},
+		},
+		Device{
+			ID: DeviceID("5"),
+			Attributes: map[string]DeviceAttribute{
+				"attrString": DeviceAttribute{Name: "attrString", Value: "val5", Description: strPtr("desc1")},
+				"attrFloat":  DeviceAttribute{Name: "attrFloat", Value: 5.0, Description: strPtr("desc2")},
+			},
+			Group: &group2,
+		},
+	}
+	floatVal4 := 4.0
+
+	testCases := map[string]struct {
+		expected []Device
+		skip     int
+		limit    int
+		filters  []Filter
+		sort     *Sort
+		hasGroup *bool
+	}{
+		"all devs, no skip, no limit": {
+			expected: inputDevs,
+			skip:     0,
+			limit:    20,
+			filters:  nil,
+			sort:     nil,
+		},
+		"all devs, with skip": {
+			expected: []Device{inputDevs[4], inputDevs[5]},
+			skip:     4,
+			limit:    20,
+			filters:  nil,
+			sort:     nil,
+		},
+		"all devs, no skip, with limit": {
+			expected: []Device{inputDevs[0], inputDevs[1], inputDevs[2]},
+			skip:     0,
+			limit:    3,
+			filters:  nil,
+			sort:     nil,
+		},
+		"skip + limit": {
+			expected: []Device{inputDevs[3], inputDevs[4]},
+			skip:     3,
+			limit:    2,
+			filters:  nil,
+			sort:     nil,
+		},
+		"filter on attribute (equal attribute)": {
+			expected: []Device{inputDevs[3]},
+			skip:     0,
+			limit:    20,
+			filters:  []Filter{Filter{AttrName: "attrString", Value: "val3", Operator: Eq}},
+			sort:     nil,
+		},
+		"filter on attribute (equal attribute float)": {
+			expected: []Device{inputDevs[4]},
+			skip:     0,
+			limit:    20,
+			filters:  []Filter{Filter{AttrName: "attrFloat", Value: "4.0", ValueFloat: &floatVal4, Operator: Eq}},
+			sort:     nil,
+		},
+		"sort, limit": {
+			expected: []Device{inputDevs[5], inputDevs[4], inputDevs[3]},
+			skip:     0,
+			limit:    3,
+			filters:  nil,
+			sort:     &Sort{AttrName: "attrFloat", Ascending: false},
+		},
+		"hasGroup = true": {
+			expected: []Device{inputDevs[1], inputDevs[2], inputDevs[5]},
+			skip:     0,
+			limit:    20,
+			filters:  nil,
+			sort:     nil,
+			hasGroup: boolPtr(true),
+		},
+		"hasGroup = false": {
+			expected: []Device{inputDevs[0], inputDevs[3], inputDevs[4]},
+			skip:     0,
+			limit:    20,
+			filters:  nil,
+			sort:     nil,
+			hasGroup: boolPtr(false),
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Logf("test case: %s", name)
+
+		// Make sure we start test with empty database
+		db.Wipe()
+
+		session := db.Session()
+
+		for _, d := range inputDevs {
+			err := session.DB(DbName).C(DbDevicesColl).Insert(d)
+			assert.NoError(t, err, "failed to setup input data")
+		}
+
+		store := NewDataStoreMongoWithSession(session)
+
+		//test
+		devs, err := store.GetDevices(tc.skip, tc.limit, tc.filters, tc.sort, tc.hasGroup)
+		assert.NoError(t, err, "failed to get devices")
+
+		assert.Equal(t, len(tc.expected), len(devs))
+
+		/*if !reflect.DeepEqual(expected, devs) {
+			assert.Fail(t, "expected: %v\nhave: %v", expected, devs)
+		}*/
+
+		// Need to close all sessions to be able to call wipe at next test case
+		session.Close()
+	}
+}
+
 func TestMongoGetDevice(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping TestMongoGetDevice in short mode.")
@@ -505,6 +647,10 @@ func TestMongoUpsertAttributes(t *testing.T) {
 
 func strPtr(s string) *string {
 	return &s
+}
+
+func boolPtr(b bool) *bool {
+	return &b
 }
 
 func compare(a, b DeviceAttributes) bool {

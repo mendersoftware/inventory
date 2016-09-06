@@ -23,6 +23,8 @@ var (
 )
 
 type DataStore interface {
+	GetDevices(skip int, limit int, filters []Filter, sort *Sort, hasGroup *bool) ([]Device, error)
+
 	// find a device with given `id`, returns the device or nil,
 	// if device was not found, error is set to ErrDevNotFound
 	GetDevice(id DeviceID) (*Device, error)

@@ -24,6 +24,77 @@ func invForTest(d DataStore) InventoryApp {
 	return &Inventory{db: d}
 }
 
+func boolPtr(value bool) *bool {
+	return &value
+}
+
+func TestInventoryListDevices(t *testing.T) {
+	t.Parallel()
+
+	groupID := GroupID("asd")
+	testCases := map[string]struct {
+		inHasGroup      *bool
+		datastoreFilter []Filter
+		datastoreError  error
+		outError        error
+		outDevices      []Device
+	}{
+		"has group nil": {
+			inHasGroup:      nil,
+			datastoreFilter: nil,
+			datastoreError:  nil,
+			outError:        nil,
+			outDevices:      []Device{Device{ID: DeviceID("1")}},
+		},
+		"has group true": {
+			inHasGroup:      boolPtr(true),
+			datastoreFilter: nil,
+			datastoreError:  nil,
+			outError:        nil,
+			outDevices:      []Device{Device{ID: DeviceID("1"), Group: &groupID}},
+		},
+		"has group false": {
+			inHasGroup:      boolPtr(false),
+			datastoreFilter: nil,
+			datastoreError:  nil,
+			outError:        nil,
+			outDevices:      []Device{Device{ID: DeviceID("1")}},
+		},
+		"datastore error": {
+			inHasGroup:      nil,
+			datastoreFilter: nil,
+			datastoreError:  errors.New("db connection failed"),
+			outError:        errors.New("failed to fetch devices: db connection failed"),
+			outDevices:      nil,
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Logf("test case: %s", name)
+
+		db := &MockDataStore{}
+		db.On("GetDevices",
+			AnythingOfType("int"),
+			AnythingOfType("int"),
+			tc.datastoreFilter,
+			AnythingOfType("*main.Sort"),
+			AnythingOfType("*bool"),
+		).Return(tc.outDevices, tc.datastoreError)
+		i := invForTest(db)
+
+		devs, err := i.ListDevices(1, 10, nil, nil, tc.inHasGroup)
+
+		if tc.outError != nil {
+			if assert.Error(t, err) {
+				assert.EqualError(t, err, tc.outError.Error())
+			}
+		} else {
+			assert.NoError(t, err)
+			assert.Equal(t, len(devs), len(tc.outDevices))
+		}
+	}
+}
+
 func TestInventoryAddDevice(t *testing.T) {
 	t.Parallel()
 

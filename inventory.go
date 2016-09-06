@@ -20,8 +20,27 @@ import (
 	"time"
 )
 
+type ComparisonOperator int
+
+const (
+	Eq ComparisonOperator = 1 << iota
+)
+
+type Filter struct {
+	AttrName   string
+	Value      string
+	ValueFloat *float64
+	Operator   ComparisonOperator
+}
+
+type Sort struct {
+	AttrName  string
+	Ascending bool
+}
+
 // this inventory service interface
 type InventoryApp interface {
+	ListDevices(skip int, limit int, filters []Filter, sort *Sort, hasGroup *bool) ([]Device, error)
 	AddDevice(d *Device) error
 	UpsertAttributes(id DeviceID, attrs DeviceAttributes) error
 }
@@ -42,6 +61,15 @@ func GetInventory(c config.Reader, l *log.Logger) (InventoryApp, error) {
 
 	inv := NewInventory(d)
 	return inv, nil
+}
+
+func (i *Inventory) ListDevices(skip int, limit int, filters []Filter, sort *Sort, hasGroup *bool) ([]Device, error) {
+	devs, err := i.db.GetDevices(skip, limit, filters, sort, hasGroup)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to fetch devices")
+	}
+
+	return devs, nil
 }
 
 func (i *Inventory) AddDevice(dev *Device) error {

@@ -23,6 +23,8 @@ import (
 	"github.com/mendersoftware/inventory/utils/identity"
 	"github.com/pkg/errors"
 	"net/http"
+	"strconv"
+	"strings"
 )
 
 const (
@@ -32,6 +34,17 @@ const (
 	uriAttributes  = "/api/0.1.0/attributes"
 
 	LogHttpCode = "http_code"
+)
+
+const (
+	queryParamSort           = "sort"
+	queryParamHasGroup       = "has_group"
+	queryParamValueSeparator = ":"
+	sortOrderAsc             = "asc"
+	sortOrderDesc            = "desc"
+	sortAttributeNameIdx     = 0
+	sortOrderIdx             = 1
+	filterEqOperatorIdx      = 0
 )
 
 // model of device's group name response at /devices/:id/group endpoint
@@ -54,6 +67,7 @@ func NewInventoryApiHandlers(invF InventoryFactory) ApiHandler {
 
 func (i *InventoryHandlers) GetApp() (rest.App, error) {
 	routes := []*rest.Route{
+		rest.Get(uriDevices, i.GetDevicesHandler),
 		rest.Post(uriDevices, i.AddDeviceHandler),
 		rest.Patch(uriAttributes, i.PatchDeviceAttributesHandler),
 	}
@@ -70,6 +84,126 @@ func (i *InventoryHandlers) GetApp() (rest.App, error) {
 
 	return app, nil
 
+}
+
+// `sort` paramater value is an attribute name with optional direction (desc or asc)
+// separated by colon (:)
+//
+// eg. `sort=attr_name1` or `sort=attr_name1:asd`
+func parseSortParam(r *rest.Request) (*Sort, error) {
+	sortStr, err := utils.ParseQueryParmStr(r, queryParamSort, false, nil)
+	if err != nil {
+		return nil, err
+	}
+	if sortStr == "" {
+		return nil, nil
+	}
+	sortValArray := strings.Split(sortStr, queryParamValueSeparator)
+	sort := Sort{AttrName: sortValArray[sortAttributeNameIdx]}
+	if len(sortValArray) == 2 {
+		sortOrder := sortValArray[sortOrderIdx]
+		if sortOrder != sortOrderAsc && sortOrder != sortOrderDesc {
+			return nil, errors.New("invalid sort order")
+		}
+		sort.Ascending = sortOrder == sortOrderAsc
+	}
+	return &sort, nil
+}
+
+// Filter paramaters name are attributes name. Value can be prefixed
+// with equality operator code (`eq` for =), separated from value by colon (:).
+// Equality operator default value is `eq`
+//
+// eg. `attr_name1=value1` or `attr_name1=eq:value1`
+func parseFilterParams(r *rest.Request) ([]Filter, error) {
+	knownParams := []string{utils.PageName, utils.PerPageName, queryParamSort, queryParamHasGroup}
+	filters := make([]Filter, 0)
+	var filter Filter
+	for name, _ := range r.URL.Query() {
+		if utils.ContainsString(name, knownParams) {
+			continue
+		}
+		valueStr, err := utils.ParseQueryParmStr(r, name, false, nil)
+		if err != nil {
+			return nil, err
+		}
+		valueStrArray := strings.Split(valueStr, queryParamValueSeparator)
+		filter = Filter{AttrName: name}
+		valueIdx := 0
+		if len(valueStrArray) == 2 {
+			valueIdx = 1
+			switch valueStrArray[filterEqOperatorIdx] {
+			case "eq":
+				filter.Operator = Eq
+			default:
+				return nil, errors.New("invalid filter operator")
+			}
+		} else {
+			filter.Operator = Eq
+		}
+		filter.Value = valueStrArray[valueIdx]
+		floatValue, err := strconv.ParseFloat(filter.Value, 64)
+		if err == nil {
+			filter.ValueFloat = &floatValue
+		}
+
+		filters = append(filters, filter)
+	}
+	return filters, nil
+}
+
+func (i *InventoryHandlers) GetDevicesHandler(w rest.ResponseWriter, r *rest.Request) {
+	l := requestlog.GetRequestLogger(r.Env)
+
+	page, perPage, err := utils.ParsePagination(r)
+	if err != nil {
+		restErrWithLog(w, l, err, http.StatusBadRequest)
+		return
+	}
+
+	hasGroup, err := utils.ParseQueryParmBool(r, queryParamHasGroup, false, nil)
+	if err != nil {
+		restErrWithLog(w, l, err, http.StatusBadRequest)
+		return
+	}
+
+	sort, err := parseSortParam(r)
+	if err != nil {
+		restErrWithLog(w, l, err, http.StatusBadRequest)
+		return
+	}
+
+	filters, err := parseFilterParams(r)
+	if err != nil {
+		restErrWithLog(w, l, err, http.StatusBadRequest)
+		return
+	}
+
+	inv, err := i.createInventory(config.Config, l)
+	if err != nil {
+		restErrWithLogInternal(w, l, err)
+		return
+	}
+
+	//get one extra device to see if there's a 'next' page
+	devs, err := inv.ListDevices(int((page-1)*perPage), int(perPage+1), filters, sort, hasGroup)
+	if err != nil {
+		restErrWithLogInternal(w, l, err)
+		return
+	}
+
+	len := len(devs)
+	hasNext := false
+	if uint64(len) > perPage {
+		hasNext = true
+		len = int(perPage)
+	}
+
+	links := utils.MakePageLinkHdrs(r, page, perPage, hasNext)
+	for _, l := range links {
+		w.Header().Add("Link", l)
+	}
+	w.WriteJson(devs[:len])
 }
 
 func (i *InventoryHandlers) AddDeviceHandler(w rest.ResponseWriter, r *rest.Request) {
