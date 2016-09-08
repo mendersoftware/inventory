@@ -215,3 +215,18 @@ func (db *DataStoreMongo) UnsetDeviceGroup(id DeviceID, groupName GroupName) err
 	}
 	return nil
 }
+
+func (db *DataStoreMongo) UpdateDeviceGroup(devId DeviceID, newGroup GroupName) error {
+	s := db.session.Copy()
+	defer s.Close()
+	c := s.DB(DbName).C(DbDevicesColl)
+
+	err := c.UpdateId(devId, bson.M{"$set": &Device{Group: newGroup}})
+	if err != nil {
+		if err == mgo.ErrNotFound {
+			return ErrDevNotFound
+		}
+		return errors.Wrap(err, "failed to update device group")
+	}
+	return nil
+}

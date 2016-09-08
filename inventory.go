@@ -44,6 +44,7 @@ type InventoryApp interface {
 	AddDevice(d *Device) error
 	UpsertAttributes(id DeviceID, attrs DeviceAttributes) error
 	UnsetDeviceGroup(id DeviceID, groupName GroupName) error
+	UpdateDeviceGroup(id DeviceID, group GroupName) error
 }
 
 type Inventory struct {
@@ -102,6 +103,14 @@ func (i *Inventory) UnsetDeviceGroup(id DeviceID, groupName GroupName) error {
 			return err
 		}
 		return errors.Wrap(err, "failed to unassign group from device")
+	}
+	return nil
+}
+
+func (i *Inventory) UpdateDeviceGroup(devid DeviceID, group GroupName) error {
+	err := i.db.UpdateDeviceGroup(devid, group)
+	if err != nil {
+		return errors.Wrap(err, "failed to add device to group")
 	}
 	return nil
 }

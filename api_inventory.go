@@ -28,10 +28,11 @@ import (
 )
 
 const (
-	uriDevices     = "/api/0.1.0/devices"
-	uriDevice      = "/api/0.1.0/devices/:id"
-	uriDeviceGroup = "/api/0.1.0/devices/:id/group/:name"
-	uriAttributes  = "/api/0.1.0/attributes"
+	uriDevices      = "/api/0.1.0/devices"
+	uriDevice       = "/api/0.1.0/devices/:id"
+	uriDeviceGroups = "/api/0.1.0/devices/:id/group"
+	uriDeviceGroup  = "/api/0.1.0/devices/:id/group/:name"
+	uriAttributes   = "/api/0.1.0/attributes"
 
 	LogHttpCode = "http_code"
 )
@@ -49,7 +50,7 @@ const (
 
 // model of device's group name response at /devices/:id/group endpoint
 type InventoryApiGroup struct {
-	Group string `json:"group"`
+	Group string `json:"group" valid:"required"`
 }
 
 type InventoryFactory func(c config.Reader, l *log.Logger) (InventoryApp, error)
@@ -71,6 +72,7 @@ func (i *InventoryHandlers) GetApp() (rest.App, error) {
 		rest.Post(uriDevices, i.AddDeviceHandler),
 		rest.Delete(uriDeviceGroup, i.DeleteDeviceGroupHandler),
 		rest.Patch(uriAttributes, i.PatchDeviceAttributesHandler),
+		rest.Put(uriDeviceGroups, i.AddDeviceToGroupHandler),
 	}
 
 	routes = append(routes)
@@ -297,6 +299,41 @@ func (i *InventoryHandlers) DeleteDeviceGroupHandler(w rest.ResponseWriter, r *r
 		return
 	}
 
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (i *InventoryHandlers) AddDeviceToGroupHandler(w rest.ResponseWriter, r *rest.Request) {
+	l := requestlog.GetRequestLogger(r.Env)
+	devId := r.PathParam("id")
+
+	var group InventoryApiGroup
+	err := r.DecodeJsonPayload(&group)
+	if err != nil {
+		restErrWithLog(
+			w, l, errors.Wrap(err, "failed to decode device group data"),
+			http.StatusBadRequest)
+		return
+	}
+	if _, err = govalidator.ValidateStruct(group); err != nil {
+		restErrWithLog(w, l, err, http.StatusBadRequest)
+		return
+	}
+
+	inv, err := i.createInventory(config.Config, l)
+	if err != nil {
+		restErrWithLogInternal(w, l, err)
+		return
+	}
+
+	err = inv.UpdateDeviceGroup(DeviceID(devId), GroupName(group.Group))
+	if err != nil {
+		if cause := errors.Cause(err); cause != nil && cause == ErrDevNotFound {
+			restErrWithLog(w, l, err, http.StatusNotFound)
+			return
+		}
+		restErrWithLogInternal(w, l, err)
+		return
+	}
 	w.WriteHeader(http.StatusNoContent)
 }
 

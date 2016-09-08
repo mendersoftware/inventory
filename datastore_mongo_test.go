@@ -640,6 +640,80 @@ func TestMongoUpsertAttributes(t *testing.T) {
 	//wipe(d)
 }
 
+func TestMongoUpdateDeviceGroup(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping TestMongoUpdateDeviceGroup in short mode.")
+	}
+
+	testCases := map[string]struct {
+		InputDeviceID  DeviceID
+		InputGroupName GroupName
+		InputDevice    *Device
+		OutputError    error
+	}{
+		"update group for device with empty device id": {
+			InputDeviceID:  DeviceID(""),
+			InputGroupName: GroupName("abc"),
+			InputDevice:    nil,
+			OutputError:    ErrDevNotFound,
+		},
+		"update group for device, device not found": {
+			InputDeviceID:  DeviceID("2"),
+			InputGroupName: GroupName("abc"),
+			InputDevice:    nil,
+			OutputError:    ErrDevNotFound,
+		},
+		"update group for device, group exists": {
+			InputDeviceID:  DeviceID("1"),
+			InputGroupName: GroupName("abc"),
+			InputDevice: &Device{
+				ID:    DeviceID("1"),
+				Group: GroupName("def"),
+			},
+		},
+		"update group for device, group does not exist": {
+			InputDeviceID:  DeviceID("1"),
+			InputGroupName: GroupName("abc"),
+			InputDevice: &Device{
+				ID:    DeviceID("1"),
+				Group: GroupName(""),
+			},
+		},
+	}
+
+	for name, testCase := range testCases {
+		t.Logf("test case: %s", name)
+
+		// Make sure we start test with empty database
+		db.Wipe()
+
+		session := db.Session()
+		store := NewDataStoreMongoWithSession(session)
+
+		if testCase.InputDevice != nil {
+			session.DB(DbName).C(DbDevicesColl).Insert(testCase.InputDevice)
+		}
+
+		err := store.UpdateDeviceGroup(testCase.InputDeviceID, testCase.InputGroupName)
+		if testCase.OutputError != nil {
+			assert.Error(t, err, "expected error")
+
+			assert.EqualError(t, err, testCase.OutputError.Error())
+		} else {
+			assert.NoError(t, err, "expected no error")
+
+			groupsColl := session.DB(DbName).C(DbDevicesColl)
+			count, err := groupsColl.Find(bson.M{"group": GroupName("abc")}).Count()
+			assert.NoError(t, err, "expected no error")
+
+			assert.Equal(t, 1, count)
+		}
+
+		// Need to close all sessions to be able to call wipe at next test case
+		session.Close()
+	}
+}
+
 func strPtr(s string) *string {
 	return &s
 }

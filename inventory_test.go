@@ -226,6 +226,49 @@ func TestInventoryUnsetDeviceGroup(t *testing.T) {
 	}
 }
 
+func TestInventoryUpdateDeviceGroup(t *testing.T) {
+	t.Parallel()
+
+	testCases := map[string]struct {
+		inDeviceID     DeviceID
+		inGroupName    GroupName
+		datastoreError error
+		outError       error
+	}{
+		"empty device ID, not found": {
+			inDeviceID:     DeviceID(""),
+			inGroupName:    GroupName("gr1"),
+			datastoreError: ErrDevNotFound,
+			outError:       errors.New("failed to add device to group: Device not found"),
+		},
+		"datastore success": {
+			inDeviceID:     DeviceID("1"),
+			inGroupName:    GroupName("gr1"),
+			datastoreError: nil,
+			outError:       nil,
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Logf("test case: %s", name)
+
+		db := &MockDataStore{}
+		db.On("UpdateDeviceGroup", AnythingOfType("main.DeviceID"), AnythingOfType("main.GroupName")).
+			Return(tc.datastoreError)
+		i := invForTest(db)
+
+		err := i.UpdateDeviceGroup(tc.inDeviceID, tc.inGroupName)
+
+		if tc.outError != nil {
+			if assert.Error(t, err) {
+				assert.EqualError(t, err, tc.outError.Error())
+			}
+		} else {
+			assert.NoError(t, err)
+		}
+	}
+}
+
 func TestNewInventory(t *testing.T) {
 	t.Parallel()
 
