@@ -45,6 +45,7 @@ type InventoryApp interface {
 	UpsertAttributes(id DeviceID, attrs DeviceAttributes) error
 	UnsetDeviceGroup(id DeviceID, groupName GroupName) error
 	UpdateDeviceGroup(id DeviceID, group GroupName) error
+	ListGroups() ([]GroupName, error)
 }
 
 type Inventory struct {
