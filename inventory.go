@@ -115,3 +115,15 @@ func (i *Inventory) UpdateDeviceGroup(devid DeviceID, group GroupName) error {
 	}
 	return nil
 }
+
+func (i *Inventory) ListGroups() ([]GroupName, error) {
+	groups, err := i.db.ListGroups()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to list groups")
+	}
+
+	if groups == nil {
+		return []GroupName{}, nil
+	}
+	return groups, nil
+}
