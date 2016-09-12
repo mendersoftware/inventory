@@ -819,3 +819,88 @@ func TestMongoUnsetDevicesGroupWithGroupName(t *testing.T) {
 		session.Close()
 	}
 }
+
+func TestMongoListGroups(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping TestMongoListGroups in short mode.")
+	}
+
+	testCases := map[string]struct {
+		InputDevices []Device
+		OutputGroups []GroupName
+	}{
+		"groups foo, bar": {
+			InputDevices: []Device{
+				{
+					ID:    DeviceID("1"),
+					Group: GroupName("foo"),
+				},
+				{
+					ID:    DeviceID("2"),
+					Group: GroupName("foo"),
+				},
+				{
+					ID:    DeviceID("3"),
+					Group: GroupName("foo"),
+				},
+				{
+					ID:    DeviceID("4"),
+					Group: GroupName("bar"),
+				},
+				{
+					ID:    DeviceID("5"),
+					Group: GroupName(""),
+				},
+			},
+			OutputGroups: []GroupName{"foo", "bar"},
+		},
+		"no groups": {
+			InputDevices: []Device{
+				{
+					ID:    DeviceID("1"),
+					Group: GroupName(""),
+				},
+				{
+					ID:    DeviceID("2"),
+					Group: GroupName(""),
+				},
+				{
+					ID:    DeviceID("3"),
+					Group: GroupName(""),
+				},
+			},
+			OutputGroups: []GroupName{},
+		},
+	}
+
+	for name, testCase := range testCases {
+		t.Logf("test case: %s", name)
+
+		db.Wipe()
+
+		session := db.Session()
+
+		for _, d := range testCase.InputDevices {
+			session.DB(DbName).C(DbDevicesColl).Insert(d)
+		}
+
+		// Make sure we start test with empty database
+		store := NewDataStoreMongoWithSession(session)
+
+		groups, err := store.ListGroups()
+		assert.NoError(t, err, "expected no error")
+
+		t.Logf("groups: %v", groups)
+		if testCase.OutputGroups != nil {
+			assert.Len(t, groups, len(testCase.OutputGroups))
+			for _, eg := range testCase.OutputGroups {
+				assert.Contains(t, groups, eg)
+			}
+		} else {
+			assert.Len(t, groups, 0)
+		}
+
+		session.Close()
+
+	}
+}
