@@ -339,7 +339,7 @@ paths:
 
   /groups/{name}/devices:
     get:
-      summary: List group's devices (paged collection).
+      summary: List group's device IDs.
       parameters:
         - name: page
           in: query
@@ -370,7 +370,7 @@ paths:
           schema:
             type: array
             items:
-              $ref: '#/definitions/Device'
+              type: string
         400:
           description: Bad request.
           schema:

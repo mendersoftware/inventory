@@ -28,12 +28,13 @@ import (
 )
 
 const (
-	uriDevices      = "/api/0.1.0/devices"
-	uriDevice       = "/api/0.1.0/devices/:id"
-	uriDeviceGroups = "/api/0.1.0/devices/:id/group"
-	uriDeviceGroup  = "/api/0.1.0/devices/:id/group/:name"
-	uriAttributes   = "/api/0.1.0/attributes"
-	uriGroups       = "/api/0.1.0/groups"
+	uriDevices       = "/api/0.1.0/devices"
+	uriDevice        = "/api/0.1.0/devices/:id"
+	uriDeviceGroups  = "/api/0.1.0/devices/:id/group"
+	uriDeviceGroup   = "/api/0.1.0/devices/:id/group/:name"
+	uriAttributes    = "/api/0.1.0/attributes"
+	uriGroups        = "/api/0.1.0/groups"
+	uriGroupsDevices = "/api/0.1.0/groups/:name/devices"
 
 	LogHttpCode = "http_code"
 )
@@ -76,6 +77,7 @@ func (i *InventoryHandlers) GetApp() (rest.App, error) {
 		rest.Patch(uriAttributes, i.PatchDeviceAttributesHandler),
 		rest.Put(uriDeviceGroups, i.AddDeviceToGroupHandler),
 		rest.Get(uriGroups, i.GetGroupsHandler),
+		rest.Get(uriGroupsDevices, i.GetDevicesByGroup),
 	}
 
 	routes = append(routes)
@@ -361,6 +363,49 @@ func (i *InventoryHandlers) AddDeviceToGroupHandler(w rest.ResponseWriter, r *re
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (i *InventoryHandlers) GetDevicesByGroup(w rest.ResponseWriter, r *rest.Request) {
+	l := requestlog.GetRequestLogger(r.Env)
+
+	group := r.PathParam("name")
+
+	page, perPage, err := utils.ParsePagination(r)
+	if err != nil {
+		restErrWithLog(w, l, err, http.StatusBadRequest)
+		return
+	}
+
+	inv, err := i.createInventory(config.Config, l)
+	if err != nil {
+		restErrWithLogInternal(w, l, err)
+		return
+	}
+
+	//get one extra device to see if there's a 'next' page
+	ids, err := inv.ListDevicesByGroup(GroupName(group), int((page-1)*perPage), int(perPage+1))
+	if err != nil {
+		if err == ErrGroupNotFound {
+			restErrWithLog(w, l, err, http.StatusNotFound)
+		} else {
+			restErrWithLogInternal(w, l, err)
+		}
+		return
+	}
+
+	len := len(ids)
+	hasNext := false
+	if uint64(len) > perPage {
+		hasNext = true
+		len = int(perPage)
+	}
+
+	links := utils.MakePageLinkHdrs(r, page, perPage, hasNext)
+	for _, l := range links {
+		w.Header().Add("Link", l)
+	}
+	w.WriteJson(ids[:len])
+
 }
 
 func parseDevice(r *rest.Request) (*Device, error) {
