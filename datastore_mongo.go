@@ -39,6 +39,8 @@ var (
 
 	// once ensures mgoMaster is created only once
 	once sync.Once
+
+	ErrGroupNotFound = errors.New("group not found")
 )
 
 type DataStoreMongo struct {
@@ -242,4 +244,38 @@ func (db *DataStoreMongo) ListGroups() ([]GroupName, error) {
 		return nil, errors.Wrap(err, "failed to list device groups")
 	}
 	return groups, nil
+}
+
+func (db *DataStoreMongo) GetDevicesByGroup(group GroupName, skip, limit int) ([]DeviceID, error) {
+	s := db.session.Copy()
+	defer s.Close()
+	c := s.DB(DbName).C(DbDevicesColl)
+
+	filter := bson.M{DbDevGroup: group}
+
+	//first, find if the group exists at all, i.e. if any dev is assigned
+	var dev Device
+	err := c.Find(filter).One(&dev)
+	if err != nil {
+		if err == mgo.ErrNotFound {
+			return nil, ErrGroupNotFound
+		} else {
+			return nil, errors.Wrap(err, "failed to get devices for group")
+		}
+	}
+
+	res := []Device{}
+
+	//get group's devices; select only the '_id' field
+	err = c.Find(filter).Select(bson.M{"_id": 1}).Skip(skip).Limit(limit).Sort("_id").All(&res)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get devices for group")
+	}
+
+	resIds := make([]DeviceID, len(res))
+	for i, d := range res {
+		resIds[i] = d.ID
+	}
+
+	return resIds, nil
 }
