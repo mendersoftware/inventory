@@ -230,3 +230,16 @@ func (db *DataStoreMongo) UpdateDeviceGroup(devId DeviceID, newGroup GroupName) 
 	}
 	return nil
 }
+
+func (db *DataStoreMongo) ListGroups() ([]GroupName, error) {
+	s := db.session.Copy()
+	defer s.Close()
+	c := s.DB(DbName).C(DbDevicesColl)
+
+	var groups []GroupName
+	err := c.Find(bson.M{}).Distinct("group", &groups)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to list device groups")
+	}
+	return groups, nil
+}

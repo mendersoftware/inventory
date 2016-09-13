@@ -98,3 +98,10 @@ func (_m *MockInventoryApp) UpdateDeviceGroup(devId DeviceID, group GroupName) e
 
 	return r0
 }
+
+// List groups mock
+func (_m *MockInventoryApp) ListGroups() ([]GroupName, error) {
+	ret := _m.Called()
+
+	return ret.Get(0).([]GroupName), ret.Error(1)
+}

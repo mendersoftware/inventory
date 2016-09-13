@@ -48,4 +48,7 @@ type DataStore interface {
 
 	// Updates device group
 	UpdateDeviceGroup(devid DeviceID, group GroupName) error
+
+	// List groups
+	ListGroups() ([]GroupName, error)
 }

@@ -323,37 +323,15 @@ paths:
             $ref: '#/definitions/Error'
   /groups:
     get:
-      summary: List groups, with paging.
-      parameters:
-        - name: page
-          in: query
-          description: Starting page
-          required: false
-          type: number
-          format: integer
-          default: 1
-        - name: per_page
-          in: query
-          description: Number of results per page
-          required: false
-          type: number
-          format: integer
-          default: 10
+      summary: List groups
       responses:
         200:
           description: Successful response
-          headers:
-            Link:
-              type: string
-              description: Standard header, we support 'first', 'next', and 'prev'.
           schema:
             type: array
             items:
-              $ref: '#/definitions/Group'
-        400:
-          description: Bad request.
-          schema:
-            $ref: '#/definitions/Error'
+              description: Group name
+              type: string
         500:
           description: Internal error.
           schema:

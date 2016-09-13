@@ -45,6 +45,7 @@ type InventoryApp interface {
 	UpsertAttributes(id DeviceID, attrs DeviceAttributes) error
 	UnsetDeviceGroup(id DeviceID, groupName GroupName) error
 	UpdateDeviceGroup(id DeviceID, group GroupName) error
+	ListGroups() ([]GroupName, error)
 }
 
 type Inventory struct {
@@ -113,4 +114,16 @@ func (i *Inventory) UpdateDeviceGroup(devid DeviceID, group GroupName) error {
 		return errors.Wrap(err, "failed to add device to group")
 	}
 	return nil
+}
+
+func (i *Inventory) ListGroups() ([]GroupName, error) {
+	groups, err := i.db.ListGroups()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to list groups")
+	}
+
+	if groups == nil {
+		return []GroupName{}, nil
+	}
+	return groups, nil
 }

@@ -120,3 +120,10 @@ func (_m *MockDataStore) UpdateDeviceGroup(devId DeviceID, group GroupName) erro
 
 	return r0
 }
+
+// List groups mock
+func (_m *MockDataStore) ListGroups() ([]GroupName, error) {
+	ret := _m.Called()
+
+	return ret.Get(0).([]GroupName), ret.Error(1)
+}

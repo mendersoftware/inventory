@@ -33,6 +33,7 @@ const (
 	uriDeviceGroups = "/api/0.1.0/devices/:id/group"
 	uriDeviceGroup  = "/api/0.1.0/devices/:id/group/:name"
 	uriAttributes   = "/api/0.1.0/attributes"
+	uriGroups       = "/api/0.1.0/groups"
 
 	LogHttpCode = "http_code"
 )
@@ -73,6 +74,7 @@ func (i *InventoryHandlers) GetApp() (rest.App, error) {
 		rest.Delete(uriDeviceGroup, i.DeleteDeviceGroupHandler),
 		rest.Patch(uriAttributes, i.PatchDeviceAttributesHandler),
 		rest.Put(uriDeviceGroups, i.AddDeviceToGroupHandler),
+		rest.Get(uriGroups, i.GetGroupsHandler),
 	}
 
 	routes = append(routes)
@@ -368,6 +370,28 @@ func parseAttributes(r *rest.Request) (DeviceAttributes, error) {
 	}
 
 	return attrs, nil
+}
+
+func (i *InventoryHandlers) GetGroupsHandler(w rest.ResponseWriter, r *rest.Request) {
+	l := requestlog.GetRequestLogger(r.Env)
+
+	inv, err := i.createInventory(config.Config, l)
+	if err != nil {
+		restErrWithLogInternal(w, l, err)
+		return
+	}
+
+	groups, err := inv.ListGroups()
+	if err != nil {
+		restErrWithLogInternal(w, l, err)
+		return
+	}
+
+	if groups == nil {
+		groups = []GroupName{}
+	}
+
+	w.WriteJson(groups)
 }
 
 // return selected http code + error message directly taken from error

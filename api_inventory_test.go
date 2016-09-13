@@ -776,3 +776,54 @@ func TestApiInventoryAddDeviceToGroup(t *testing.T) {
 		utils.CheckRecordedResponse(t, recorded, tc.JSONResponseParams)
 	}
 }
+
+func TestApiListGroups(t *testing.T) {
+	rest.ErrorFieldName = "error"
+
+	tcases := map[string]struct {
+		utils.JSONResponseParams
+
+		inReq        *http.Request
+		outputGroups []GroupName
+
+		inventoryErr error
+	}{
+		"some groups": {
+			inReq:        test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/groups", nil),
+			outputGroups: []GroupName{"foo", "bar"},
+			JSONResponseParams: utils.JSONResponseParams{
+				OutputStatus:     http.StatusOK,
+				OutputBodyObject: []string{"foo", "bar"},
+			},
+		},
+		"no groups": {
+			inReq: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/groups", nil),
+			JSONResponseParams: utils.JSONResponseParams{
+				OutputStatus:     http.StatusOK,
+				OutputBodyObject: []string{},
+			},
+		},
+		"error": {
+			inReq: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/groups", nil),
+			JSONResponseParams: utils.JSONResponseParams{
+				OutputStatus:     http.StatusInternalServerError,
+				OutputBodyObject: RestError("internal error"),
+			},
+			inventoryErr: errors.New("internal error"),
+		},
+	}
+
+	for name, tc := range tcases {
+		t.Logf("test case: %s", name)
+		inv := MockInventoryApp{}
+		inv.On("ListGroups").Return(tc.outputGroups, tc.inventoryErr)
+
+		factory := func(c config.Reader, l *log.Logger) (InventoryApp, error) {
+			return &inv, nil
+		}
+		apih := makeMockApiHandler(t, factory)
+
+		recorded := test.RunRequest(t, apih, tc.inReq)
+		utils.CheckRecordedResponse(t, recorded, tc.JSONResponseParams)
+	}
+}

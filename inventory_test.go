@@ -269,6 +269,53 @@ func TestInventoryUpdateDeviceGroup(t *testing.T) {
 	}
 }
 
+func TestInventoryListGroups(t *testing.T) {
+	t.Parallel()
+
+	testCases := map[string]struct {
+		inputGroups    []GroupName
+		datastoreError error
+		outputGroups   []GroupName
+		outError       error
+	}{
+		"some groups": {
+			inputGroups:  []GroupName{"foo", "bar"},
+			outputGroups: []GroupName{"foo", "bar"},
+		},
+		"no groups - nil": {
+			inputGroups:  nil,
+			outputGroups: []GroupName{},
+		},
+		"no groups - empty slice": {
+			inputGroups:  []GroupName{},
+			outputGroups: []GroupName{},
+		},
+		"error": {
+			datastoreError: errors.New("random error"),
+			outError:       errors.New("failed to list groups: random error"),
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Logf("test case: %s", name)
+
+		db := &MockDataStore{}
+		db.On("ListGroups").Return(tc.inputGroups, tc.datastoreError)
+		i := invForTest(db)
+
+		groups, err := i.ListGroups()
+
+		if tc.outError != nil {
+			if assert.Error(t, err) {
+				assert.EqualError(t, err, tc.outError.Error())
+			}
+		} else {
+			assert.NoError(t, err)
+			assert.EqualValues(t, tc.outputGroups, groups)
+		}
+	}
+}
+
 func TestNewInventory(t *testing.T) {
 	t.Parallel()
 
