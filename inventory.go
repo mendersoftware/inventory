@@ -41,6 +41,7 @@ type Sort struct {
 // this inventory service interface
 type InventoryApp interface {
 	ListDevices(skip int, limit int, filters []Filter, sort *Sort, hasGroup *bool) ([]Device, error)
+	GetDevice(id DeviceID) (*Device, error)
 	AddDevice(d *Device) error
 	UpsertAttributes(id DeviceID, attrs DeviceAttributes) error
 	UnsetDeviceGroup(id DeviceID, groupName GroupName) error
@@ -73,6 +74,17 @@ func (i *Inventory) ListDevices(skip int, limit int, filters []Filter, sort *Sor
 	}
 
 	return devs, nil
+}
+
+func (i *Inventory) GetDevice(id DeviceID) (*Device, error) {
+	dev, err := i.db.GetDevice(id)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to fetch device")
+	}
+	if dev == nil {
+		return nil, ErrDevNotFound
+	}
+	return dev, nil
 }
 
 func (i *Inventory) AddDevice(dev *Device) error {
