@@ -81,9 +81,6 @@ func (i *Inventory) GetDevice(id DeviceID) (*Device, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to fetch device")
 	}
-	if dev == nil {
-		return nil, ErrDevNotFound
-	}
 	return dev, nil
 }
 

@@ -112,7 +112,6 @@ func TestInventoryGetDevice(t *testing.T) {
 		"no device": {
 			devid:     DeviceID("2"),
 			outDevice: nil,
-			outError:  ErrDevNotFound,
 		},
 		"datastore error": {
 			devid:          DeviceID("3"),
@@ -138,7 +137,11 @@ func TestInventoryGetDevice(t *testing.T) {
 			}
 		} else {
 			assert.NoError(t, err)
-			assert.Equal(t, *tc.outDevice, *dev)
+			if tc.outDevice != nil && assert.NotNil(t, dev) {
+				assert.Equal(t, *tc.outDevice, *dev)
+			} else {
+				assert.Nil(t, dev)
+			}
 		}
 	}
 }
