@@ -843,7 +843,6 @@ func TestApiGetDevice(t *testing.T) {
 			inDevId:      DeviceID("1"),
 			inReq:        test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices/1", nil),
 			outputDevice: nil,
-			inventoryErr: ErrDevNotFound,
 			JSONResponseParams: utils.JSONResponseParams{
 				OutputStatus:     http.StatusNotFound,
 				OutputBodyObject: RestError(ErrDevNotFound.Error()),

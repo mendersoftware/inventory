@@ -224,12 +224,11 @@ func (i *InventoryHandlers) GetDeviceHandler(w rest.ResponseWriter, r *rest.Requ
 
 	dev, err := inv.GetDevice(DeviceID(deviceID))
 	if err != nil {
-		cause := errors.Cause(err)
-		if cause != nil && cause == ErrDevNotFound {
-			restErrWithLog(w, l, err, http.StatusNotFound)
-			return
-		}
 		restErrWithLogInternal(w, l, err)
+		return
+	}
+	if dev == nil {
+		restErrWithLog(w, l, ErrDevNotFound, http.StatusNotFound)
 		return
 	}
 
