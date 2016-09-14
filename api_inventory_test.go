@@ -827,3 +827,65 @@ func TestApiListGroups(t *testing.T) {
 		utils.CheckRecordedResponse(t, recorded, tc.JSONResponseParams)
 	}
 }
+
+func TestApiGetDevice(t *testing.T) {
+	rest.ErrorFieldName = "error"
+
+	tcases := map[string]struct {
+		utils.JSONResponseParams
+
+		inReq        *http.Request
+		inDevId      DeviceID
+		outputDevice *Device
+		inventoryErr error
+	}{
+		"no device": {
+			inDevId:      DeviceID("1"),
+			inReq:        test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices/1", nil),
+			outputDevice: nil,
+			inventoryErr: ErrDevNotFound,
+			JSONResponseParams: utils.JSONResponseParams{
+				OutputStatus:     http.StatusNotFound,
+				OutputBodyObject: RestError(ErrDevNotFound.Error()),
+			},
+		},
+		"some device": {
+			inDevId: DeviceID("2"),
+			inReq:   test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices/2", nil),
+			outputDevice: &Device{
+				ID:    DeviceID("2"),
+				Group: GroupName("foo"),
+			},
+			JSONResponseParams: utils.JSONResponseParams{
+				OutputStatus: http.StatusOK,
+				OutputBodyObject: Device{
+					ID:    DeviceID("2"),
+					Group: GroupName("foo"),
+				},
+			},
+		},
+		"error": {
+			inDevId: DeviceID("3"),
+			inReq:   test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices/3", nil),
+			JSONResponseParams: utils.JSONResponseParams{
+				OutputStatus:     http.StatusInternalServerError,
+				OutputBodyObject: RestError("internal error"),
+			},
+			inventoryErr: errors.New("internal error"),
+		},
+	}
+
+	for name, tc := range tcases {
+		t.Logf("test case: %s", name)
+		inv := MockInventoryApp{}
+		inv.On("GetDevice", tc.inDevId).Return(tc.outputDevice, tc.inventoryErr)
+
+		factory := func(c config.Reader, l *log.Logger) (InventoryApp, error) {
+			return &inv, nil
+		}
+		apih := makeMockApiHandler(t, factory)
+
+		recorded := test.RunRequest(t, apih, tc.inReq)
+		utils.CheckRecordedResponse(t, recorded, tc.JSONResponseParams)
+	}
+}
