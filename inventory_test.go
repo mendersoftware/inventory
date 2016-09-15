@@ -95,6 +95,57 @@ func TestInventoryListDevices(t *testing.T) {
 	}
 }
 
+func TestInventoryGetDevice(t *testing.T) {
+	t.Parallel()
+
+	group := GroupName("asd")
+	testCases := map[string]struct {
+		devid          DeviceID
+		datastoreError error
+		outError       error
+		outDevice      *Device
+	}{
+		"has device": {
+			devid:     DeviceID("1"),
+			outDevice: &Device{ID: DeviceID("1"), Group: group},
+		},
+		"no device": {
+			devid:     DeviceID("2"),
+			outDevice: nil,
+		},
+		"datastore error": {
+			devid:          DeviceID("3"),
+			datastoreError: errors.New("db connection failed"),
+			outError:       errors.New("failed to fetch device: db connection failed"),
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Logf("test case: %s", name)
+
+		db := &MockDataStore{}
+		db.On("GetDevice",
+			AnythingOfType("DeviceID"),
+		).Return(tc.outDevice, tc.datastoreError)
+		i := invForTest(db)
+
+		dev, err := i.GetDevice(tc.devid)
+
+		if tc.outError != nil {
+			if assert.Error(t, err) {
+				assert.EqualError(t, err, tc.outError.Error())
+			}
+		} else {
+			assert.NoError(t, err)
+			if tc.outDevice != nil && assert.NotNil(t, dev) {
+				assert.Equal(t, *tc.outDevice, *dev)
+			} else {
+				assert.Nil(t, dev)
+			}
+		}
+	}
+}
+
 func TestInventoryAddDevice(t *testing.T) {
 	t.Parallel()
 

@@ -105,3 +105,9 @@ func (_m *MockInventoryApp) ListGroups() ([]GroupName, error) {
 
 	return ret.Get(0).([]GroupName), ret.Error(1)
 }
+
+func (_m *MockInventoryApp) GetDevice(id DeviceID) (*Device, error) {
+	ret := _m.Called(id)
+
+	return ret.Get(0).(*Device), ret.Error(1)
+}

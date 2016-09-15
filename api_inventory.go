@@ -71,6 +71,7 @@ func (i *InventoryHandlers) GetApp() (rest.App, error) {
 	routes := []*rest.Route{
 		rest.Get(uriDevices, i.GetDevicesHandler),
 		rest.Post(uriDevices, i.AddDeviceHandler),
+		rest.Get(uriDevice, i.GetDeviceHandler),
 		rest.Delete(uriDeviceGroup, i.DeleteDeviceGroupHandler),
 		rest.Patch(uriAttributes, i.PatchDeviceAttributesHandler),
 		rest.Put(uriDeviceGroups, i.AddDeviceToGroupHandler),
@@ -209,6 +210,29 @@ func (i *InventoryHandlers) GetDevicesHandler(w rest.ResponseWriter, r *rest.Req
 		w.Header().Add("Link", l)
 	}
 	w.WriteJson(devs[:len])
+}
+
+func (i *InventoryHandlers) GetDeviceHandler(w rest.ResponseWriter, r *rest.Request) {
+	deviceID := r.PathParam("id")
+	l := requestlog.GetRequestLogger(r.Env)
+
+	inv, err := i.createInventory(config.Config, l)
+	if err != nil {
+		restErrWithLogInternal(w, l, err)
+		return
+	}
+
+	dev, err := inv.GetDevice(DeviceID(deviceID))
+	if err != nil {
+		restErrWithLogInternal(w, l, err)
+		return
+	}
+	if dev == nil {
+		restErrWithLog(w, l, ErrDevNotFound, http.StatusNotFound)
+		return
+	}
+
+	w.WriteJson(dev)
 }
 
 func (i *InventoryHandlers) AddDeviceHandler(w rest.ResponseWriter, r *rest.Request) {
