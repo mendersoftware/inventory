@@ -431,6 +431,65 @@ func TestInventoryListDevicesByGroup(t *testing.T) {
 	}
 }
 
+func TestInventoryGetDeviceGroup(t *testing.T) {
+	t.Parallel()
+
+	testCases := map[string]struct {
+		DatastoreError error
+		DatastoreGroup GroupName
+		OutError       error
+		OutGroup       GroupName
+	}{
+		"success - device has group": {
+			DatastoreError: nil,
+			DatastoreGroup: GroupName("dev"),
+			OutError:       nil,
+			OutGroup:       GroupName("dev"),
+		},
+		"success - device has no group": {
+			DatastoreError: nil,
+			DatastoreGroup: GroupName(""),
+			OutError:       nil,
+			OutGroup:       GroupName(""),
+		},
+		"datastore error - device not found": {
+			DatastoreError: ErrDevNotFound,
+			DatastoreGroup: GroupName(""),
+			OutError:       ErrDevNotFound,
+			OutGroup:       GroupName(""),
+		},
+		"datastore error - generic": {
+			DatastoreError: errors.New("datastore error"),
+			DatastoreGroup: GroupName(""),
+			OutError:       errors.New("failed to get device's group: datastore error"),
+			OutGroup:       GroupName(""),
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Logf("test case: %s", name)
+
+		db := &MockDataStore{}
+
+		db.On("GetDeviceGroup",
+			AnythingOfType("main.DeviceID"),
+		).Return(tc.OutGroup, tc.DatastoreError)
+
+		i := invForTest(db)
+
+		group, err := i.GetDeviceGroup("foo")
+
+		if tc.OutError != nil {
+			if assert.Error(t, err) {
+				assert.EqualError(t, err, tc.OutError.Error())
+			}
+		} else {
+			assert.NoError(t, err)
+			assert.Equal(t, tc.OutGroup, group)
+		}
+	}
+}
+
 func TestNewInventory(t *testing.T) {
 	t.Parallel()
 

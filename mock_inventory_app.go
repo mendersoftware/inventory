@@ -134,3 +134,24 @@ func (_m *MockInventoryApp) ListDevicesByGroup(group GroupName, skip int, limit 
 
 	return r0, r1
 }
+
+// GetDeviceGroup provides a mock function with given fields: id
+func (_m *MockInventoryApp) GetDeviceGroup(id DeviceID) (GroupName, error) {
+	ret := _m.Called(id)
+
+	var r0 GroupName
+	if rf, ok := ret.Get(0).(func(DeviceID) GroupName); ok {
+		r0 = rf(id)
+	} else {
+		r0 = ret.Get(0).(GroupName)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(DeviceID) error); ok {
+		r1 = rf(id)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
