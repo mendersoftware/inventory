@@ -127,3 +127,26 @@ func (_m *MockDataStore) ListGroups() ([]GroupName, error) {
 
 	return ret.Get(0).([]GroupName), ret.Error(1)
 }
+
+// GetDevicesByGroup provides a mock function with given fields: group, skip, limit
+func (_m *MockDataStore) GetDevicesByGroup(group GroupName, skip int, limit int) ([]DeviceID, error) {
+	ret := _m.Called(group, skip, limit)
+
+	var r0 []DeviceID
+	if rf, ok := ret.Get(0).(func(GroupName, int, int) []DeviceID); ok {
+		r0 = rf(group, skip, limit)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]DeviceID)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(GroupName, int, int) error); ok {
+		r1 = rf(group, skip, limit)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}

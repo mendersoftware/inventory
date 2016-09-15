@@ -904,3 +904,134 @@ func TestMongoListGroups(t *testing.T) {
 
 	}
 }
+
+func TestGetDevicesByGroup(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping TestGetDevicesByGroup in short mode.")
+	}
+
+	inputDevices := []Device{
+		Device{
+			ID:    DeviceID("1"),
+			Group: GroupName("dev"),
+		},
+		Device{
+			ID:    DeviceID("2"),
+			Group: GroupName("prod"),
+		},
+		Device{
+			ID:    DeviceID("3"),
+			Group: GroupName("test"),
+		},
+		Device{
+			ID:    DeviceID("4"),
+			Group: GroupName("prod"),
+		},
+		Device{
+			ID:    DeviceID("5"),
+			Group: GroupName("prod"),
+		},
+		Device{
+			ID:    DeviceID("6"),
+			Group: GroupName("dev"),
+		},
+		Device{
+			ID:    DeviceID("7"),
+			Group: GroupName("test"),
+		},
+		Device{
+			ID:    DeviceID("8"),
+			Group: GroupName("dev"),
+		},
+	}
+
+	testCases := map[string]struct {
+		InputGroupName GroupName
+		InputSkip      int
+		InputLimit     int
+		OutputDevices  []DeviceID
+		OutputError    error
+	}{
+		"no skip, no limit": {
+			InputGroupName: "dev",
+			InputSkip:      0,
+			InputLimit:     0,
+			OutputDevices: []DeviceID{
+
+				DeviceID("1"),
+				DeviceID("6"),
+				DeviceID("8"),
+			},
+			OutputError: nil,
+		},
+		"no skip, limit": {
+			InputGroupName: "prod",
+			InputSkip:      0,
+			InputLimit:     2,
+			OutputDevices: []DeviceID{
+				DeviceID("2"),
+				DeviceID("4"),
+			},
+			OutputError: nil,
+		},
+		"skip, no limit": {
+			InputGroupName: "dev",
+			InputSkip:      2,
+			InputLimit:     0,
+			OutputDevices: []DeviceID{
+				DeviceID("8"),
+			},
+			OutputError: nil,
+		},
+		"skip + limit": {
+			InputGroupName: "prod",
+			InputSkip:      1,
+			InputLimit:     1,
+			OutputDevices: []DeviceID{
+				DeviceID("4"),
+			},
+			OutputError: nil,
+		},
+		"no results (past last page)": {
+			InputGroupName: "dev",
+			InputSkip:      10,
+			InputLimit:     1,
+			OutputDevices:  []DeviceID{},
+			OutputError:    nil,
+		},
+		"group doesn't exist": {
+			InputGroupName: "unknown",
+			InputSkip:      0,
+			InputLimit:     0,
+			OutputDevices:  nil,
+			OutputError:    ErrGroupNotFound,
+		},
+	}
+
+	db.Wipe()
+	session := db.Session()
+
+	for _, d := range inputDevices {
+		err := session.DB(DbName).C(DbDevicesColl).Insert(d)
+		assert.NoError(t, err, "failed to setup input data")
+	}
+
+	for name, tc := range testCases {
+		t.Logf("test case: %s", name)
+
+		store := NewDataStoreMongoWithSession(session)
+
+		devs, err := store.GetDevicesByGroup(tc.InputGroupName, tc.InputSkip, tc.InputLimit)
+
+		if tc.OutputError != nil {
+			assert.EqualError(t, err, tc.OutputError.Error())
+		} else {
+			assert.NoError(t, err, "expected no error")
+			if !reflect.DeepEqual(tc.OutputDevices, devs) {
+				assert.Fail(t, "expected: %v\nhave: %v", tc.OutputDevices, devs)
+			}
+		}
+	}
+
+	session.Close()
+}

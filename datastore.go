@@ -51,4 +51,7 @@ type DataStore interface {
 
 	// List groups
 	ListGroups() ([]GroupName, error)
+
+	// Lists devices belonging to a group
+	GetDevicesByGroup(group GroupName, skip, limit int) ([]DeviceID, error)
 }

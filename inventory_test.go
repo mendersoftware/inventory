@@ -17,6 +17,7 @@ import (
 	"errors"
 	"github.com/stretchr/testify/assert"
 	. "github.com/stretchr/testify/mock"
+	"reflect"
 	"testing"
 )
 
@@ -351,6 +352,7 @@ func TestInventoryListGroups(t *testing.T) {
 		t.Logf("test case: %s", name)
 
 		db := &MockDataStore{}
+
 		db.On("ListGroups").Return(tc.inputGroups, tc.datastoreError)
 		i := invForTest(db)
 
@@ -363,6 +365,68 @@ func TestInventoryListGroups(t *testing.T) {
 		} else {
 			assert.NoError(t, err)
 			assert.EqualValues(t, tc.outputGroups, groups)
+		}
+	}
+}
+
+func TestInventoryListDevicesByGroup(t *testing.T) {
+	t.Parallel()
+
+	testCases := map[string]struct {
+		DatastoreError error
+		OutError       string
+		OutDevices     []DeviceID
+	}{
+		"success": {
+			DatastoreError: nil,
+			OutError:       "",
+			OutDevices: []DeviceID{
+				DeviceID("1"),
+				DeviceID("2"),
+				DeviceID("3"),
+			},
+		},
+		"success - empty list": {
+			DatastoreError: nil,
+			OutError:       "",
+			OutDevices:     []DeviceID{},
+		},
+		"datastore error - group not found": {
+			DatastoreError: ErrGroupNotFound,
+			OutError:       "group not found",
+			OutDevices:     nil,
+		},
+		"datastore error - generic": {
+			DatastoreError: errors.New("datastore error"),
+			OutError:       "failed to list devices by group: datastore error",
+			OutDevices:     nil,
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Logf("test case: %s", name)
+
+		db := &MockDataStore{}
+
+		db.On("GetDevicesByGroup",
+			AnythingOfType("main.GroupName"),
+			AnythingOfType("int"),
+			AnythingOfType("int"),
+		).Return(tc.OutDevices, tc.DatastoreError)
+
+		i := invForTest(db)
+
+		devs, err := i.ListDevicesByGroup("foo", 1, 1)
+
+		if tc.OutError != "" {
+			if assert.Error(t, err) {
+				assert.EqualError(t, err, tc.OutError)
+			}
+		} else {
+			assert.NoError(t, err)
+			if !reflect.DeepEqual(tc.OutDevices, devs) {
+				assert.Fail(t, "expected: %v\nhave: %v", tc.OutDevices, devs)
+			}
 		}
 	}
 }
