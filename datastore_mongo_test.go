@@ -1035,3 +1035,66 @@ func TestGetDevicesByGroup(t *testing.T) {
 
 	session.Close()
 }
+
+func TestGetDeviceGroup(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping TestGetDeviceGroup in short mode.")
+	}
+
+	inputDevices := []Device{
+		Device{
+			ID:    DeviceID("1"),
+			Group: GroupName("dev"),
+		},
+		Device{
+			ID: DeviceID("2"),
+		},
+	}
+
+	testCases := map[string]struct {
+		InputDeviceID DeviceID
+		OutputGroup   GroupName
+		OutputError   error
+	}{
+		"dev has group": {
+			InputDeviceID: DeviceID("1"),
+			OutputGroup:   GroupName("dev"),
+			OutputError:   nil,
+		},
+		"dev has no group": {
+			InputDeviceID: DeviceID("2"),
+			OutputGroup:   "",
+			OutputError:   nil,
+		},
+		"dev doesn't exist": {
+			InputDeviceID: DeviceID("3"),
+			OutputGroup:   "",
+			OutputError:   ErrDevNotFound,
+		},
+	}
+
+	db.Wipe()
+	session := db.Session()
+
+	for _, d := range inputDevices {
+		err := session.DB(DbName).C(DbDevicesColl).Insert(d)
+		assert.NoError(t, err, "failed to setup input data")
+	}
+
+	for name, tc := range testCases {
+		t.Logf("test case: %s", name)
+
+		store := NewDataStoreMongoWithSession(session)
+
+		group, err := store.GetDeviceGroup(tc.InputDeviceID)
+
+		if tc.OutputError != nil {
+			assert.EqualError(t, err, tc.OutputError.Error())
+		} else {
+			assert.NoError(t, err, "expected no error")
+			assert.Equal(t, tc.OutputGroup, group)
+		}
+	}
+
+	session.Close()
+}
