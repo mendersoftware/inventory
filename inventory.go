@@ -48,6 +48,7 @@ type InventoryApp interface {
 	UpdateDeviceGroup(id DeviceID, group GroupName) error
 	ListGroups() ([]GroupName, error)
 	ListDevicesByGroup(group GroupName, skip int, limit int) ([]DeviceID, error)
+	GetDeviceGroup(id DeviceID) (GroupName, error)
 }
 
 type Inventory struct {
@@ -149,4 +150,17 @@ func (i *Inventory) ListDevicesByGroup(group GroupName, skip, limit int) ([]Devi
 	}
 
 	return ids, nil
+}
+
+func (i *Inventory) GetDeviceGroup(id DeviceID) (GroupName, error) {
+	group, err := i.db.GetDeviceGroup(id)
+	if err != nil {
+		if err == ErrDevNotFound {
+			return "", err
+		} else {
+			return "", errors.Wrap(err, "failed to get device's group")
+		}
+	}
+
+	return group, nil
 }

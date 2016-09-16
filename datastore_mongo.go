@@ -279,3 +279,22 @@ func (db *DataStoreMongo) GetDevicesByGroup(group GroupName, skip, limit int) ([
 
 	return resIds, nil
 }
+
+func (db *DataStoreMongo) GetDeviceGroup(id DeviceID) (GroupName, error) {
+	s := db.session.Copy()
+	defer s.Close()
+	c := s.DB(DbName).C(DbDevicesColl)
+
+	var dev Device
+
+	err := c.FindId(id).Select(bson.M{"group": 1}).One(&dev)
+	if err != nil {
+		if err == mgo.ErrNotFound {
+			return "", ErrDevNotFound
+		} else {
+			return "", errors.Wrap(err, "failed to get device")
+		}
+	}
+
+	return dev.Group, nil
+}

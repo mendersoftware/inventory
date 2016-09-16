@@ -76,6 +76,7 @@ func (i *InventoryHandlers) GetApp() (rest.App, error) {
 		rest.Delete(uriDeviceGroup, i.DeleteDeviceGroupHandler),
 		rest.Patch(uriAttributes, i.PatchDeviceAttributesHandler),
 		rest.Put(uriDeviceGroups, i.AddDeviceToGroupHandler),
+		rest.Get(uriDeviceGroups, i.GetDeviceGroupHandler),
 		rest.Get(uriGroups, i.GetGroupsHandler),
 		rest.Get(uriGroupsDevices, i.GetDevicesByGroup),
 	}
@@ -461,6 +462,35 @@ func (i *InventoryHandlers) GetGroupsHandler(w rest.ResponseWriter, r *rest.Requ
 	}
 
 	w.WriteJson(groups)
+}
+
+func (i *InventoryHandlers) GetDeviceGroupHandler(w rest.ResponseWriter, r *rest.Request) {
+	deviceID := r.PathParam("id")
+	l := requestlog.GetRequestLogger(r.Env)
+
+	inv, err := i.createInventory(config.Config, l)
+	if err != nil {
+		restErrWithLogInternal(w, l, err)
+		return
+	}
+
+	group, err := inv.GetDeviceGroup(DeviceID(deviceID))
+	if err != nil {
+		if err == ErrDevNotFound {
+			restErrWithLog(w, l, ErrDevNotFound, http.StatusNotFound)
+		} else {
+			restErrWithLogInternal(w, l, err)
+		}
+		return
+	}
+
+	ret := map[string]*GroupName{"group": nil}
+
+	if group != "" {
+		ret["group"] = &group
+	}
+
+	w.WriteJson(ret)
 }
 
 // return selected http code + error message directly taken from error

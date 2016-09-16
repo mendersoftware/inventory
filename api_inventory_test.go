@@ -1007,3 +1007,79 @@ func TestApiInventoryGetDevicesByGroup(t *testing.T) {
 		utils.CheckRecordedResponse(t, recorded, testCase.resp)
 	}
 }
+
+func TestApiGetDeviceGroup(t *testing.T) {
+	rest.ErrorFieldName = "error"
+
+	tcases := map[string]struct {
+		utils.JSONResponseParams
+
+		inReq *http.Request
+
+		inventoryGroup GroupName
+		inventoryErr   error
+	}{
+
+		/*
+		   device w group
+		   device n group
+		   no device
+		   generic error
+		*/
+
+		"device with group": {
+			inReq:          test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices/1/group", nil),
+			inventoryGroup: GroupName("dev"),
+			inventoryErr:   nil,
+
+			JSONResponseParams: utils.JSONResponseParams{
+				OutputStatus:     http.StatusOK,
+				OutputBodyObject: map[string]interface{}{"group": "dev"},
+			},
+		},
+		"device without group": {
+			inReq:          test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices/1/group", nil),
+			inventoryGroup: GroupName(""),
+			inventoryErr:   nil,
+
+			JSONResponseParams: utils.JSONResponseParams{
+				OutputStatus:     http.StatusOK,
+				OutputBodyObject: map[string]interface{}{"group": nil},
+			},
+		},
+		"device not found": {
+			inReq:          test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices/1/group", nil),
+			inventoryGroup: GroupName(""),
+			inventoryErr:   ErrDevNotFound,
+
+			JSONResponseParams: utils.JSONResponseParams{
+				OutputStatus:     http.StatusNotFound,
+				OutputBodyObject: RestError(ErrDevNotFound.Error()),
+			},
+		},
+		"generic inventory error": {
+			inReq:          test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices/1/group", nil),
+			inventoryGroup: GroupName(""),
+			inventoryErr:   errors.New("inventory: internal error"),
+
+			JSONResponseParams: utils.JSONResponseParams{
+				OutputStatus:     http.StatusInternalServerError,
+				OutputBodyObject: RestError("internal error"),
+			},
+		},
+	}
+
+	for name, tc := range tcases {
+		t.Logf("test case: %s", name)
+		inv := MockInventoryApp{}
+		inv.On("GetDeviceGroup", AnythingOfType("main.DeviceID")).Return(tc.inventoryGroup, tc.inventoryErr)
+
+		factory := func(c config.Reader, l *log.Logger) (InventoryApp, error) {
+			return &inv, nil
+		}
+		apih := makeMockApiHandler(t, factory)
+
+		recorded := test.RunRequest(t, apih, tc.inReq)
+		utils.CheckRecordedResponse(t, recorded, tc.JSONResponseParams)
+	}
+}

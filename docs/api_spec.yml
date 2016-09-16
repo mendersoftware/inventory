@@ -213,11 +213,11 @@ paths:
           type: string
       responses:
         200:
-          description: Device's group found.
+          description: Success. In case device is not assigned to any group, group will be set as null.
           schema:
             $ref: "#/definitions/Group"
         404:
-          description: Device or group not found
+          description: Device not found
           schema:
             $ref: "#/definitions/Error"
         500:
