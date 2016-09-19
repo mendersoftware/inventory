@@ -28,3 +28,4 @@ _testmain.go
 .vscode/.browse.VC.db
 .vscode/.browse.VC.db-wal
 .vscode/launch.json
+.vscode/.browse.VC.db-shm
