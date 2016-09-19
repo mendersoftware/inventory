@@ -35,7 +35,7 @@ type Device struct {
 	ID DeviceID `json:"id" bson:"_id,omitempty" valid:"length(1|4096),required"`
 
 	//a map of attributes names and their values.
-	Attributes DeviceAttributes `json:"attributes" bson:",omitempty" valid:"optional"`
+	Attributes DeviceAttributes `json:"attributes,omitempty" bson:",omitempty" valid:"optional"`
 
 	//device's group name
 	Group GroupName `json:"-" bson:"group,omitempty" valid:"optional"`
@@ -68,7 +68,20 @@ func (d *DeviceAttributes) UnmarshalJSON(b []byte) error {
 			(*d)[attr.Name] = attr
 		}
 	}
+
 	return nil
+}
+
+func (d DeviceAttributes) MarshalJSON() ([]byte, error) {
+	attrsArray := make([]DeviceAttribute, 0, len(d))
+
+	for a, v := range d {
+		nv := v
+		nv.Name = a
+		attrsArray = append(attrsArray, nv)
+	}
+
+	return json.Marshal(attrsArray)
 }
 
 var deviceAttributeValueValidator = govalidator.CustomTypeValidator(func(i interface{}, context interface{}) bool {
