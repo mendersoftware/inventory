@@ -1,0 +1,88 @@
+swagger: '2.0'
+info:
+  title: Inventory Service Device API
+  version: '0.1'
+  description: |
+    ### Authorization
+
+    Incoming requests must set `Authorization` header and include device token
+    obtained from the API. The header shall look like this:
+
+    ```
+    Authorization: Bearer <token>
+    # example
+    Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWV9.TJVA95OrM7E2cBab30RMHrHDcEfxjoYZgeFONFh7HgQ
+    ```
+
+host: 'localhost:8080'
+basePath: '/api/devices/0.1/inventory'
+
+paths:
+  /attributes:
+    patch:
+      summary: Upload a set of attributes for a device.
+      description: |
+        Attribute values are uploaded as a collection of attribute-value entries.
+
+        Attribute names are human readable, unique IDs, e.g. 'device_type', 'ip_addr', 'cpu_load', etc.
+
+        The method has upsert semantics:
+          - values of exisiting attributes are overwritten,
+          - attributes uploaded for the first time are simply created,
+          - the Device resource will also be created if necessary
+
+        In other words, no special initialization of attributes is required.
+
+        This is a device-only endpoint. The requesting device ID is extracted from the provided auth token.
+
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          type: string
+          format: Bearer [token]
+          description: issued by device auth service
+        - name: attributes
+          in: body
+          description: List of attribute values.
+          required: true
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/AttributeNew'
+      responses:
+        200:
+          description: Attributes updated successfully.
+        401:
+          description: Device is not authenticated.
+        400:
+          description: Bad request.
+          schema:
+            $ref: '#/definitions/Error'
+        500:
+          description: Internal error.
+          schema:
+            $ref: '#/definitions/Error'
+
+definitions:
+  AttributeNew:
+    type: object
+    required:
+      - name
+      - value
+    properties:
+      name:
+        type: string
+        description: Unique name.
+      description:
+        type: string
+      value:
+        type: object
+        description: The actual current value of the attribute (see Supported Attribute Types in API description).
+  Error:
+    description: Error descriptor
+    type: object
+    properties:
+      error:
+        description: Description of the error
+        type: string
