@@ -1,7 +1,7 @@
 swagger: '2.0'
 info:
   version: "0.1.0"
-  title: Mender Device Inventory API
+  title: Device Inventory API
   description: |
     The Inventory API allows devices to upload almost arbitrary attributes (software/hardware info, health checks, metrics, etc.) of various data types to the backend. This data can be used by the administrator to monitor the state of registered devices.
 
