@@ -1,6 +1,6 @@
 swagger: '2.0'
 info:
-  version: "0.1.0"
+  version: "0.1"
   title: Mender Device Inventory API
   description: |
     The Inventory API allows devices to upload almost arbitrary attributes (software/hardware info, health checks, metrics, etc.) of various data types to the backend. This data can be used by the administrator to monitor the state of registered devices.
@@ -16,52 +16,10 @@ info:
       - dates (integer representation - unix time) - supported only for internal
       Mender attributes, whose names are well known
 
+host: 'localhost:8080'
+basePath: '/api/0.1/integrations/inventory'
+
 paths:
-  /attributes:
-    patch:
-      summary: Upload a set of attributes for a device.
-      description: |
-        Attribute values are uploaded as a collection of attribute-value entries.
-
-        Attribute names are human readable, unique IDs, e.g. 'device_type', 'ip_addr', 'cpu_load', etc.
-
-        The method has upsert semantics:
-          - values of exisiting attributes are overwritten,
-          - attributes uploaded for the first time are simply created,
-          - the Device resource will also be created if necessary
-
-        In other words, no special initialization of attributes is required.
-
-        This is a device-only endpoint. The requesting device ID is extracted from the provided auth token.
-
-      parameters:
-        - name: Authorization
-          in: header
-          required: true
-          type: string
-          format: Bearer [token]
-          description: issued by device auth service
-        - name: attributes
-          in: body
-          description: List of attribute values.
-          required: true
-          schema:
-            type: array
-            items:
-              $ref: '#/definitions/AttributeNew'
-      responses:
-        200:
-          description: Attributes updated successfully.
-        401:
-          description: Device is not authenticated.
-        400:
-          description: Bad request.
-          schema:
-            $ref: '#/definitions/Error'
-        500:
-          description: Internal error.
-          schema:
-            $ref: '#/definitions/Error'
   /devices:
     post:
       summary: Create a device resource with a supplied set of attributes.
@@ -455,21 +413,3 @@ definitions:
       error:
         description: Description of the error
         type: string
-  PatchOperation:
-    description: RFC6902 JSON Patch operation document.
-    type: object
-    required:
-      - op
-      - path
-      - value
-    properties:
-      op:
-        type: string
-        description: Operation
-      path:
-        type: string
-        description: Operation target.
-      value:
-        type: object
-        description: Operation value.
-
