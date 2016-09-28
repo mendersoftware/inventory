@@ -18,4 +18,4 @@ mongo: mongo-inventory:27017
     #       production environment
     #
     # Defaults to: prod
-middleware: prod
+middleware: dev
