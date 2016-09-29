@@ -20,6 +20,7 @@ import (
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 	"sync"
+	"time"
 )
 
 const (
@@ -156,7 +157,12 @@ func (db *DataStoreMongo) UpsertAttributes(id DeviceID, attrs DeviceAttributes) 
 	c := s.DB(DbName).C(DbDevicesColl)
 
 	update := makeAttrUpsert(attrs)
-	update = bson.M{"$set": update}
+
+	//set update time and optionally created time
+	now := time.Now()
+	update["updated_ts"] = now
+	update = bson.M{"$set": update,
+		"$setOnInsert": bson.M{"created_ts": now}}
 
 	_, err := c.UpsertId(id, update)
 
@@ -164,7 +170,7 @@ func (db *DataStoreMongo) UpsertAttributes(id DeviceID, attrs DeviceAttributes) 
 }
 
 // prepare an attribute upsert doc based on DeviceAttributes map
-func makeAttrUpsert(attrs DeviceAttributes) interface{} {
+func makeAttrUpsert(attrs DeviceAttributes) map[string]interface{} {
 	var fieldName string
 	upsert := map[string]interface{}{}
 
