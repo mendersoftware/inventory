@@ -1,5 +1,4 @@
 [![Build Status](https://travis-ci.com/mendersoftware/inventory.svg?token=rx8YqsZ2ZyaopcMPmDmo&branch=master)](https://travis-ci.com/mendersoftware/inventory)
-[![Coverage Status](https://coveralls.io/repos/github/mendersoftware/inventory/badge.svg?branch=master)](https://coveralls.io/github/mendersoftware/inventory?branch=master)
 
 Mender: Device Inventory Service
 ==============================================
