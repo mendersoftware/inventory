@@ -1,4 +1,6 @@
-[![Build Status](https://travis-ci.com/mendersoftware/inventory.svg?token=rx8YqsZ2ZyaopcMPmDmo&branch=master)](https://travis-ci.com/mendersoftware/inventory)
+[![Build Status](https://travis-ci.org/mendersoftware/inventory.svg?branch=master)](https://travis-ci.org/mendersoftware/inventory)
+[![codecov](https://codecov.io/gh/mendersoftware/inventory/branch/master/graph/badge.svg)](https://codecov.io/gh/mendersoftware/inventory)
+[![Go Report Card](https://goreportcard.com/badge/github.com/mendersoftware/inventory)](https://goreportcard.com/report/github.com/mendersoftware/inventory)
 
 Mender: Device Inventory Service
 ==============================================
