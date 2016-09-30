@@ -20,6 +20,7 @@ import (
 	"gopkg.in/mgo.v2/bson"
 	"reflect"
 	"testing"
+	"time"
 )
 
 // test funcs
@@ -325,6 +326,9 @@ func TestMongoUpsertAttributes(t *testing.T) {
 		t.Skip("skipping TestMongoUpsertAttributes in short mode.")
 	}
 
+	//single create timestamp for all inserted devs
+	createdTs := time.Now()
+
 	testCases := map[string]struct {
 		devs []Device
 
@@ -349,6 +353,7 @@ func TestMongoUpsertAttributes(t *testing.T) {
 							Description: strPtr("descr"),
 						},
 					},
+					CreatedTs: createdTs,
 				},
 			},
 			inDevId: DeviceID("0003"),
@@ -390,6 +395,7 @@ func TestMongoUpsertAttributes(t *testing.T) {
 							Description: strPtr("descr"),
 						},
 					},
+					CreatedTs: createdTs,
 				},
 			},
 			inDevId: DeviceID("0003"),
@@ -428,6 +434,7 @@ func TestMongoUpsertAttributes(t *testing.T) {
 							Description: strPtr("descr"),
 						},
 					},
+					CreatedTs: createdTs,
 				},
 			},
 			inDevId: DeviceID("0003"),
@@ -464,6 +471,7 @@ func TestMongoUpsertAttributes(t *testing.T) {
 							Description: strPtr("descr"),
 						},
 					},
+					CreatedTs: createdTs,
 				},
 			},
 			inDevId: DeviceID("0003"),
@@ -500,6 +508,7 @@ func TestMongoUpsertAttributes(t *testing.T) {
 							Description: strPtr("descr"),
 						},
 					},
+					CreatedTs: createdTs,
 				},
 			},
 			inDevId: DeviceID("0003"),
@@ -524,7 +533,8 @@ func TestMongoUpsertAttributes(t *testing.T) {
 		"dev exists, no attributes exist, upsert new attrs (val + descr)": {
 			devs: []Device{
 				{
-					ID: DeviceID("0003"),
+					ID:        DeviceID("0003"),
+					CreatedTs: createdTs,
 				},
 			},
 			inDevId: DeviceID("0003"),
@@ -609,6 +619,7 @@ func TestMongoUpsertAttributes(t *testing.T) {
 	}
 
 	for name, tc := range testCases {
+
 		t.Logf("%s", name)
 		//setup
 		db.Wipe()
@@ -634,6 +645,14 @@ func TestMongoUpsertAttributes(t *testing.T) {
 			t.Errorf("attributes mismatch, have: %v\nwant: %v", dev.Attributes, tc.outAttrs)
 		}
 
+		//check timestamp validity
+		//note that mongo stores time with lower precision- custom comparison
+		assert.Equal(t, createdTs.Unix(), dev.CreatedTs.Unix())
+		assert.Condition(t,
+			func() bool {
+				return dev.UpdatedTs.After(dev.CreatedTs) ||
+					dev.UpdatedTs.Unix() == dev.CreatedTs.Unix()
+			})
 		s.Close()
 	}
 
