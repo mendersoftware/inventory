@@ -1,28 +1,26 @@
 swagger: '2.0'
 info:
-  version: "0.1"
-  title: Mender Device Inventory API
+  version: '0.1'
+  title: Device inventory
   description: |
-    The Inventory API allows devices to upload almost arbitrary attributes (software/hardware info, health checks, metrics, etc.) of various data types to the backend. This data can be used by the administrator to monitor the state of registered devices.
+    An API for device attribute management and device grouping. Intended for use by the web GUI.
 
-    Attribute data is searchable, and can be indirectly used to create and manage groups of devices (e.g. based on attribute values) for the purpose of deployment scheduling.
+    Devices can upload vendor-specific attributes (software/hardware info, health checks, metrics, etc.) of various data types to the backend.
 
-    **Supported Attribute Types**
+    This API enables the user to:
+    * list devices with their attributes
+    * search devices by attribute value
+    * use the results to create and manage device groups for the purpose of deployment scheduling
 
-    Attribute types are implicit, derived from JSON type. Supported types are:
-      - number
-      - string
-      - array of either numbers or strings (no mixed arrays)
-      - dates (integer representation - unix time) - supported only for internal
-      Mender attributes, whose names are well known
-
-host: 'localhost:8080'
-basePath: '/api/0.1/integrations/inventory'
+basePath: '/api/integrations/0.1/inventory'
+host: 'docker.mender.io:8080'
+schemes:
+  - https
 
 paths:
   /devices:
     post:
-      summary: Create a device resource with a supplied set of attributes.
+      summary: Create a device resource with the supplied set of attributes
       parameters:
         - name: device
           in: body
@@ -31,86 +29,64 @@ paths:
             $ref: "#/definitions/DeviceNew"
       responses:
         201:
-          description: Device created succesfully.
+          description: The device was successfully created.
           headers:
             Location:
               type: string
-              description: URI for the newly created Device.
+              description: URI for the newly created 'Device' resource.
         400:
-          description: Bad request.
+          description: Malformed request body. See error for details.
           schema:
             $ref: '#/definitions/Error'
         409:
-          description: Conflict
+          description: Conflict - the device already exists.
           schema:
             $ref: '#/definitions/Error'
         500:
-          description: Internal error.
+          description: Internal server error.
           schema:
             $ref: '#/definitions/Error'
     get:
-      summary: List devices.
+      summary: List devices
       description:  |
-        In the simplest case, returns a paged collection of devices. Optionally accepts searching
-        and sorting parameters, described below.
+        Returns a paged collection of devices and their attributes.
+        Accepts optinal search and sort parameters.
 
         **Searching**
-
-        Search is performed by passing a set of attribute name/filter pairs specified with a query mini-language, e.g.:
-
-        ```
-        GET /devices?attr_name_1=eq:foo&           //exactly equals 'foo'
-                     attr_name_2=100&              //exactly equals 100 - alternate form
-                     attr_name_3=gt:100&           //greater than 100
+        Searching by attributes values is accomplished by appending attribute
+        name/value pairs to the query string, e.g.:
 
         ```
-
-        Filters are combined with logical AND - currently no advanced logical operations are supported.
-
-        Supported comparison operators:
-        - eq (equals; can be omitted for brevity)
-        - gt (greater than)
-        - gte (greater or equal)
-        - lt (less than)
-        - lte (less than or equal)
-
-        **Sorting**
-
-        Sorting is enabled with a dedicated `sort` parameter, which specifies attribute names
-        to sort on, each with an optional direction (default - `desc`), e.g.:
-
+        GET /devices?attr_name_1=foo&
+                     attr_name_2=100&
+                     ...
         ```
-          GET /devices? sort=attr_name_1:asc, attr_name_2:desc, ...
-
-        ```
-
-        which sorts by attr_name_1 ascending, then by attr_name_2 descending.
-
-        Simplified form:
-
-        ```
-          GET /devices? sort=attr_name_1:asc, attr_name_2, ...
-
-        ```
-
       parameters:
         - name: page
           in: query
-          description: Starting page
+          description: Starting page.
           required: false
           type: number
           format: integer
           default: 1
         - name: per_page
           in: query
-          description: Number of results per page
+          description: Number of results per page.
           required: false
           type: number
           format: integer
           default: 10
         - name: sort
           in: query
-          description: Supports sorting by attribute values (see description).
+          description: |
+            Supports sorting the device list by attribute values.
+
+            The parameter is formatted as a list of attribute names and sort directions, e.g.:
+
+            '?sort=attr1:asc, attr2:desc'
+
+            will sort by 'attr1' ascending, and then by 'attr2' descending. 'desc' is the default
+            sort direction, and can be omitted.
           required: false
           type: string
         - name: has_group
@@ -121,17 +97,43 @@ paths:
 
       responses:
         200:
-          description: Successful response
+          description: Successful response.
           headers:
             Link:
               type: string
-              description: Standard header, we support 'first', 'next', and 'prev'.
+              description: |
+                Standard header, used for page navigation.
+
+                Supported relation types are 'first', 'next' and 'prev'.
           schema:
+            title: ListOfDevices
             type: array
             items:
               $ref: '#/definitions/Device'
+          examples:
+            application/json:
+              - id: "291ae0e5956c69c2267489213df4459d19ed48a806603def19d417d004a4b67e"
+                attributes:
+                  - name: "ip_addr"
+                    value: "1.2.3.4"
+                    description: "IP address"
+                  - name: "mac_addr"
+                    value: "00.01:02:03:04:05"
+                    description: "MAC address"
+                  - name: "ports"
+                    value:
+                      - "8080"
+                      - "8081"
+                    description: "Open ports"
+                updated_ts: "2016-10-03T16:58:51.639Z"
+              - id: "76f40e5956c699e327489213df4459d1923e1a806603def19d417d004a4a3ef"
+                attributes:
+                  - name: "mac"
+                    value: "00:01:02:03:04:05"
+                    description: "MAC address"
+                updated_ts: "2016-10-04T18:24:21.432Z"
         400:
-          description: Bad request.
+          description: Missing or malformed request parameters. See error for details.
           schema:
             $ref: '#/definitions/Error'
         500:
@@ -141,80 +143,112 @@ paths:
   /devices/{id}:
     get:
       summary: Get a selected device
+      description: Returns the details of the selected devices, including its attributes.
       parameters:
         - name: id
           in: path
-          description: Device identifier
+          description: Device identifier.
           required: true
           type: string
       responses:
         200:
-          description: Device found.
+          description: Successful response - the device was found.
           schema:
             $ref: "#/definitions/Device"
+          examples:
+            application/json:
+              id: "291ae0e5956c69c2267489213df4459d19ed48a806603def19d417d004a4b67e"
+              attributes:
+                - name: "ip_addr"
+                  value: "1.2.3.4"
+                  description: "IP address"
+                - name: "mac_addr"
+                  value: "00.01:02:03:04:05"
+                  description: "MAC address"
+                - name: "ports"
+                  value:
+                    - "8080"
+                    - "8081"
+                  description: "Open ports"
+              updated_ts: "2016-10-03T16:58:51.639Z"
         404:
-          description: Device not found
+          description: The device was not found.
           schema:
             $ref: "#/definitions/Error"
         500:
-          description: Internal error
+          description: Internal server error.
           schema:
             $ref: "#/definitions/Error"
   /devices/{id}/group:
     get:
-      summary: Get a selected device's group.
+      summary: Get a selected device's group
       parameters:
         - name: id
           in: path
-          description: Device identifier
+          description: Device identifier.
           required: true
           type: string
       responses:
         200:
-          description: Success. In case device is not assigned to any group, group will be set as null.
+          description: |
+            Successful response.
+
+            If the device is not assigned to any group, the 'group' field will be set to 'null'.
           schema:
             $ref: "#/definitions/Group"
+          examples:
+            application/json:
+              group: "testing"
+        400:
+          description: Missing or malformed request params or body. See the error message for details.
         404:
-          description: Device not found
+          description: The device was not found.
           schema:
             $ref: "#/definitions/Error"
         500:
-          description: Internal error
+          description: Internal server error.
           schema:
             $ref: "#/definitions/Error"
     put:
-      summary: Add device to group.
+      summary: Add a device to a group
+      description: |
+        Adds a device to a group.
+
+        Note that a given device can belong to at most one group.
+        If a device already belongs to some group, it will be moved
+        to the selected one.
       parameters:
         - name: id
           in: path
-          description: Device identifier
+          description: Device identifier.
           required: true
           type: string
         - name: group
           in: body
-          description: Group
+          description: Group descriptor.
           required: true
           schema:
             $ref: '#/definitions/Group'
       responses:
         204:
-          description: Device added to group.
+          description: Success - the device was added to the group.
         404:
-          description: Device not found
+          description: The device was not found.
           schema:
             $ref: "#/definitions/Error"
         500:
-          description: Internal error
+          description: Internal server error.
           schema:
             $ref: "#/definitions/Error"
-
   /devices/{id}/group/{name}:
     delete:
-      summary: Remove device from group.
+      summary: Remove a device from a group
+      description: |
+        Removes the device with identifier 'id' from the group 'group'.
       parameters:
         - name: id
           in: path
-          description: Device identifier
+          description: Device identifier.
           required: true
           type: string
         - name: name
@@ -224,55 +258,9 @@ paths:
           type: string
       responses:
         204:
-          description: Device removed from group successfully.
+          description: The device was successfully removed from the group.
         404:
-          description: Device not found or device not in given group.
-          schema:
-            $ref: '#/definitions/Error'
-        500:
-          description: Internal error.
-          schema:
-            $ref: '#/definitions/Error'
-
-  /devices/{id}/attributes:
-    patch:
-      summary: Upload a set of attribute values for a device.
-      description: |
-        Attribute values are uploaded as a collection of attribute-value entries.
-
-        Attribute names are human readable, unique IDs, e.g. 'device_type', 'ip_addr', 'cpu_load', etc.
-
-        The method has upsert semantics:
-          - values of exisiting attributes are overwritten,
-          - attributes uploaded for the first time are simply created
-
-        In other words, no special initialization of attributes is required.
-
-        This is a user- and system-facing endpoint only. The device has a dedicated counterpart.
-
-      parameters:
-        - name: id
-          in: path
-          description: Device identifier
-          required: true
-          type: string
-        - name: attributes
-          in: body
-          description: List of attribute values.
-          required: true
-          schema:
-            type: array
-            items:
-              $ref: '#/definitions/AttributeNew'
-      responses:
-        200:
-          description: Attributes updated successfully.
-        400:
-          description: Bad request.
-          schema:
-            $ref: '#/definitions/Error'
-        404:
-          description: Device not found.
+          description: The device was not found or doesn't belong to the group.
           schema:
             $ref: '#/definitions/Error'
         500:
@@ -282,40 +270,49 @@ paths:
   /groups:
     get:
       summary: List groups
+      description: Returns a collection of all defined device groups.
       responses:
         200:
-          description: Successful response
+          description: Successful response.
           schema:
             type: array
             items:
+              title: ListOfGroupNames
               description: Group name
               type: string
+          examples:
+            application/json:
+              - "staging"
+              - "testing"
+              - "production"
         500:
-          description: Internal error.
+          description: Internal server error.
           schema:
             $ref: '#/definitions/Error'
 
   /groups/{name}/devices:
     get:
-      summary: List group's device IDs.
+      summary: List the devices belonging to a given group
+      description: |
+        Returns a paged collection of device IDs.
       parameters:
         - name: page
           in: query
-          description: Starting page
+          description: Starting page.
           required: false
           type: number
           format: integer
           default: 1
         - name: per_page
           in: query
-          description: Number of results per page
+          description: Number of results per page.
           required: false
           type: number
           format: integer
           default: 10
         - name: name
           in: path
-          description: Group name
+          description: Group name.
           required: true
           type: string
       responses:
@@ -326,24 +323,26 @@ paths:
               type: string
               description: Standard header, we support 'first', 'next', and 'prev'.
           schema:
+            title: ListOfIDs
             type: array
             items:
               type: string
         400:
-          description: Bad request.
+          description: Invalid request parameters.
           schema:
             $ref: '#/definitions/Error'
         404:
-          description: Group not found.
+          description: The group was not found.
           schema:
             $ref: '#/definitions/Error'
         500:
-          description: Internal error.
+          description: Internal server error.
           schema:
             $ref: '#/definitions/Error'
 
 definitions:
-  AttributeNew:
+  Attribute:
+    description: Attribute descriptor.
     type: object
     required:
       - name
@@ -351,37 +350,24 @@ definitions:
     properties:
       name:
         type: string
-        description: Unique name.
+        description: |
+            A human readable, unique attribute ID, e.g. 'device_type', 'ip_addr', 'cpu_load', etc.
       description:
         type: string
+        description: Attribute description.
       value:
         type: object
-        description: The actual current value of the attribute (see Supported Attribute Types in API description).
-  Attribute:
-    type: object
-    properties:
-      name:
-        type: string
-        description: Unique name.
-      description:
-        type: string
-      value:
-        type: object
-        description: The actual current value of the attribute (see Supported Attribute Types in API description).
-  Device:
-    type: object
-    properties:
-      id:
-        type: string
-        description: Mender-assigned unique ID.
-      updated_ts:
-        type: string
-        description: Timestamp of the last attribute update.
-      attributes:
-        type: array
-        items:
-          $ref: '#/definitions/Attribute'
-        description: A list of attributes and their values.
+        description: |
+            The current value of the attribute.
+
+            Attribute type is implicit, inferred from the JSON type.
+
+            Supported types: number, string, array of numbers, array of strings. Mixed arrays are not allowed.
+    example:
+      application/json:
+        name: "cpu_load"
+        description: "The current CPU load."
+        value: 42
   DeviceNew:
     type: object
     required:
@@ -392,20 +378,68 @@ definitions:
         description: Mender-assigned unique ID.
       updated_ts:
         type: string
-        description: Timestamp of the last attribute update.
+        description: Timestamp of the most recent attribute update.
       attributes:
         type: array
         items:
           $ref: '#/definitions/Attribute'
-        description: A list of attributes and their values.
+        description: A list of attribute descriptors.
+    example:
+      application/json:
+        id: "291ae0e5956c69c2267489213df4459d19ed48a806603def19d417d004a4b67e"
+        attributes:
+          - name: "ip_addr"
+            value: "1.2.3.4"
+            description: "IP address"
+          - name: "mac_addr"
+            value: "00.01:02:03:04:05"
+            description: "MAC address"
+          - name: "ports"
+            value:
+              - "8080"
+              - "8081"
+            description: "Open ports"
+  Device:
+    type: object
+    properties:
+      id:
+        type: string
+        description: Mender-assigned unique ID.
+      updated_ts:
+        type: string
+        description: Timestamp of the most recent attribute update.
+      attributes:
+        type: array
+        items:
+          $ref: '#/definitions/Attribute'
+        description: A list of attribute descriptors.
+    example:
+      application/json:
+        id: "291ae0e5956c69c2267489213df4459d19ed48a806603def19d417d004a4b67e"
+        attributes:
+          - name: "ip_addr"
+            value: "1.2.3.4"
+            description: "IP address"
+          - name: "mac_addr"
+            value: "00.01:02:03:04:05"
+            description: "MAC address"
+          - name: "ports"
+            value:
+              - "8080"
+              - "8081"
+            description: "Open ports"
+        updated_ts: "2016-10-03T16:58:51.639Z"
   Group:
-    description: Device group
+    description: Device group.
     type: object
     properties:
       group:
         type: string
     required:
       - group
+    example:
+      application/json:
+        group: "staging"
   Error:
     description: Error descriptor
     type: object
@@ -413,3 +447,6 @@ definitions:
       error:
         description: Description of the error
         type: string
+    example:
+      application/json:
+          error: "failed to decode device group data: JSON payload is empty"
