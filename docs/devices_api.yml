@@ -13,7 +13,7 @@ schemes:
   - https
 
 paths:
-  /attributes:
+  /device/attributes:
     patch:
       summary: Upload a set of attributes for a device
       description: |
