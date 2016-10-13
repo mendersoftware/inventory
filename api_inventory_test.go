@@ -62,7 +62,13 @@ func ExtractHeader(hdr, val string, r *test.Recorded) string {
 }
 
 func RestError(status string) map[string]interface{} {
-	return map[string]interface{}{"error": status}
+	return map[string]interface{}{"error": status, "request_id": "test"}
+}
+
+func runTestRequest(t *testing.T, handler http.Handler, req *http.Request, resp utils.JSONResponseParams) {
+	req.Header.Add(requestid.RequestIdHeader, "test")
+	recorded := test.RunRequest(t, handler, req)
+	utils.CheckRecordedResponse(t, recorded, resp)
 }
 
 func makeMockApiHandler(t *testing.T, f InventoryFactory) http.Handler {
@@ -269,8 +275,7 @@ func TestApiInventoryGetDevices(t *testing.T) {
 		}
 		apih := makeMockApiHandler(t, factory)
 
-		recorded := test.RunRequest(t, apih, testCase.inReq)
-		utils.CheckRecordedResponse(t, recorded, testCase.resp)
+		runTestRequest(t, apih, testCase.inReq, testCase.resp)
 	}
 }
 
@@ -426,8 +431,7 @@ func TestApiInventoryAddDevice(t *testing.T) {
 		}
 		apih := makeMockApiHandler(t, factory)
 
-		recorded := test.RunRequest(t, apih, tc.inReq)
-		utils.CheckRecordedResponse(t, recorded, tc.JSONResponseParams)
+		runTestRequest(t, apih, tc.inReq, tc.JSONResponseParams)
 	}
 }
 
@@ -642,9 +646,7 @@ func TestApiInventoryUpsertAttributes(t *testing.T) {
 			tc.inReq.Header.Set(k, v)
 		}
 
-		recorded := test.RunRequest(t, apih, tc.inReq)
-
-		utils.CheckRecordedResponse(t, recorded, tc.resp)
+		runTestRequest(t, apih, tc.inReq, tc.resp)
 	}
 }
 
@@ -705,8 +707,7 @@ func TestApiInventoryDeleteDeviceGroup(t *testing.T) {
 		}
 		apih := makeMockApiHandler(t, factory)
 
-		recorded := test.RunRequest(t, apih, tc.inReq)
-		utils.CheckRecordedResponse(t, recorded, tc.JSONResponseParams)
+		runTestRequest(t, apih, tc.inReq, tc.JSONResponseParams)
 	}
 }
 
@@ -780,8 +781,7 @@ func TestApiInventoryAddDeviceToGroup(t *testing.T) {
 		}
 		apih := makeMockApiHandler(t, factory)
 
-		recorded := test.RunRequest(t, apih, tc.inReq)
-		utils.CheckRecordedResponse(t, recorded, tc.JSONResponseParams)
+		runTestRequest(t, apih, tc.inReq, tc.JSONResponseParams)
 	}
 }
 
@@ -831,8 +831,7 @@ func TestApiListGroups(t *testing.T) {
 		}
 		apih := makeMockApiHandler(t, factory)
 
-		recorded := test.RunRequest(t, apih, tc.inReq)
-		utils.CheckRecordedResponse(t, recorded, tc.JSONResponseParams)
+		runTestRequest(t, apih, tc.inReq, tc.JSONResponseParams)
 	}
 }
 
@@ -892,8 +891,7 @@ func TestApiGetDevice(t *testing.T) {
 		}
 		apih := makeMockApiHandler(t, factory)
 
-		recorded := test.RunRequest(t, apih, tc.inReq)
-		utils.CheckRecordedResponse(t, recorded, tc.JSONResponseParams)
+		runTestRequest(t, apih, tc.inReq, tc.JSONResponseParams)
 	}
 }
 
@@ -1003,8 +1001,7 @@ func TestApiInventoryGetDevicesByGroup(t *testing.T) {
 		}
 		apih := makeMockApiHandler(t, factory)
 
-		recorded := test.RunRequest(t, apih, testCase.inReq)
-		utils.CheckRecordedResponse(t, recorded, testCase.resp)
+		runTestRequest(t, apih, testCase.inReq, testCase.resp)
 	}
 }
 
@@ -1079,7 +1076,6 @@ func TestApiGetDeviceGroup(t *testing.T) {
 		}
 		apih := makeMockApiHandler(t, factory)
 
-		recorded := test.RunRequest(t, apih, tc.inReq)
-		utils.CheckRecordedResponse(t, recorded, tc.JSONResponseParams)
+		runTestRequest(t, apih, tc.inReq, tc.JSONResponseParams)
 	}
 }
