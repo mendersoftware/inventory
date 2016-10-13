@@ -35,8 +35,6 @@ const (
 	uriAttributes    = "/api/0.1.0/attributes"
 	uriGroups        = "/api/0.1.0/groups"
 	uriGroupsDevices = "/api/0.1.0/groups/:name/devices"
-
-	LogHttpCode = "http_code"
 )
 
 const (
@@ -511,5 +509,5 @@ func restErrWithLogInternal(w rest.ResponseWriter, l *log.Logger, e error) {
 // log full error
 func restErrWithLogMsg(w rest.ResponseWriter, l *log.Logger, e error, code int, msg string) {
 	rest.Error(w, msg, code)
-	l.F(log.Ctx{LogHttpCode: code}).Error(errors.Wrap(e, msg).Error())
+	l.F(log.Ctx{}).Error(errors.Wrap(e, msg).Error())
 }
