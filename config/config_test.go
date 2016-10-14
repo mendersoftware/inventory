@@ -96,4 +96,14 @@ func TestFromConfigFile(t *testing.T) {
 	if err := FromConfigFile("testdata/config-empty.yaml", []Default{}); err != nil {
 		t.Fatal(err)
 	}
+
+	err := FromConfigFile("", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = FromConfigFile("non-existing-file.yaml", nil)
+	if err == nil {
+		t.FailNow()
+	}
 }
