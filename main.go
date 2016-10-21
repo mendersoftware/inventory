@@ -26,7 +26,7 @@ func main() {
 	var debug bool
 
 	flag.StringVar(&configPath, "config",
-		"config.yaml",
+		"",
 		"Configuration file path. Supports JSON, TOML, YAML and HCL formatted configs.")
 	flag.BoolVar(&printVersion, "version",
 		false, "Show version")
@@ -50,6 +50,10 @@ func main() {
 		l.Infof("setting up development configuration")
 		config.Config.Set(SettingMiddleware, EnvDev)
 	}
+
+	// Enable setting conig values by environment variables
+	config.Config.SetEnvPrefix("INVENTORY")
+	config.Config.AutomaticEnv()
 
 	l.Printf("Inventory Service, version %s starting up",
 		CreateVersionString())
