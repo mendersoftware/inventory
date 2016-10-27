@@ -73,29 +73,34 @@ func (db *DataStoreMongo) GetDevices(skip int, limit int, filters []Filter, sort
 	c := s.DB(DbName).C(DbDevicesColl)
 	res := []Device{}
 
-	findQuery := make(bson.M, 0)
+	queryFilters := make([]bson.M, 0)
 	for _, filter := range filters {
 		op := mongoOperator(filter.Operator)
 		field := fmt.Sprintf("%s.%s.%s", DbDevAttributes, filter.AttrName, DbDevAttributesValue)
 		switch filter.Operator {
 		default:
 			if filter.ValueFloat != nil {
-				findQuery["$or"] = []bson.M{
+				queryFilters = append(queryFilters, bson.M{"$or": []bson.M{
 					bson.M{field: bson.M{op: filter.Value}},
 					bson.M{field: bson.M{op: filter.ValueFloat}},
-				}
+				}})
 			} else {
-				findQuery[field] = bson.M{op: filter.Value}
+				queryFilters = append(queryFilters, bson.M{field: bson.M{op: filter.Value}})
 			}
 		}
 	}
 
 	if hasGroup != nil {
 		if *hasGroup {
-			findQuery[DbDevGroup] = bson.M{"$exists": true}
+			queryFilters = append(queryFilters, bson.M{DbDevGroup: bson.M{"$exists": true}})
 		} else {
-			findQuery[DbDevGroup] = bson.M{"$exists": false}
+			queryFilters = append(queryFilters, bson.M{DbDevGroup: bson.M{"$exists": false}})
 		}
+	}
+
+	findQuery := bson.M{}
+	if len(queryFilters) > 0 {
+		findQuery["$and"] = queryFilters
 	}
 
 	query := c.Find(findQuery).Skip(skip).Limit(limit)
