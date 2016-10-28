@@ -32,7 +32,7 @@ type DeviceAttribute struct {
 // Device wrapper
 type Device struct {
 	//system-generated device ID
-	ID DeviceID `json:"id" bson:"_id,omitempty" valid:"length(1|4096),required"`
+	ID DeviceID `json:"id" bson:"_id,omitempty" valid:"length(1|1024),required"`
 
 	//a map of attributes names and their values.
 	Attributes DeviceAttributes `json:"attributes,omitempty" bson:",omitempty" valid:"optional"`
