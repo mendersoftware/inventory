@@ -50,7 +50,7 @@ paths:
       summary: List devices
       description:  |
         Returns a paged collection of devices and their attributes.
-        Accepts optinal search and sort parameters.
+        Accepts optional search and sort parameters.
 
         **Searching**
         Searching by attributes values is accomplished by appending attribute
