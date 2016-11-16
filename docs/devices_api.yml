@@ -21,7 +21,7 @@ paths:
         The device ID is retrieved from the authorization header.
 
         This method has upsert semantics:
-        * the values of exisiting attributes are overwritten
+        * the values of existing attributes are overwritten
         * attributes uploaded for the first time are automatically created
       parameters:
         - name: Authorization
