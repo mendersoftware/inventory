@@ -55,8 +55,23 @@ func TestMongoGetDevices(t *testing.T) {
 			},
 			Group: GroupName("2"),
 		},
+		Device{
+			ID: DeviceID("6"),
+			Attributes: map[string]DeviceAttribute{
+				"attrString": DeviceAttribute{Name: "attrString", Value: "val6", Description: strPtr("desc1")},
+				"attrFloat":  DeviceAttribute{Name: "attrFloat", Value: 4.0, Description: strPtr("desc2")},
+			},
+		},
+		Device{
+			ID: DeviceID("7"),
+			Attributes: map[string]DeviceAttribute{
+				"attrString": DeviceAttribute{Name: "attrString", Value: "val4", Description: strPtr("desc1")},
+				"attrFloat":  DeviceAttribute{Name: "attrFloat", Value: 6.0, Description: strPtr("desc2")},
+			},
+		},
 	}
 	floatVal4 := 4.0
+	floatVal5 := 5.0
 
 	testCases := map[string]struct {
 		expected []Device
@@ -74,7 +89,7 @@ func TestMongoGetDevices(t *testing.T) {
 			sort:     nil,
 		},
 		"all devs, with skip": {
-			expected: []Device{inputDevs[4], inputDevs[5]},
+			expected: []Device{inputDevs[4], inputDevs[5], inputDevs[6], inputDevs[7]},
 			skip:     4,
 			limit:    20,
 			filters:  nil,
@@ -102,11 +117,21 @@ func TestMongoGetDevices(t *testing.T) {
 			sort:     nil,
 		},
 		"filter on attribute (equal attribute float)": {
+			expected: []Device{inputDevs[5]},
+			skip:     0,
+			limit:    20,
+			filters:  []Filter{Filter{AttrName: "attrFloat", Value: "5.0", ValueFloat: &floatVal5, Operator: Eq}},
+			sort:     nil,
+		},
+		"filter on two attributes (equal)": {
 			expected: []Device{inputDevs[4]},
 			skip:     0,
 			limit:    20,
-			filters:  []Filter{Filter{AttrName: "attrFloat", Value: "4.0", ValueFloat: &floatVal4, Operator: Eq}},
-			sort:     nil,
+			filters: []Filter{
+				Filter{AttrName: "attrString", Value: "val4", Operator: Eq},
+				Filter{AttrName: "attrFloat", Value: "4.0", ValueFloat: &floatVal4, Operator: Eq},
+			},
+			sort: nil,
 		},
 		"sort, limit": {
 			expected: []Device{inputDevs[5], inputDevs[4], inputDevs[3]},
@@ -124,7 +149,7 @@ func TestMongoGetDevices(t *testing.T) {
 			hasGroup: boolPtr(true),
 		},
 		"hasGroup = false": {
-			expected: []Device{inputDevs[0], inputDevs[3], inputDevs[4]},
+			expected: []Device{inputDevs[0], inputDevs[3], inputDevs[4], inputDevs[6], inputDevs[7]},
 			skip:     0,
 			limit:    20,
 			filters:  nil,

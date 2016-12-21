@@ -1,71 +1,74 @@
 swagger: '2.0'
 info:
-  title: Inventory Service Device API
+  title: Device inventory
   version: '0.1'
   description: |
-    ### Authorization
+    An API for uploading device attributes. Intended for use by devices.
 
-    Incoming requests must set `Authorization` header and include device token
-    obtained from the API. The header shall look like this:
+    Devices can upload vendor-specific attributes (software/hardware info, health checks, metrics, etc.) of various data types to the backend.
 
-    ```
-    Authorization: Bearer <token>
-    # example
-    Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWV9.TJVA95OrM7E2cBab30RMHrHDcEfxjoYZgeFONFh7HgQ
-    ```
-
-host: 'localhost:8080'
 basePath: '/api/devices/0.1/inventory'
+host: 'docker.mender.io:8080'
+schemes:
+  - https
 
 paths:
-  /attributes:
+  /device/attributes:
     patch:
-      summary: Upload a set of attributes for a device.
+      summary: Upload a set of attributes for a device
       description: |
-        Attribute values are uploaded as a collection of attribute-value entries.
+        Saves the provided attribute set for the authenticated device.
+        The device ID is retrieved from the authorization header.
 
-        Attribute names are human readable, unique IDs, e.g. 'device_type', 'ip_addr', 'cpu_load', etc.
-
-        The method has upsert semantics:
-          - values of exisiting attributes are overwritten,
-          - attributes uploaded for the first time are simply created,
-          - the Device resource will also be created if necessary
-
-        In other words, no special initialization of attributes is required.
-
-        This is a device-only endpoint. The requesting device ID is extracted from the provided auth token.
-
+        This method has upsert semantics:
+        * the values of existing attributes are overwritten
+        * attributes uploaded for the first time are automatically created
       parameters:
         - name: Authorization
           in: header
           required: true
           type: string
           format: Bearer [token]
-          description: issued by device auth service
+          description: Contains the JWT token issued by the Device Authentication Service.
         - name: attributes
           in: body
-          description: List of attribute values.
+          description: A list of attribute descriptors.
           required: true
           schema:
+            title: ListOfAttributes
             type: array
             items:
-              $ref: '#/definitions/AttributeNew'
+              $ref: '#/definitions/Attribute'
+            example:
+              application/json:
+                - name: "ip_addr"
+                  value: "1.2.3.4"
+                  description: "IP address"
+                - name: "mac_addr"
+                  value: "00.01:02:03:04:05"
+                  description: "MAC address"
+                - name: "ports"
+                  value:
+                    - "8080"
+                    - "8081"
+                  description: "Open ports"
       responses:
         200:
-          description: Attributes updated successfully.
+          description: Attributes were uploaded successfully.
         401:
-          description: Device is not authenticated.
+          description: The device is not authenticated.
         400:
-          description: Bad request.
+          description: Missing/malformed request parameters or body. See error for details.
           schema:
             $ref: '#/definitions/Error'
         500:
-          description: Internal error.
+          description: Internal server error.
           schema:
             $ref: '#/definitions/Error'
 
 definitions:
-  AttributeNew:
+  Attribute:
+    description: Attribute descriptor.
     type: object
     required:
       - name
@@ -73,16 +76,36 @@ definitions:
     properties:
       name:
         type: string
-        description: Unique name.
+        description: |
+            A human readable, unique attribute ID, e.g. 'device_type', 'ip_addr', 'cpu_load', etc.
       description:
         type: string
+        description: Attribute description.
       value:
-        type: object
-        description: The actual current value of the attribute (see Supported Attribute Types in API description).
+        type: string
+        description: |
+            The current value of the attribute.
+
+            Attribute type is implicit, inferred from the JSON type.
+
+            Supported types: number, string, array of numbers, array of strings. Mixed arrays are not allowed.
+    example:
+      application/json:
+        name: "cpu_load"
+        description: "The current CPU load."
+        value: 42
+
   Error:
-    description: Error descriptor
+    description: Error descriptor.
     type: object
     properties:
       error:
-        description: Description of the error
+        description: Description of the error.
         type: string
+      request_id:
+        description: Request ID (same as in X-MEN-RequestID header).
+        type: string
+    example:
+      application/json:
+          error: "failed to decode device group data: JSON payload is empty"
+          request_id: "f7881e82-0492-49fb-b459-795654e7188a"
