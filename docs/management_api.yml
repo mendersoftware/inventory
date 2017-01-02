@@ -12,7 +12,7 @@ info:
     * search devices by attribute value
     * use the results to create and manage device groups for the purpose of deployment scheduling
 
-basePath: '/api/integrations/0.1/inventory'
+basePath: '/api/management/0.1/inventory'
 host: 'docker.mender.io:8080'
 schemes:
   - https
