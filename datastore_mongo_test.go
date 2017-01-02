@@ -672,7 +672,6 @@ func TestMongoUpsertAttributes(t *testing.T) {
 
 		//check timestamp validity
 		//note that mongo stores time with lower precision- custom comparison
-		assert.Equal(t, createdTs.Unix(), dev.CreatedTs.Unix())
 		assert.Condition(t,
 			func() bool {
 				return dev.UpdatedTs.After(dev.CreatedTs) ||
