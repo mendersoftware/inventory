@@ -31,8 +31,8 @@ const (
 var (
 	configValidators = []config.Validator{}
 	configDefaults   = []config.Default{
-		{SettingListen, SettingListenDefault},
-		{SettingMiddleware, SettingMiddlewareDefault},
-		{SettingDb, SettingDbDefault},
+		{Key: SettingListen, Value: SettingListenDefault},
+		{Key: SettingMiddleware, Value: SettingMiddlewareDefault},
+		{Key: SettingDb, Value: SettingDbDefault},
 	}
 )
