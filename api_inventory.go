@@ -208,6 +208,7 @@ func (i *InventoryHandlers) GetDevicesHandler(w rest.ResponseWriter, r *rest.Req
 	}
 
 	links := utils.MakePageLinkHdrs(r, page, perPage, hasNext)
+
 	for _, l := range links {
 		w.Header().Add("Link", l)
 	}

@@ -21,6 +21,7 @@ import (
 	"math"
 	"net/url"
 	"strconv"
+	"strings"
 )
 
 //pagination constants
@@ -33,7 +34,7 @@ const (
 	PerPageMax     = 500
 	PerPageDefault = 20
 	LinkHdr        = "Link"
-	LinkTmpl       = "<%s>; rel=\"%s\""
+	LinkTmpl       = "<%s?%s>; rel=\"%s\""
 	LinkPrev       = "prev"
 	LinkNext       = "next"
 	LinkFirst      = "first"
@@ -138,31 +139,26 @@ func ParsePagination(r *rest.Request) (uint64, uint64, error) {
 
 func MakePageLinkHdrs(r *rest.Request, page, per_page uint64, has_next bool) []string {
 	var links []string
+
+	pathitems := strings.Split(r.URL.Path, "/")
+	resource := pathitems[len(pathitems)-1]
+	query := r.URL.Query()
+
 	if page > 1 {
-		links = append(links, MakeLink(LinkPrev, r, page-1, per_page))
+		links = append(links, MakeLink(LinkPrev, resource, query, page-1, per_page))
 	}
 
 	if has_next {
-		links = append(links, MakeLink(LinkNext, r, page+1, per_page))
+		links = append(links, MakeLink(LinkNext, resource, query, page+1, per_page))
 	}
 
-	links = append(links, MakeLink(LinkFirst, r, 1, per_page))
+	links = append(links, MakeLink(LinkFirst, resource, query, 1, per_page))
 	return links
 }
 
-func MakeLink(link_type string, r *rest.Request, page, per_page uint64) string {
-	url := r.URL
-	q := url.Query()
-	q.Set(PageName, strconv.Itoa(int(page)))
-	q.Set(PerPageName, strconv.Itoa(int(per_page)))
-	url.RawQuery = q.Encode()
+func MakeLink(link_type string, resource string, query url.Values, page, per_page uint64) string {
+	query.Set(PageName, strconv.Itoa(int(page)))
+	query.Set(PerPageName, strconv.Itoa(int(per_page)))
 
-	//url's Host and Scheme will mostly be empty -
-	//infer from Request or use defaults
-	url.Host = r.Host
-	if url.Scheme == "" {
-		url.Scheme = DefaultScheme
-	}
-
-	return fmt.Sprintf(LinkTmpl, url.String(), link_type)
+	return fmt.Sprintf(LinkTmpl, resource, query.Encode(), link_type)
 }
