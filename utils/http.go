@@ -21,7 +21,6 @@ import (
 	"math"
 	"net/url"
 	"strconv"
-	"strings"
 )
 
 //pagination constants
@@ -166,18 +165,4 @@ func MakeLink(link_type string, r *rest.Request, page, per_page uint64) string {
 	}
 
 	return fmt.Sprintf(LinkTmpl, url.String(), link_type)
-}
-
-// build URL using request 'r' and template, replace path params with
-// elements from 'params' using lexical match as in strings.Replace()
-func BuildURL(r *rest.Request, template string, params map[string]string) *url.URL {
-	url := r.BaseUrl()
-
-	path := template
-	for k, v := range params {
-		path = strings.Replace(path, k, v, -1)
-	}
-	url.Path = path
-
-	return url
 }

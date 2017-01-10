@@ -169,16 +169,3 @@ func TestParsePaginationDefault(t *testing.T) {
 	assert.Equal(t, uint64(PageDefault), page)
 	assert.Equal(t, uint64(PerPageDefault), per_page)
 }
-
-func TestBuildURL(t *testing.T) {
-
-	hr, _ := http.NewRequest("PUT", "http://1.2.3.4:9999/foo/bar", nil)
-	r := &rest.Request{Request: hr}
-
-	u := BuildURL(r, "/api/:id/some/:status/:bar", map[string]string{
-		":id":     "1",
-		":status": "foo",
-	})
-
-	assert.Equal(t, "http://1.2.3.4:9999/api/1/some/foo/:bar", u.String())
-}
