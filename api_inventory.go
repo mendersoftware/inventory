@@ -208,6 +208,7 @@ func (i *InventoryHandlers) GetDevicesHandler(w rest.ResponseWriter, r *rest.Req
 	}
 
 	links := utils.MakePageLinkHdrs(r, page, perPage, hasNext)
+
 	for _, l := range links {
 		w.Header().Add("Link", l)
 	}
@@ -262,10 +263,7 @@ func (i *InventoryHandlers) AddDeviceHandler(w rest.ResponseWriter, r *rest.Requ
 		return
 	}
 
-	devurl := utils.BuildURL(r, uriDevice, map[string]string{
-		":id": dev.ID.String(),
-	})
-	w.Header().Add("Location", devurl.String())
+	w.Header().Add("Location", "devices/"+dev.ID.String())
 	w.WriteHeader(http.StatusCreated)
 }
 

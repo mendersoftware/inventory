@@ -17,6 +17,7 @@ import (
 	"github.com/ant0ine/go-json-rest/rest"
 	"github.com/stretchr/testify/assert"
 	"net/http"
+	neturl "net/url"
 	"testing"
 )
 
@@ -65,15 +66,12 @@ func mockPageRequest(url, page, per_page string) *rest.Request {
 }
 
 func TestMakeLink(t *testing.T) {
-	url := "https://localhost:8080/resource"
-	req := mockRequest(url, false)
-
-	l := MakeLink("first", req, 1, 10)
-	assert.Equal(t, "<http://localhost:8080/resource?page=1&per_page=10>; rel=\"first\"", l)
+	l := MakeLink("first", "resource", neturl.Values{}, 1, 10)
+	assert.Equal(t, "<resource?page=1&per_page=10>; rel=\"first\"", l)
 }
 
 func TestMakePageLinkHdrs(t *testing.T) {
-	url := "https://localhost:8080/resource?page=2&per_page=10"
+	url := "https://localhost:8080/base/url/resource?page=2&per_page=10"
 	req := mockRequest(url, true)
 	links := MakePageLinkHdrs(req, 2, 10, true)
 	assert.Len(t, links, 3)
@@ -168,17 +166,4 @@ func TestParsePaginationDefault(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, uint64(PageDefault), page)
 	assert.Equal(t, uint64(PerPageDefault), per_page)
-}
-
-func TestBuildURL(t *testing.T) {
-
-	hr, _ := http.NewRequest("PUT", "http://1.2.3.4:9999/foo/bar", nil)
-	r := &rest.Request{Request: hr}
-
-	u := BuildURL(r, "/api/:id/some/:status/:bar", map[string]string{
-		":id":     "1",
-		":status": "foo",
-	})
-
-	assert.Equal(t, "http://1.2.3.4:9999/api/1/some/foo/:bar", u.String())
 }

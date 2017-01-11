@@ -124,8 +124,8 @@ func TestApiInventoryGetDevices(t *testing.T) {
 				OutputBodyObject: mockListDevices(5),
 				OutputHeaders: map[string][]string{
 					"Link": []string{
-						fmt.Sprintf(utils.LinkTmpl, "http://1.2.3.4/api/0.1.0/devices?page=3&per_page=5", "prev"),
-						fmt.Sprintf(utils.LinkTmpl, "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5", "first"),
+						fmt.Sprintf(utils.LinkTmpl, "devices", "page=3&per_page=5", "prev"),
+						fmt.Sprintf(utils.LinkTmpl, "devices", "page=1&per_page=5", "first"),
 					},
 				},
 			},
@@ -139,8 +139,8 @@ func TestApiInventoryGetDevices(t *testing.T) {
 				OutputBodyObject: mockListDevices(5),
 				OutputHeaders: map[string][]string{
 					"Link": []string{
-						fmt.Sprintf(utils.LinkTmpl, "http://1.2.3.4/api/0.1.0/devices?page=3&per_page=5", "prev"),
-						fmt.Sprintf(utils.LinkTmpl, "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5", "first"),
+						fmt.Sprintf(utils.LinkTmpl, "devices", "page=3&per_page=5", "prev"),
+						fmt.Sprintf(utils.LinkTmpl, "devices", "page=1&per_page=5", "first"),
 					},
 				},
 			},
@@ -184,7 +184,7 @@ func TestApiInventoryGetDevices(t *testing.T) {
 				OutputBodyObject: mockListDevices(5),
 				OutputHeaders: map[string][]string{
 					"Link": []string{
-						fmt.Sprintf(utils.LinkTmpl, "http://1.2.3.4/api/0.1.0/devices?attr_name1=qe%3A123%3A123%3A123&page=1&per_page=5", "first"),
+						fmt.Sprintf(utils.LinkTmpl, "devices", "attr_name1=qe%3A123%3A123%3A123&page=1&per_page=5", "first"),
 					},
 				},
 			},
@@ -208,7 +208,7 @@ func TestApiInventoryGetDevices(t *testing.T) {
 				OutputBodyObject: mockListDevices(5),
 				OutputHeaders: map[string][]string{
 					"Link": []string{
-						fmt.Sprintf(utils.LinkTmpl, "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&sort=attr_name1%3Aasc", "first"),
+						fmt.Sprintf(utils.LinkTmpl, "devices", "page=1&per_page=5&sort=attr_name1%3Aasc", "first"),
 					},
 				},
 			},
@@ -232,7 +232,7 @@ func TestApiInventoryGetDevices(t *testing.T) {
 				OutputBodyObject: mockListDevices(5),
 				OutputHeaders: map[string][]string{
 					"Link": []string{
-						fmt.Sprintf(utils.LinkTmpl, "http://1.2.3.4/api/0.1.0/devices?has_group=true&page=1&per_page=5", "first"),
+						fmt.Sprintf(utils.LinkTmpl, "devices", "has_group=true&page=1&per_page=5", "first"),
 					},
 				},
 			},
@@ -326,7 +326,7 @@ func TestApiInventoryAddDevice(t *testing.T) {
 			JSONResponseParams: utils.JSONResponseParams{
 				OutputStatus:     http.StatusCreated,
 				OutputBodyObject: nil,
-				OutputHeaders:    map[string][]string{"Location": []string{"http://1.2.3.4/api/0.1.0/devices/id-0001"}},
+				OutputHeaders:    map[string][]string{"Location": []string{"devices/id-0001"}},
 			},
 		},
 		"body formatted ok, wrong attributes type": {
@@ -914,8 +914,8 @@ func TestApiInventoryGetDevicesByGroup(t *testing.T) {
 				OutputBodyObject: mockListDeviceIDs(5),
 				OutputHeaders: map[string][]string{
 					"Link": []string{
-						fmt.Sprintf(utils.LinkTmpl, "http://1.2.3.4/api/0.1.0/groups/foo/devices?page=3&per_page=5", "prev"),
-						fmt.Sprintf(utils.LinkTmpl, "http://1.2.3.4/api/0.1.0/groups/foo/devices?page=1&per_page=5", "first"),
+						fmt.Sprintf(utils.LinkTmpl, "devices", "page=3&per_page=5", "prev"),
+						fmt.Sprintf(utils.LinkTmpl, "devices", "page=1&per_page=5", "first"),
 					},
 				},
 			},
@@ -929,8 +929,8 @@ func TestApiInventoryGetDevicesByGroup(t *testing.T) {
 				OutputBodyObject: mockListDeviceIDs(5),
 				OutputHeaders: map[string][]string{
 					"Link": []string{
-						fmt.Sprintf(utils.LinkTmpl, "http://1.2.3.4/api/0.1.0/groups/foo/devices?page=3&per_page=5", "prev"),
-						fmt.Sprintf(utils.LinkTmpl, "http://1.2.3.4/api/0.1.0/groups/foo/devices?page=1&per_page=5", "first"),
+						fmt.Sprintf(utils.LinkTmpl, "devices", "page=3&per_page=5", "prev"),
+						fmt.Sprintf(utils.LinkTmpl, "devices", "page=1&per_page=5", "first"),
 					},
 				},
 			},
