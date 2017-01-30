@@ -126,6 +126,12 @@
 			"path": "github.com/mendersoftware/go-lib-micro/mongo/migrate",
 			"revision": "bda4d06c5fc4066cc4d91326fec36944f759f62e",
 			"revisionTime": "2017-01-28T10:47:18Z"
+	 	},
+		{
+			"checksumSHA1": "5PDgQnNLCVPQR537rMBdiAPm5aM=",
+			"path": "github.com/mendersoftware/go-lib-micro/customheader",
+			"revision": "5a7f06d87cc653f59e4cd6de15e711d7b795bb46",
+			"revisionTime": "2017-01-30T12:11:14Z"
 		},
 		{
 			"checksumSHA1": "i38FeB/pqmU7xcluq/0LHjIwDY8=",

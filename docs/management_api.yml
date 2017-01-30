@@ -1,6 +1,6 @@
 swagger: '2.0'
 info:
-  version: '0.1'
+  version: '1'
   title: Device inventory
   description: |
     An API for device attribute management and device grouping. Intended for use by the web GUI.
@@ -12,8 +12,8 @@ info:
     * search devices by attribute value
     * use the results to create and manage device groups for the purpose of deployment scheduling
 
-basePath: '/api/management/0.1/inventory'
-host: 'docker.mender.io:8080'
+basePath: '/api/management/v1/inventory'
+host: 'docker.mender.io'
 schemes:
   - https
 
