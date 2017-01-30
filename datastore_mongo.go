@@ -21,9 +21,13 @@ import (
 	"gopkg.in/mgo.v2/bson"
 	"sync"
 	"time"
+
+	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
 )
 
 const (
+	DbVersion = "0.1.0"
+
 	DbName        = "inventory"
 	DbDevicesColl = "devices"
 
@@ -308,4 +312,23 @@ func (db *DataStoreMongo) GetDeviceGroup(id DeviceID) (GroupName, error) {
 	}
 
 	return dev.Group, nil
+}
+
+func (db *DataStoreMongo) Migrate(version string, migrations []migrate.Migration) error {
+	m := migrate.DummyMigrator{
+		Session: db.session,
+		Db:      DbName,
+	}
+
+	ver, err := migrate.NewVersion(version)
+	if err != nil {
+		return errors.Wrap(err, "failed to parse service version")
+	}
+
+	err = m.Apply(ver, migrations)
+	if err != nil {
+		return errors.Wrap(err, "failed to apply migrations")
+	}
+
+	return nil
 }
