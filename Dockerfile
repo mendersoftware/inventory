@@ -1,5 +1,7 @@
 FROM alpine:3.4
 
+EXPOSE 8080
+
 COPY ./inventory /usr/bin/
 
 RUN mkdir /etc/inventory
