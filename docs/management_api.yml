@@ -22,6 +22,12 @@ paths:
     post:
       summary: Create a device resource with the supplied set of attributes
       parameters:
+        - name: Authorization
+          in: header
+          required: true
+          type: string
+          format: Bearer [token]
+          description: Contains the JWT token issued by the User Administration and Authentication Service.
         - name: device
           in: body
           required: true
@@ -62,6 +68,12 @@ paths:
                      ...
         ```
       parameters:
+        - name: Authorization
+          in: header
+          required: true
+          type: string
+          format: Bearer [token]
+          description: Contains the JWT token issued by the User Administration and Authentication Service.
         - name: page
           in: query
           description: Starting page.
@@ -145,6 +157,12 @@ paths:
       summary: Get a selected device
       description: Returns the details of the selected devices, including its attributes.
       parameters:
+        - name: Authorization
+          in: header
+          required: true
+          type: string
+          format: Bearer [token]
+          description: Contains the JWT token issued by the User Administration and Authentication Service.
         - name: id
           in: path
           description: Device identifier.
@@ -183,6 +201,12 @@ paths:
     get:
       summary: Get a selected device's group
       parameters:
+        - name: Authorization
+          in: header
+          required: true
+          type: string
+          format: Bearer [token]
+          description: Contains the JWT token issued by the User Administration and Authentication Service.
         - name: id
           in: path
           description: Device identifier.
@@ -218,6 +242,12 @@ paths:
         If a device already belongs to some group, it will be moved
         to the selected one.
       parameters:
+        - name: Authorization
+          in: header
+          required: true
+          type: string
+          format: Bearer [token]
+          description: Contains the JWT token issued by the User Administration and Authentication Service.
         - name: id
           in: path
           description: Device identifier.
@@ -246,6 +276,12 @@ paths:
       description: |
         Removes the device with identifier 'id' from the group 'group'.
       parameters:
+        - name: Authorization
+          in: header
+          required: true
+          type: string
+          format: Bearer [token]
+          description: Contains the JWT token issued by the User Administration and Authentication Service.
         - name: id
           in: path
           description: Device identifier.
@@ -296,6 +332,12 @@ paths:
       description: |
         Returns a paged collection of device IDs.
       parameters:
+        - name: Authorization
+          in: header
+          required: true
+          type: string
+          format: Bearer [token]
+          description: Contains the JWT token issued by the User Administration and Authentication Service.
         - name: page
           in: query
           description: Starting page.
