@@ -18,6 +18,7 @@ import (
 	"net/http"
 
 	"github.com/ant0ine/go-json-rest/rest"
+	"github.com/mendersoftware/go-lib-micro/customheader"
 	"github.com/mendersoftware/inventory/accesslog"
 	dlog "github.com/mendersoftware/inventory/log"
 	"github.com/mendersoftware/inventory/requestid"
@@ -83,6 +84,11 @@ var (
 func SetupMiddleware(api *rest.Api, mwtype string) error {
 
 	l := dlog.New(dlog.Ctx{})
+
+	api.Use(&customheader.CustomHeaderMiddleware{
+		HeaderName:  "X-INVENTORY-VERSION",
+		HeaderValue: CreateVersionString(),
+	})
 
 	l.Infof("setting up %s middleware", mwtype)
 
