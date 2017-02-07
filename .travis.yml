@@ -122,10 +122,6 @@ after_success:
     # Integrate with https://codecov.io
     - bash <(curl -s https://codecov.io/bash)
     
-    # Make build directory and copy all artifacts to this directory.
-    - mkdir build
-    - cp $BUILD_ARTIFATS $CONFIG_FILE build/
-
     # Check if api docs have changed
     - git show --stat ${TRAVIS_COMMIT_RANGE} | grep -E "docs/.+\.yml" && export API_DOCS_CHANGED=true
 
