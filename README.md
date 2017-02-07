@@ -1,5 +1,5 @@
-[![Build Status](https://travis-ci.org/mendersoftware/inventory.svg?branch=master)](https://travis-ci.org/mendersoftware/inventory)
-[![codecov](https://codecov.io/gh/mendersoftware/inventory/branch/master/graph/badge.svg)](https://codecov.io/gh/mendersoftware/inventory)
+[![Build Status](https://travis-ci.org/mendersoftware/inventory.svg?branch=1.0.x)](https://travis-ci.org/mendersoftware/inventory)
+[![codecov](https://codecov.io/gh/mendersoftware/inventory/branch/1.0.x/graph/badge.svg)](https://codecov.io/gh/mendersoftware/inventory)
 [![Go Report Card](https://goreportcard.com/badge/github.com/mendersoftware/inventory)](https://goreportcard.com/report/github.com/mendersoftware/inventory)
 [![Docker pulls](https://img.shields.io/docker/pulls/mendersoftware/inventory.svg?maxAge=3600)](https://hub.docker.com/r/mendersoftware/inventory/)
 
