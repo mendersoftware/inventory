@@ -41,6 +41,9 @@ type DataStore interface {
 	// })
 	AddDevice(dev *Device) error
 
+	// delete device and all attributes
+	DeleteDevice(id DeviceID) error
+
 	// Updates the device attributes in a differential manner.
 	// Nonexistent attributes are created, existing are overwritten; the device resource is also created if necessary.
 	UpsertAttributes(id DeviceID, attrs DeviceAttributes) error
