@@ -49,6 +49,7 @@ type InventoryApp interface {
 	ListGroups() ([]GroupName, error)
 	ListDevicesByGroup(group GroupName, skip int, limit int) ([]DeviceID, error)
 	GetDeviceGroup(id DeviceID) (GroupName, error)
+	DeleteDevice(id DeviceID) error
 }
 
 type Inventory struct {
@@ -98,6 +99,18 @@ func (i *Inventory) AddDevice(dev *Device) error {
 		return errors.Wrap(err, "failed to add device")
 	}
 	return nil
+}
+
+func (i *Inventory) DeleteDevice(id DeviceID) error {
+	err := i.db.DeleteDevice(id)
+	switch err {
+	case nil:
+		return nil
+	case ErrDevNotFound:
+		return ErrDevNotFound
+	default:
+		return errors.Wrap(err, "failed to delete device")
+	}
 }
 
 func (i *Inventory) UpsertAttributes(id DeviceID, attrs DeviceAttributes) error {

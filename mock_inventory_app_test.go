@@ -155,3 +155,17 @@ func (_m *MockInventoryApp) GetDeviceGroup(id DeviceID) (GroupName, error) {
 
 	return r0, r1
 }
+
+// DeleteDevice provides a mock function with given fields: id
+func (_m *MockInventoryApp) DeleteDevice(id DeviceID) error {
+	ret := _m.Called(id)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(DeviceID) error); ok {
+		r0 = rf(id)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
