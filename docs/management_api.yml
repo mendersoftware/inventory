@@ -197,6 +197,33 @@ paths:
           description: Internal server error.
           schema:
             $ref: "#/definitions/Error"
+    delete:
+      summary: Remove selected device
+      description: Deletes all information concerning the device, including its attributes.
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          type: string
+          format: Bearer [token]
+          description: Contains the JWT token issued by the User Administration and Authentication Service.
+        - name: id
+          in: path
+          description: Device identifier.
+          required: true
+          type: string
+      responses:
+          204:
+            description: Device removed
+          404:
+            description: Device not found
+            schema:
+              $ref: "#/definitions/Error"
+          500:
+            description: Internal server error.
+            schema:
+              $ref: "#/definitions/Error"
+
   /devices/{id}/group:
     get:
       summary: Get a selected device's group
