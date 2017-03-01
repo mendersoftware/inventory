@@ -1079,3 +1079,58 @@ func TestApiGetDeviceGroup(t *testing.T) {
 		runTestRequest(t, apih, tc.inReq, tc.JSONResponseParams)
 	}
 }
+
+func TestApiDeleteDevice(t *testing.T) {
+	t.Parallel()
+	rest.ErrorFieldName = "error"
+
+	tcases := map[string]struct {
+		utils.JSONResponseParams
+
+		inReq        *http.Request
+		inDevId      DeviceID
+		inventoryErr error
+	}{
+		"no device": {
+			inDevId:      DeviceID("1"),
+			inReq:        test.MakeSimpleRequest("DELETE", "http://1.2.3.4/api/0.1.0/devices/1", nil),
+			inventoryErr: ErrDevNotFound,
+			JSONResponseParams: utils.JSONResponseParams{
+				OutputStatus:     http.StatusNotFound,
+				OutputBodyObject: RestError(ErrDevNotFound.Error()),
+			},
+		},
+		"some device": {
+			inDevId: DeviceID("2"),
+			inReq:   test.MakeSimpleRequest("DELETE", "http://1.2.3.4/api/0.1.0/devices/2", nil),
+			JSONResponseParams: utils.JSONResponseParams{
+				OutputStatus: http.StatusNoContent,
+			},
+		},
+		"error": {
+			inDevId: DeviceID("3"),
+			inReq:   test.MakeSimpleRequest("DELETE", "http://1.2.3.4/api/0.1.0/devices/3", nil),
+			JSONResponseParams: utils.JSONResponseParams{
+				OutputStatus:     http.StatusInternalServerError,
+				OutputBodyObject: RestError("internal error"),
+			},
+			inventoryErr: errors.New("inventory internal error"),
+		},
+	}
+
+	for name, tc := range tcases {
+		t.Run(fmt.Sprintf("test case: %s", name), func(t *testing.T) {
+			t.Parallel()
+
+			inv := MockInventoryApp{}
+			inv.On("DeleteDevice", tc.inDevId).Return(tc.inventoryErr)
+
+			factory := func(c config.Reader, l *log.Logger) (InventoryApp, error) {
+				return &inv, nil
+			}
+			apih := makeMockApiHandler(t, factory)
+
+			runTestRequest(t, apih, tc.inReq, tc.JSONResponseParams)
+		})
+	}
+}

@@ -1190,3 +1190,77 @@ func TestMigrate(t *testing.T) {
 	}
 
 }
+
+// test funcs
+func TestMongoDeleteDevice(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping TestMongoDeleteDevice in short mode.")
+	}
+
+	inputDevs := []Device{
+		Device{ID: DeviceID("0")},
+		Device{ID: DeviceID("1")},
+	}
+
+	testCases := map[string]struct {
+		inputId  DeviceID
+		expected []Device
+		err      error
+	}{
+		"existing 1": {
+			inputId: DeviceID("0"),
+			expected: []Device{
+				Device{ID: DeviceID("1")},
+			},
+			err: nil,
+		},
+		"existing 2": {
+			inputId: DeviceID("1"),
+			expected: []Device{
+				Device{ID: DeviceID("0")},
+			},
+			err: nil,
+		},
+		"doesn't exist": {
+			inputId: DeviceID("3"),
+			expected: []Device{
+				Device{ID: DeviceID("0")},
+				Device{ID: DeviceID("1")},
+			},
+			err: ErrDevNotFound,
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Logf("test case: %s", name)
+
+		// Make sure we start test with empty database
+		db.Wipe()
+
+		session := db.Session()
+
+		for _, d := range inputDevs {
+			err := session.DB(DbName).C(DbDevicesColl).Insert(d)
+			assert.NoError(t, err, "failed to setup input data")
+		}
+
+		store := NewDataStoreMongoWithSession(session)
+
+		//test
+		err := store.DeleteDevice(tc.inputId)
+		if tc.err != nil {
+			assert.EqualError(t, err, tc.err.Error())
+		} else {
+			assert.NoError(t, err, "failed to delete device")
+
+			var outDevs []Device
+			err := session.DB(DbName).C(DbDevicesColl).Find(nil).All(&outDevs)
+			assert.NoError(t, err, "failed to verify devices")
+
+			assert.True(t, reflect.DeepEqual(tc.expected, outDevs))
+		}
+
+		// Need to close all sessions to be able to call wipe at next test case
+		session.Close()
+	}
+}

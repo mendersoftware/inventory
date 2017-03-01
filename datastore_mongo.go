@@ -314,6 +314,20 @@ func (db *DataStoreMongo) GetDeviceGroup(id DeviceID) (GroupName, error) {
 	return dev.Group, nil
 }
 
+func (db *DataStoreMongo) DeleteDevice(id DeviceID) error {
+	s := db.session.Copy()
+	defer s.Close()
+
+	if err := s.DB(DbName).C(DbDevicesColl).RemoveId(id); err != nil {
+		if err.Error() == mgo.ErrNotFound.Error() {
+			return ErrDevNotFound
+		}
+		return err
+	}
+
+	return nil
+}
+
 func (db *DataStoreMongo) Migrate(version string, migrations []migrate.Migration) error {
 	m := migrate.DummyMigrator{
 		Session: db.session,

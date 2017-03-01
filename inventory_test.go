@@ -15,6 +15,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"github.com/stretchr/testify/assert"
 	. "github.com/stretchr/testify/mock"
 	"reflect"
@@ -487,6 +488,49 @@ func TestInventoryGetDeviceGroup(t *testing.T) {
 			assert.NoError(t, err)
 			assert.Equal(t, tc.OutGroup, group)
 		}
+	}
+}
+
+func TestInventoryDeleteDevice(t *testing.T) {
+	t.Parallel()
+
+	testCases := map[string]struct {
+		datastoreError error
+		outError       error
+	}{
+		"ok": {
+			datastoreError: nil,
+			outError:       nil,
+		},
+		"no device": {
+			datastoreError: ErrDevNotFound,
+			outError:       ErrDevNotFound,
+		},
+		"datastore error": {
+			datastoreError: errors.New("db connection failed"),
+			outError:       errors.New("failed to delete device: db connection failed"),
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(fmt.Sprintf("test case: %s", name), func(t *testing.T) {
+
+			db := &MockDataStore{}
+			db.On("DeleteDevice",
+				AnythingOfType("DeviceID"),
+			).Return(tc.datastoreError)
+			i := invForTest(db)
+
+			err := i.DeleteDevice(DeviceID("foo"))
+
+			if tc.outError != nil {
+				if assert.Error(t, err) {
+					assert.EqualError(t, err, tc.outError.Error())
+				}
+			} else {
+				assert.NoError(t, err)
+			}
+		})
 	}
 }
 
