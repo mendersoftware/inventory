@@ -1,0 +1,13 @@
+version: '2'
+services:
+    acceptance:
+        image: testing
+        networks:
+            - mender
+        volumes:
+            - "${TESTS_DIR}:/testing"
+        depends_on:
+            - mender-inventory
+    mender-inventory:
+            # built/tagged locally and only used for testing
+            image: mendersoftware/inventory:pr
