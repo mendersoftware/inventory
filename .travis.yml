@@ -11,6 +11,10 @@ services:
 go:
     - 1.7.4
 
+cache:
+  directories:
+    - node_modules
+
 env:
     matrix:
         - JOB_TYPE=compile_and_basic_tests
@@ -56,6 +60,7 @@ before_install:
     - sudo apt-get install -y nodejs mongodb-org
 
     - pip2.7 install -U --user paramiko fabric PyYAML pytest requests bravado pytest-xdist
+    - sudo npm install -g npm
     - sudo npm install -g swagger-cli
 
     # Get our own Swagger verifier
