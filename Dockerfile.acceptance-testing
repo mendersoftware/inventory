@@ -1,0 +1,10 @@
+FROM alpine:3.4
+
+EXPOSE 8080
+RUN mkdir /tests
+
+COPY ./inventory /usr/bin/
+COPY ./config.yaml /usr/bin/
+STOPSIGNAL SIGINT
+
+ENTRYPOINT ["/usr/bin/inventory", "-test.coverprofile=/testing/coverage-acceptance.txt", "-acceptance-tests", "-test.run=TestRunMain"]
