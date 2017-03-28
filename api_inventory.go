@@ -251,16 +251,12 @@ func (i *InventoryHandlers) DeleteDeviceHandler(w rest.ResponseWriter, r *rest.R
 
 	err = inv.DeleteDevice(DeviceID(deviceID))
 
-	switch err {
-	case nil:
-		w.WriteHeader(http.StatusNoContent)
-	case ErrDevNotFound:
-		restErrWithLog(w, r, l, ErrDevNotFound, http.StatusNotFound)
-	default:
+	if err != nil && err != ErrDevNotFound {
 		restErrWithLogInternal(w, r, l, err)
+		return
 	}
 
-	return
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (i *InventoryHandlers) AddDeviceHandler(w rest.ResponseWriter, r *rest.Request) {
