@@ -19,8 +19,9 @@ import (
 	"os"
 	"testing"
 
-	"gopkg.in/mgo.v2/dbtest"
 	"log"
+
+	"gopkg.in/mgo.v2/dbtest"
 )
 
 var db *dbtest.DBServer

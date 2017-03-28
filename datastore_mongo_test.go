@@ -16,12 +16,14 @@ package main_test
 import (
 	"context"
 	"errors"
-	. "github.com/mendersoftware/inventory"
-	"github.com/stretchr/testify/assert"
-	"gopkg.in/mgo.v2/bson"
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"gopkg.in/mgo.v2/bson"
+
+	. "github.com/mendersoftware/inventory"
 
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
 )

@@ -16,7 +16,9 @@ package main
 import (
 	"context"
 	"flag"
+
 	"github.com/mendersoftware/go-lib-micro/log"
+
 	"github.com/mendersoftware/inventory/config"
 )
 

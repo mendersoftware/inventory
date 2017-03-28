@@ -14,10 +14,12 @@
 package main
 
 import (
-	"github.com/mendersoftware/inventory/config"
+	"time"
+
 	"github.com/mendersoftware/go-lib-micro/log"
 	"github.com/pkg/errors"
-	"time"
+
+	"github.com/mendersoftware/inventory/config"
 )
 
 type ComparisonOperator int

@@ -17,11 +17,12 @@ package utils
 import (
 	"errors"
 	"fmt"
-	"github.com/ant0ine/go-json-rest/rest"
 	"math"
 	"net/url"
 	"strconv"
 	"strings"
+
+	"github.com/ant0ine/go-json-rest/rest"
 )
 
 //pagination constants

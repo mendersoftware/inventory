@@ -14,9 +14,11 @@
 package main
 
 import (
-	"github.com/ant0ine/go-json-rest/rest"
-	"github.com/mendersoftware/inventory/utils"
 	"net/http"
+
+	"github.com/ant0ine/go-json-rest/rest"
+
+	"github.com/mendersoftware/inventory/utils"
 )
 
 type HttpOptionsGenerator func(methods []string) rest.HandlerFunc

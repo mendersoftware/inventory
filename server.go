@@ -14,11 +14,13 @@
 package main
 
 import (
+	"net/http"
+
 	"github.com/ant0ine/go-json-rest/rest"
-	"github.com/mendersoftware/inventory/config"
 	"github.com/mendersoftware/go-lib-micro/log"
 	"github.com/pkg/errors"
-	"net/http"
+
+	"github.com/mendersoftware/inventory/config"
 )
 
 func SetupAPI(stacktype string) (*rest.Api, error) {

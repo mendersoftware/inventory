@@ -17,19 +17,21 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/ant0ine/go-json-rest/rest"
-	"github.com/ant0ine/go-json-rest/rest/test"
-	"github.com/mendersoftware/inventory/config"
-	"github.com/mendersoftware/go-lib-micro/log"
-	"github.com/mendersoftware/go-lib-micro/requestid"
-	"github.com/mendersoftware/go-lib-micro/requestlog"
-	"github.com/mendersoftware/inventory/utils"
-	"github.com/pkg/errors"
-	"github.com/stretchr/testify/assert"
-	. "github.com/stretchr/testify/mock"
 	"net/http"
 	"strconv"
 	"testing"
+
+	"github.com/ant0ine/go-json-rest/rest"
+	"github.com/ant0ine/go-json-rest/rest/test"
+	"github.com/mendersoftware/go-lib-micro/log"
+	"github.com/mendersoftware/go-lib-micro/requestid"
+	"github.com/mendersoftware/go-lib-micro/requestlog"
+	"github.com/pkg/errors"
+	"github.com/stretchr/testify/assert"
+	. "github.com/stretchr/testify/mock"
+
+	"github.com/mendersoftware/inventory/config"
+	"github.com/mendersoftware/inventory/utils"
 )
 
 func ToJson(data interface{}) string {

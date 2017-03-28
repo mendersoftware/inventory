@@ -17,11 +17,12 @@ package main
 import (
 	"context"
 	"fmt"
+	"sync"
+	"time"
+
 	"github.com/pkg/errors"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
-	"sync"
-	"time"
 
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
 )

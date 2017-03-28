@@ -14,18 +14,20 @@
 package main
 
 import (
-	"github.com/ant0ine/go-json-rest/rest"
-	"github.com/asaskevich/govalidator"
-	"github.com/mendersoftware/inventory/config"
-	"github.com/mendersoftware/go-lib-micro/log"
-	"github.com/mendersoftware/go-lib-micro/requestid"
-	"github.com/mendersoftware/go-lib-micro/requestlog"
-	"github.com/mendersoftware/inventory/utils"
-	"github.com/mendersoftware/inventory/utils/identity"
-	"github.com/pkg/errors"
 	"net/http"
 	"strconv"
 	"strings"
+
+	"github.com/ant0ine/go-json-rest/rest"
+	"github.com/asaskevich/govalidator"
+	"github.com/mendersoftware/go-lib-micro/log"
+	"github.com/mendersoftware/go-lib-micro/requestid"
+	"github.com/mendersoftware/go-lib-micro/requestlog"
+	"github.com/pkg/errors"
+
+	"github.com/mendersoftware/inventory/config"
+	"github.com/mendersoftware/inventory/utils"
+	"github.com/mendersoftware/inventory/utils/identity"
 )
 
 const (

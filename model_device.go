@@ -15,8 +15,9 @@ package main
 
 import (
 	"encoding/json"
-	"github.com/asaskevich/govalidator"
 	"time"
+
+	"github.com/asaskevich/govalidator"
 )
 
 type DeviceID string
