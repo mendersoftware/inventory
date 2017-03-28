@@ -11,29 +11,34 @@
 //    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
-package requestlog
+package requestid
 
 import (
+	"context"
+
 	"github.com/ant0ine/go-json-rest/rest"
-	"github.com/ant0ine/go-json-rest/rest/test"
-	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
-func TestRequestLogMiddleware(t *testing.T) {
-	api := rest.NewApi()
+// GetReqId helper for retrieving current request Id
+func GetReqId(r *rest.Request) string {
+	reqid := r.Env[RequestIdHeader]
+	if reqid != nil {
+		return reqid.(string)
+	}
 
-	api.Use(&RequestLogMiddleware{})
+	return ""
+}
 
-	api.SetApp(rest.AppSimple(func(w rest.ResponseWriter, r *rest.Request) {
-		log := r.Env[ReqLog]
-		assert.NotNil(t, log)
-		w.WriteJson(map[string]string{"foo": "bar"})
-	}))
+// FromContext extracts current request Id from context.Context
+func FromContext(ctx context.Context) string {
+	val := ctx.Value(RequestIdHeader)
+	if v, ok := val.(string); ok {
+		return v
+	}
+	return ""
+}
 
-	handler := api.MakeHandler()
-
-	req := test.MakeSimpleRequest("GET", "http://localhost/", nil)
-
-	_ = test.RunRequest(t, handler, req)
+// WithContext adds request to context `ctx` and returns the resulting context.
+func WithContext(ctx context.Context, reqid string) context.Context {
+	return context.WithValue(ctx, RequestIdHeader, reqid)
 }

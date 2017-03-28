@@ -31,15 +31,21 @@
 package log
 
 import (
-	"github.com/Sirupsen/logrus"
+	"context"
 	"path"
 	"runtime"
 	"strings"
+
+	"github.com/Sirupsen/logrus"
 )
 
 var (
 	// log is a global logger instance
 	Log = logrus.New()
+)
+
+const (
+	LoggerContextKey = "github.com/mendersoftware/go-lib-micro/log.Logger"
 )
 
 // ContextLogger interface for components which support
@@ -73,9 +79,21 @@ type Logger struct {
 	*logrus.Entry
 }
 
-// New returns a new Logger with a given context.
+// New returns a new Logger with a given context, derived from the global Log.
 func New(ctx Ctx) *Logger {
-	return &Logger{Log.WithFields(logrus.Fields(ctx))}
+	return NewFromLogger(Log, ctx)
+}
+
+// NewFromLogger returns a new Logger derived from a given logrus.Logger,
+// instead of the global one.
+func NewFromLogger(log *logrus.Logger, ctx Ctx) *Logger {
+	return &Logger{log.WithFields(logrus.Fields(ctx))}
+}
+
+// NewFromLogger returns a new Logger derived from a given logrus.Logger,
+// instead of the global one.
+func NewFromEntry(log *logrus.Entry, ctx Ctx) *Logger {
+	return &Logger{log.WithFields(logrus.Fields(ctx))}
 }
 
 // F returns a new Logger enriched with new context fields.
@@ -114,4 +132,31 @@ func (hook ContextHook) Fire(entry *logrus.Entry) error {
 	}
 
 	return nil
+}
+
+// Grab an instance of Logger that may have been passed in context.Context.
+// Returns the logger or creates a new instance if none was found in ctx. Since
+// Logger is based on logrus.Entry, if logger instance from context is any of
+// logrus.Logger, logrus.Entry, necessary adaption will be applied.
+func FromContext(ctx context.Context) *Logger {
+	l := ctx.Value(LoggerContextKey)
+	if l == nil {
+		return New(Ctx{})
+	}
+
+	switch v := l.(type) {
+	case *Logger:
+		return v
+	case *logrus.Entry:
+		return NewFromEntry(v, Ctx{})
+	case *logrus.Logger:
+		return NewFromLogger(v, Ctx{})
+	default:
+		return New(Ctx{})
+	}
+}
+
+// WithContext adds logger to context `ctx` and returns the resulting context.
+func WithContext(ctx context.Context, log *Logger) context.Context {
+	return context.WithValue(ctx, LoggerContextKey, log)
 }
