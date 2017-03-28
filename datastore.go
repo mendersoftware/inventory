@@ -16,8 +16,6 @@ package main
 
 import (
 	"errors"
-
-	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
 )
 
 var (
@@ -62,7 +60,4 @@ type DataStore interface {
 
 	// Get device's group
 	GetDeviceGroup(id DeviceID) (GroupName, error)
-
-	// Run migrations
-	Migrate(version string, migrations []migrate.Migration) error
 }
