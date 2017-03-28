@@ -19,10 +19,10 @@ import (
 
 	"github.com/ant0ine/go-json-rest/rest"
 	"github.com/mendersoftware/go-lib-micro/customheader"
-	"github.com/mendersoftware/inventory/accesslog"
-	dlog "github.com/mendersoftware/inventory/log"
-	"github.com/mendersoftware/inventory/requestid"
-	"github.com/mendersoftware/inventory/requestlog"
+	"github.com/mendersoftware/go-lib-micro/accesslog"
+	dlog "github.com/mendersoftware/go-lib-micro/log"
+	"github.com/mendersoftware/go-lib-micro/requestid"
+	"github.com/mendersoftware/go-lib-micro/requestlog"
 )
 
 const (

@@ -16,7 +16,7 @@ package main
 import (
 	"github.com/ant0ine/go-json-rest/rest"
 	"github.com/mendersoftware/inventory/config"
-	"github.com/mendersoftware/inventory/log"
+	"github.com/mendersoftware/go-lib-micro/log"
 	"github.com/pkg/errors"
 	"net/http"
 )

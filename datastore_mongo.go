@@ -15,6 +15,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"github.com/pkg/errors"
 	"gopkg.in/mgo.v2"
@@ -328,7 +329,7 @@ func (db *DataStoreMongo) DeleteDevice(id DeviceID) error {
 	return nil
 }
 
-func (db *DataStoreMongo) Migrate(version string, migrations []migrate.Migration) error {
+func (db *DataStoreMongo) Migrate(ctx context.Context, version string, migrations []migrate.Migration) error {
 	m := migrate.DummyMigrator{
 		Session: db.session,
 		Db:      DbName,
@@ -339,7 +340,7 @@ func (db *DataStoreMongo) Migrate(version string, migrations []migrate.Migration
 		return errors.Wrap(err, "failed to parse service version")
 	}
 
-	err = m.Apply(ver, migrations)
+	err = m.Apply(ctx, *ver, migrations)
 	if err != nil {
 		return errors.Wrap(err, "failed to apply migrations")
 	}

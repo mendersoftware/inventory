@@ -14,6 +14,7 @@
 package main_test
 
 import (
+	"context"
 	"errors"
 	. "github.com/mendersoftware/inventory"
 	"github.com/stretchr/testify/assert"
@@ -1174,14 +1175,14 @@ func TestMigrate(t *testing.T) {
 
 		store := NewDataStoreMongoWithSession(session)
 
-		err := store.Migrate(tc.version, nil)
+		err := store.Migrate(context.Background(), tc.version, nil)
 		if tc.err == "" {
 			assert.NoError(t, err)
 			var out []migrate.MigrationEntry
 			session.DB(DbName).C(migrate.DbMigrationsColl).Find(nil).All(&out)
 			assert.Len(t, out, 1)
 			v, _ := migrate.NewVersion(tc.version)
-			assert.Equal(t, v, out[0].Version)
+			assert.Equal(t, *v, out[0].Version)
 		} else {
 			assert.EqualError(t, err, tc.err)
 		}
