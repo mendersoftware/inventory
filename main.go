@@ -20,6 +20,7 @@ import (
 	"github.com/mendersoftware/go-lib-micro/log"
 
 	"github.com/mendersoftware/inventory/config"
+	"github.com/mendersoftware/inventory/store/mongo"
 )
 
 func main() {
@@ -63,12 +64,12 @@ func main() {
 
 	ctx := context.Background()
 
-	db, err := NewDataStoreMongo(config.Config.GetString(SettingDb))
+	db, err := mongo.NewDataStoreMongo(config.Config.GetString(SettingDb))
 	if err != nil {
 		l.Fatal("failed to connect to db")
 	}
 
-	err = db.Migrate(ctx, DbVersion, nil)
+	err = db.Migrate(ctx, mongo.DbVersion, nil)
 	if err != nil {
 		l.Fatal("failed to run migrations")
 	}

@@ -11,7 +11,7 @@
 //    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
-package main
+package http
 
 import (
 	"net/http"
@@ -25,7 +25,9 @@ import (
 	"github.com/mendersoftware/go-lib-micro/requestlog"
 	"github.com/pkg/errors"
 
-	"github.com/mendersoftware/inventory/config"
+	inventory "github.com/mendersoftware/inventory/inv"
+	"github.com/mendersoftware/inventory/model"
+	"github.com/mendersoftware/inventory/store"
 	"github.com/mendersoftware/inventory/utils"
 	"github.com/mendersoftware/inventory/utils/identity"
 )
@@ -56,7 +58,7 @@ type InventoryApiGroup struct {
 	Group string `json:"group" valid:"required"`
 }
 
-type InventoryFactory func(c config.Reader, l *log.Logger) (InventoryApp, error)
+type InventoryFactory func(l *log.Logger) (inventory.InventoryApp, error)
 
 type InventoryHandlers struct {
 	createInventory InventoryFactory
@@ -101,7 +103,7 @@ func (i *InventoryHandlers) GetApp() (rest.App, error) {
 // separated by colon (:)
 //
 // eg. `sort=attr_name1` or `sort=attr_name1:asd`
-func parseSortParam(r *rest.Request) (*Sort, error) {
+func parseSortParam(r *rest.Request) (*store.Sort, error) {
 	sortStr, err := utils.ParseQueryParmStr(r, queryParamSort, false, nil)
 	if err != nil {
 		return nil, err
@@ -110,7 +112,7 @@ func parseSortParam(r *rest.Request) (*Sort, error) {
 		return nil, nil
 	}
 	sortValArray := strings.Split(sortStr, queryParamValueSeparator)
-	sort := Sort{AttrName: sortValArray[sortAttributeNameIdx]}
+	sort := store.Sort{AttrName: sortValArray[sortAttributeNameIdx]}
 	if len(sortValArray) == 2 {
 		sortOrder := sortValArray[sortOrderIdx]
 		if sortOrder != sortOrderAsc && sortOrder != sortOrderDesc {
@@ -126,10 +128,10 @@ func parseSortParam(r *rest.Request) (*Sort, error) {
 // Equality operator default value is `eq`
 //
 // eg. `attr_name1=value1` or `attr_name1=eq:value1`
-func parseFilterParams(r *rest.Request) ([]Filter, error) {
+func parseFilterParams(r *rest.Request) ([]store.Filter, error) {
 	knownParams := []string{utils.PageName, utils.PerPageName, queryParamSort, queryParamHasGroup}
-	filters := make([]Filter, 0)
-	var filter Filter
+	filters := make([]store.Filter, 0)
+	var filter store.Filter
 	for name, _ := range r.URL.Query() {
 		if utils.ContainsString(name, knownParams) {
 			continue
@@ -139,18 +141,18 @@ func parseFilterParams(r *rest.Request) ([]Filter, error) {
 			return nil, err
 		}
 		valueStrArray := strings.Split(valueStr, queryParamValueSeparator)
-		filter = Filter{AttrName: name}
+		filter = store.Filter{AttrName: name}
 		valueIdx := 0
 		if len(valueStrArray) == 2 {
 			valueIdx = 1
 			switch valueStrArray[filterEqOperatorIdx] {
 			case "eq":
-				filter.Operator = Eq
+				filter.Operator = store.Eq
 			default:
 				return nil, errors.New("invalid filter operator")
 			}
 		} else {
-			filter.Operator = Eq
+			filter.Operator = store.Eq
 		}
 		filter.Value = valueStrArray[valueIdx]
 		floatValue, err := strconv.ParseFloat(filter.Value, 64)
@@ -190,7 +192,7 @@ func (i *InventoryHandlers) GetDevicesHandler(w rest.ResponseWriter, r *rest.Req
 		return
 	}
 
-	inv, err := i.createInventory(config.Config, l)
+	inv, err := i.createInventory(l)
 	if err != nil {
 		restErrWithLogInternal(w, r, l, err)
 		return
@@ -222,19 +224,19 @@ func (i *InventoryHandlers) GetDeviceHandler(w rest.ResponseWriter, r *rest.Requ
 	deviceID := r.PathParam("id")
 	l := requestlog.GetRequestLogger(r.Env)
 
-	inv, err := i.createInventory(config.Config, l)
+	inv, err := i.createInventory(l)
 	if err != nil {
 		restErrWithLogInternal(w, r, l, err)
 		return
 	}
 
-	dev, err := inv.GetDevice(DeviceID(deviceID))
+	dev, err := inv.GetDevice(model.DeviceID(deviceID))
 	if err != nil {
 		restErrWithLogInternal(w, r, l, err)
 		return
 	}
 	if dev == nil {
-		restErrWithLog(w, r, l, ErrDevNotFound, http.StatusNotFound)
+		restErrWithLog(w, r, l, store.ErrDevNotFound, http.StatusNotFound)
 		return
 	}
 
@@ -245,15 +247,15 @@ func (i *InventoryHandlers) DeleteDeviceHandler(w rest.ResponseWriter, r *rest.R
 	deviceID := r.PathParam("id")
 	l := requestlog.GetRequestLogger(r.Env)
 
-	inv, err := i.createInventory(config.Config, l)
+	inv, err := i.createInventory(l)
 	if err != nil {
 		restErrWithLogInternal(w, r, l, err)
 		return
 	}
 
-	err = inv.DeleteDevice(DeviceID(deviceID))
+	err = inv.DeleteDevice(model.DeviceID(deviceID))
 
-	if err != nil && err != ErrDevNotFound {
+	if err != nil && err != store.ErrDevNotFound {
 		restErrWithLogInternal(w, r, l, err)
 		return
 	}
@@ -270,7 +272,7 @@ func (i *InventoryHandlers) AddDeviceHandler(w rest.ResponseWriter, r *rest.Requ
 		return
 	}
 
-	inv, err := i.createInventory(config.Config, l)
+	inv, err := i.createInventory(l)
 	if err != nil {
 		restErrWithLogInternal(w, r, l, err)
 		return
@@ -278,7 +280,7 @@ func (i *InventoryHandlers) AddDeviceHandler(w rest.ResponseWriter, r *rest.Requ
 
 	err = inv.AddDevice(dev)
 	if err != nil {
-		if cause := errors.Cause(err); cause != nil && cause == ErrDuplicatedDeviceId {
+		if cause := errors.Cause(err); cause != nil && cause == store.ErrDuplicatedDeviceId {
 			restErrWithLogMsg(w, r, l, err, http.StatusConflict, "device with specified ID already exists")
 			return
 		}
@@ -308,13 +310,13 @@ func (i *InventoryHandlers) PatchDeviceAttributesHandler(w rest.ResponseWriter, 
 	}
 
 	//upsert the attributes
-	inv, err := i.createInventory(config.Config, l)
+	inv, err := i.createInventory(l)
 	if err != nil {
 		restErrWithLogInternal(w, r, l, err)
 		return
 	}
 
-	err = inv.UpsertAttributes(DeviceID(idata.Subject), attrs)
+	err = inv.UpsertAttributes(model.DeviceID(idata.Subject), attrs)
 	if err != nil {
 		restErrWithLogInternal(w, r, l, err)
 		return
@@ -329,17 +331,17 @@ func (i *InventoryHandlers) DeleteDeviceGroupHandler(w rest.ResponseWriter, r *r
 	deviceID := r.PathParam("id")
 	groupName := r.PathParam("name")
 
-	inv, err := i.createInventory(config.Config, l)
+	inv, err := i.createInventory(l)
 	if err != nil {
 		restErrWithLogInternal(w, r, l, err)
 		return
 	}
 
-	err = inv.UnsetDeviceGroup(DeviceID(deviceID), GroupName(groupName))
+	err = inv.UnsetDeviceGroup(model.DeviceID(deviceID), model.GroupName(groupName))
 	if err != nil {
 		cause := errors.Cause(err)
 		if cause != nil {
-			if cause.Error() == ErrDevNotFound.Error() {
+			if cause.Error() == store.ErrDevNotFound.Error() {
 				restErrWithLog(w, r, l, err, http.StatusNotFound)
 				return
 			}
@@ -368,15 +370,15 @@ func (i *InventoryHandlers) AddDeviceToGroupHandler(w rest.ResponseWriter, r *re
 		return
 	}
 
-	inv, err := i.createInventory(config.Config, l)
+	inv, err := i.createInventory(l)
 	if err != nil {
 		restErrWithLogInternal(w, r, l, err)
 		return
 	}
 
-	err = inv.UpdateDeviceGroup(DeviceID(devId), GroupName(group.Group))
+	err = inv.UpdateDeviceGroup(model.DeviceID(devId), model.GroupName(group.Group))
 	if err != nil {
-		if cause := errors.Cause(err); cause != nil && cause == ErrDevNotFound {
+		if cause := errors.Cause(err); cause != nil && cause == store.ErrDevNotFound {
 			restErrWithLog(w, r, l, err, http.StatusNotFound)
 			return
 		}
@@ -397,16 +399,16 @@ func (i *InventoryHandlers) GetDevicesByGroup(w rest.ResponseWriter, r *rest.Req
 		return
 	}
 
-	inv, err := i.createInventory(config.Config, l)
+	inv, err := i.createInventory(l)
 	if err != nil {
 		restErrWithLogInternal(w, r, l, err)
 		return
 	}
 
 	//get one extra device to see if there's a 'next' page
-	ids, err := inv.ListDevicesByGroup(GroupName(group), int((page-1)*perPage), int(perPage+1))
+	ids, err := inv.ListDevicesByGroup(model.GroupName(group), int((page-1)*perPage), int(perPage+1))
 	if err != nil {
-		if err == ErrGroupNotFound {
+		if err == store.ErrGroupNotFound {
 			restErrWithLog(w, r, l, err, http.StatusNotFound)
 		} else {
 			restErrWithLogInternal(w, r, l, err)
@@ -429,8 +431,8 @@ func (i *InventoryHandlers) GetDevicesByGroup(w rest.ResponseWriter, r *rest.Req
 
 }
 
-func parseDevice(r *rest.Request) (*Device, error) {
-	dev := Device{}
+func parseDevice(r *rest.Request) (*model.Device, error) {
+	dev := model.Device{}
 
 	//decode body
 	err := r.DecodeJsonPayload(&dev)
@@ -445,8 +447,8 @@ func parseDevice(r *rest.Request) (*Device, error) {
 	return &dev, nil
 }
 
-func parseAttributes(r *rest.Request) (DeviceAttributes, error) {
-	var attrs DeviceAttributes
+func parseAttributes(r *rest.Request) (model.DeviceAttributes, error) {
+	var attrs model.DeviceAttributes
 
 	err := r.DecodeJsonPayload(&attrs)
 	if err != nil {
@@ -465,7 +467,7 @@ func parseAttributes(r *rest.Request) (DeviceAttributes, error) {
 func (i *InventoryHandlers) GetGroupsHandler(w rest.ResponseWriter, r *rest.Request) {
 	l := requestlog.GetRequestLogger(r.Env)
 
-	inv, err := i.createInventory(config.Config, l)
+	inv, err := i.createInventory(l)
 	if err != nil {
 		restErrWithLogInternal(w, r, l, err)
 		return
@@ -478,7 +480,7 @@ func (i *InventoryHandlers) GetGroupsHandler(w rest.ResponseWriter, r *rest.Requ
 	}
 
 	if groups == nil {
-		groups = []GroupName{}
+		groups = []model.GroupName{}
 	}
 
 	w.WriteJson(groups)
@@ -488,23 +490,23 @@ func (i *InventoryHandlers) GetDeviceGroupHandler(w rest.ResponseWriter, r *rest
 	deviceID := r.PathParam("id")
 	l := requestlog.GetRequestLogger(r.Env)
 
-	inv, err := i.createInventory(config.Config, l)
+	inv, err := i.createInventory(l)
 	if err != nil {
 		restErrWithLogInternal(w, r, l, err)
 		return
 	}
 
-	group, err := inv.GetDeviceGroup(DeviceID(deviceID))
+	group, err := inv.GetDeviceGroup(model.DeviceID(deviceID))
 	if err != nil {
-		if err == ErrDevNotFound {
-			restErrWithLog(w, r, l, ErrDevNotFound, http.StatusNotFound)
+		if err == store.ErrDevNotFound {
+			restErrWithLog(w, r, l, store.ErrDevNotFound, http.StatusNotFound)
 		} else {
 			restErrWithLogInternal(w, r, l, err)
 		}
 		return
 	}
 
-	ret := map[string]*GroupName{"group": nil}
+	ret := map[string]*model.GroupName{"group": nil}
 
 	if group != "" {
 		ret["group"] = &group

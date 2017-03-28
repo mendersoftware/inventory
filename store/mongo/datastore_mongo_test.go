@@ -11,7 +11,7 @@
 //    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
-package main_test
+package mongo_test
 
 import (
 	"context"
@@ -23,7 +23,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/mgo.v2/bson"
 
-	. "github.com/mendersoftware/inventory"
+	"github.com/mendersoftware/inventory/model"
+	"github.com/mendersoftware/inventory/store"
+	. "github.com/mendersoftware/inventory/store/mongo"
 
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
 )
@@ -34,44 +36,44 @@ func TestMongoGetDevices(t *testing.T) {
 		t.Skip("skipping TestMongoGetDevices in short mode.")
 	}
 
-	inputDevs := []Device{
-		Device{ID: DeviceID("0")},
-		Device{ID: DeviceID("1"), Group: GroupName("1")},
-		Device{ID: DeviceID("2"), Group: GroupName("2")},
-		Device{
-			ID: DeviceID("3"),
-			Attributes: map[string]DeviceAttribute{
-				"attrString": DeviceAttribute{Name: "attrString", Value: "val3", Description: strPtr("desc1")},
-				"attrFloat":  DeviceAttribute{Name: "attrFloat", Value: 3.0, Description: strPtr("desc2")},
+	inputDevs := []model.Device{
+		{ID: model.DeviceID("0")},
+		{ID: model.DeviceID("1"), Group: model.GroupName("1")},
+		{ID: model.DeviceID("2"), Group: model.GroupName("2")},
+		{
+			ID: model.DeviceID("3"),
+			Attributes: map[string]model.DeviceAttribute{
+				"attrString": {Name: "attrString", Value: "val3", Description: strPtr("desc1")},
+				"attrFloat":  {Name: "attrFloat", Value: 3.0, Description: strPtr("desc2")},
 			},
 		},
-		Device{
-			ID: DeviceID("4"),
-			Attributes: map[string]DeviceAttribute{
-				"attrString": DeviceAttribute{Name: "attrString", Value: "val4", Description: strPtr("desc1")},
-				"attrFloat":  DeviceAttribute{Name: "attrFloat", Value: 4.0, Description: strPtr("desc2")},
+		{
+			ID: model.DeviceID("4"),
+			Attributes: map[string]model.DeviceAttribute{
+				"attrString": {Name: "attrString", Value: "val4", Description: strPtr("desc1")},
+				"attrFloat":  {Name: "attrFloat", Value: 4.0, Description: strPtr("desc2")},
 			},
 		},
-		Device{
-			ID: DeviceID("5"),
-			Attributes: map[string]DeviceAttribute{
-				"attrString": DeviceAttribute{Name: "attrString", Value: "val5", Description: strPtr("desc1")},
-				"attrFloat":  DeviceAttribute{Name: "attrFloat", Value: 5.0, Description: strPtr("desc2")},
+		{
+			ID: model.DeviceID("5"),
+			Attributes: map[string]model.DeviceAttribute{
+				"attrString": {Name: "attrString", Value: "val5", Description: strPtr("desc1")},
+				"attrFloat":  {Name: "attrFloat", Value: 5.0, Description: strPtr("desc2")},
 			},
-			Group: GroupName("2"),
+			Group: model.GroupName("2"),
 		},
-		Device{
-			ID: DeviceID("6"),
-			Attributes: map[string]DeviceAttribute{
-				"attrString": DeviceAttribute{Name: "attrString", Value: "val6", Description: strPtr("desc1")},
-				"attrFloat":  DeviceAttribute{Name: "attrFloat", Value: 4.0, Description: strPtr("desc2")},
+		{
+			ID: model.DeviceID("6"),
+			Attributes: map[string]model.DeviceAttribute{
+				"attrString": {Name: "attrString", Value: "val6", Description: strPtr("desc1")},
+				"attrFloat":  {Name: "attrFloat", Value: 4.0, Description: strPtr("desc2")},
 			},
 		},
-		Device{
-			ID: DeviceID("7"),
-			Attributes: map[string]DeviceAttribute{
-				"attrString": DeviceAttribute{Name: "attrString", Value: "val4", Description: strPtr("desc1")},
-				"attrFloat":  DeviceAttribute{Name: "attrFloat", Value: 6.0, Description: strPtr("desc2")},
+		{
+			ID: model.DeviceID("7"),
+			Attributes: map[string]model.DeviceAttribute{
+				"attrString": {Name: "attrString", Value: "val4", Description: strPtr("desc1")},
+				"attrFloat":  {Name: "attrFloat", Value: 6.0, Description: strPtr("desc2")},
 			},
 		},
 	}
@@ -79,11 +81,11 @@ func TestMongoGetDevices(t *testing.T) {
 	floatVal5 := 5.0
 
 	testCases := map[string]struct {
-		expected []Device
+		expected []model.Device
 		skip     int
 		limit    int
-		filters  []Filter
-		sort     *Sort
+		filters  []store.Filter
+		sort     *store.Sort
 		hasGroup *bool
 	}{
 		"all devs, no skip, no limit": {
@@ -94,59 +96,83 @@ func TestMongoGetDevices(t *testing.T) {
 			sort:     nil,
 		},
 		"all devs, with skip": {
-			expected: []Device{inputDevs[4], inputDevs[5], inputDevs[6], inputDevs[7]},
+			expected: []model.Device{inputDevs[4], inputDevs[5], inputDevs[6], inputDevs[7]},
 			skip:     4,
 			limit:    20,
 			filters:  nil,
 			sort:     nil,
 		},
 		"all devs, no skip, with limit": {
-			expected: []Device{inputDevs[0], inputDevs[1], inputDevs[2]},
+			expected: []model.Device{inputDevs[0], inputDevs[1], inputDevs[2]},
 			skip:     0,
 			limit:    3,
 			filters:  nil,
 			sort:     nil,
 		},
 		"skip + limit": {
-			expected: []Device{inputDevs[3], inputDevs[4]},
+			expected: []model.Device{inputDevs[3], inputDevs[4]},
 			skip:     3,
 			limit:    2,
 			filters:  nil,
 			sort:     nil,
 		},
 		"filter on attribute (equal attribute)": {
-			expected: []Device{inputDevs[3]},
+			expected: []model.Device{inputDevs[3]},
 			skip:     0,
 			limit:    20,
-			filters:  []Filter{Filter{AttrName: "attrString", Value: "val3", Operator: Eq}},
-			sort:     nil,
+			filters: []store.Filter{
+				{
+					AttrName: "attrString",
+					Value:    "val3", Operator: store.Eq,
+				},
+			},
+			sort: nil,
 		},
 		"filter on attribute (equal attribute float)": {
-			expected: []Device{inputDevs[5]},
+			expected: []model.Device{inputDevs[5]},
 			skip:     0,
 			limit:    20,
-			filters:  []Filter{Filter{AttrName: "attrFloat", Value: "5.0", ValueFloat: &floatVal5, Operator: Eq}},
-			sort:     nil,
+			filters: []store.Filter{
+				{
+					AttrName:   "attrFloat",
+					Value:      "5.0",
+					ValueFloat: &floatVal5,
+					Operator:   store.Eq,
+				},
+			},
+			sort: nil,
 		},
 		"filter on two attributes (equal)": {
-			expected: []Device{inputDevs[4]},
+			expected: []model.Device{inputDevs[4]},
 			skip:     0,
 			limit:    20,
-			filters: []Filter{
-				Filter{AttrName: "attrString", Value: "val4", Operator: Eq},
-				Filter{AttrName: "attrFloat", Value: "4.0", ValueFloat: &floatVal4, Operator: Eq},
+			filters: []store.Filter{
+				{
+					AttrName: "attrString",
+					Value:    "val4",
+					Operator: store.Eq,
+				},
+				{
+					AttrName:   "attrFloat",
+					Value:      "4.0",
+					ValueFloat: &floatVal4,
+					Operator:   store.Eq,
+				},
 			},
 			sort: nil,
 		},
 		"sort, limit": {
-			expected: []Device{inputDevs[5], inputDevs[4], inputDevs[3]},
+			expected: []model.Device{inputDevs[5], inputDevs[4], inputDevs[3]},
 			skip:     0,
 			limit:    3,
 			filters:  nil,
-			sort:     &Sort{AttrName: "attrFloat", Ascending: false},
+			sort: &store.Sort{
+				AttrName:  "attrFloat",
+				Ascending: false,
+			},
 		},
 		"hasGroup = true": {
-			expected: []Device{inputDevs[1], inputDevs[2], inputDevs[5]},
+			expected: []model.Device{inputDevs[1], inputDevs[2], inputDevs[5]},
 			skip:     0,
 			limit:    20,
 			filters:  nil,
@@ -154,7 +180,7 @@ func TestMongoGetDevices(t *testing.T) {
 			hasGroup: boolPtr(true),
 		},
 		"hasGroup = false": {
-			expected: []Device{inputDevs[0], inputDevs[3], inputDevs[4], inputDevs[6], inputDevs[7]},
+			expected: []model.Device{inputDevs[0], inputDevs[3], inputDevs[4], inputDevs[6], inputDevs[7]},
 			skip:     0,
 			limit:    20,
 			filters:  nil,
@@ -195,24 +221,24 @@ func TestMongoGetDevice(t *testing.T) {
 	}
 
 	testCases := map[string]struct {
-		InputID     DeviceID
-		InputDevice *Device
+		InputID     model.DeviceID
+		InputDevice *model.Device
 		OutputError error
 	}{
 		"no device and no ID given": {
-			InputID:     DeviceID(""),
+			InputID:     model.DeviceID(""),
 			InputDevice: nil,
 		},
 		"device with given ID not exists": {
-			InputID:     DeviceID("123"),
+			InputID:     model.DeviceID("123"),
 			InputDevice: nil,
 		},
 		"device with given ID exists, no error": {
-			InputID: DeviceID("0002"),
-			InputDevice: &Device{
-				ID: DeviceID("0002"),
-				Attributes: DeviceAttributes{
-					"mac": DeviceAttribute{Name: "mac", Value: "0002-mac"},
+			InputID: model.DeviceID("0002"),
+			InputDevice: &model.Device{
+				ID: model.DeviceID("0002"),
+				Attributes: model.DeviceAttributes{
+					"mac": {Name: "mac", Value: "0002-mac"},
 				},
 			},
 		},
@@ -253,7 +279,7 @@ func TestMongoAddDevice(t *testing.T) {
 	}
 
 	testCases := map[string]struct {
-		InputDevice *Device
+		InputDevice *model.Device
 		OutputError error
 	}{
 		"no device given": {
@@ -261,47 +287,47 @@ func TestMongoAddDevice(t *testing.T) {
 			OutputError: errors.New("failed to store device: error parsing element 0 of field documents :: caused by :: wrong type for '0' field, expected object, found 0: null"),
 		},
 		"valid device with one attribute, no error": {
-			InputDevice: &Device{
-				ID: DeviceID("0002"),
-				Attributes: DeviceAttributes{
-					"mac": DeviceAttribute{Name: "mac", Value: "0002-mac"},
+			InputDevice: &model.Device{
+				ID: model.DeviceID("0002"),
+				Attributes: model.DeviceAttributes{
+					"mac": {Name: "mac", Value: "0002-mac"},
 				},
 			},
 			OutputError: nil,
 		},
 		"valid device with two attributes, no error": {
-			InputDevice: &Device{
-				ID: DeviceID("0003"),
-				Attributes: DeviceAttributes{
-					"mac": DeviceAttribute{Name: "mac", Value: "0002-mac"},
-					"sn":  DeviceAttribute{Name: "sn", Value: "0002-sn"},
+			InputDevice: &model.Device{
+				ID: model.DeviceID("0003"),
+				Attributes: model.DeviceAttributes{
+					"mac": {Name: "mac", Value: "0002-mac"},
+					"sn":  {Name: "sn", Value: "0002-sn"},
 				},
 			},
 			OutputError: nil,
 		},
 		"valid device with attribute without value, no error": {
-			InputDevice: &Device{
-				ID: DeviceID("0004"),
-				Attributes: DeviceAttributes{
-					"mac": DeviceAttribute{Name: "mac"},
+			InputDevice: &model.Device{
+				ID: model.DeviceID("0004"),
+				Attributes: model.DeviceAttributes{
+					"mac": {Name: "mac"},
 				},
 			},
 			OutputError: nil,
 		},
 		"valid device with array in attribute value, no error": {
-			InputDevice: &Device{
-				ID: DeviceID("0005"),
-				Attributes: DeviceAttributes{
-					"mac": DeviceAttribute{Name: "mac", Value: []interface{}{123, 456}},
+			InputDevice: &model.Device{
+				ID: model.DeviceID("0005"),
+				Attributes: model.DeviceAttributes{
+					"mac": {Name: "mac", Value: []interface{}{123, 456}},
 				},
 			},
 			OutputError: nil,
 		},
 		"valid device without attributes, no error": {
-			InputDevice: &Device{
-				ID: DeviceID("0007"),
-				Attributes: DeviceAttributes{
-					"mac": DeviceAttribute{Name: "mac"},
+			InputDevice: &model.Device{
+				ID: model.DeviceID("0007"),
+				Attributes: model.DeviceAttributes{
+					"mac": {Name: "mac"},
 				},
 			},
 			OutputError: nil,
@@ -324,7 +350,7 @@ func TestMongoAddDevice(t *testing.T) {
 		} else {
 			assert.NoError(t, err, "expected no error inserting to data store")
 
-			var dbdev *Device
+			var dbdev *model.Device
 			devsColl := session.DB(DbName).C(DbDevicesColl)
 			err := devsColl.Find(nil).One(&dbdev)
 
@@ -360,18 +386,18 @@ func TestMongoUpsertAttributes(t *testing.T) {
 	createdTs := time.Now()
 
 	testCases := map[string]struct {
-		devs []Device
+		devs []model.Device
 
-		inDevId DeviceID
-		inAttrs DeviceAttributes
+		inDevId model.DeviceID
+		inAttrs model.DeviceAttributes
 
-		outAttrs DeviceAttributes
+		outAttrs model.DeviceAttributes
 	}{
 		"dev exists, attributes exist, update both attrs (descr + val)": {
-			devs: []Device{
+			devs: []model.Device{
 				{
-					ID: DeviceID("0003"),
-					Attributes: map[string]DeviceAttribute{
+					ID: model.DeviceID("0003"),
+					Attributes: map[string]model.DeviceAttribute{
 						"mac": {
 							Name:        "mac",
 							Value:       "0003-mac",
@@ -386,34 +412,34 @@ func TestMongoUpsertAttributes(t *testing.T) {
 					CreatedTs: createdTs,
 				},
 			},
-			inDevId: DeviceID("0003"),
-			inAttrs: map[string]DeviceAttribute{
-				"mac": DeviceAttribute{
+			inDevId: model.DeviceID("0003"),
+			inAttrs: map[string]model.DeviceAttribute{
+				"mac": {
 					Description: strPtr("mac description"),
 					Value:       "0003-newmac",
 				},
-				"sn": DeviceAttribute{
+				"sn": {
 					Description: strPtr("sn description"),
 					Value:       "0003-newsn",
 				},
 			},
 
-			outAttrs: map[string]DeviceAttribute{
-				"mac": DeviceAttribute{
+			outAttrs: map[string]model.DeviceAttribute{
+				"mac": {
 					Description: strPtr("mac description"),
 					Value:       "0003-newmac",
 				},
-				"sn": DeviceAttribute{
+				"sn": {
 					Description: strPtr("sn description"),
 					Value:       "0003-newsn",
 				},
 			},
 		},
 		"dev exists, attributes exist, update one attr (descr + val)": {
-			devs: []Device{
+			devs: []model.Device{
 				{
-					ID: DeviceID("0003"),
-					Attributes: map[string]DeviceAttribute{
+					ID: model.DeviceID("0003"),
+					Attributes: map[string]model.DeviceAttribute{
 						"mac": {
 							Name:        "mac",
 							Value:       "0003-mac",
@@ -428,20 +454,20 @@ func TestMongoUpsertAttributes(t *testing.T) {
 					CreatedTs: createdTs,
 				},
 			},
-			inDevId: DeviceID("0003"),
-			inAttrs: map[string]DeviceAttribute{
-				"sn": DeviceAttribute{
+			inDevId: model.DeviceID("0003"),
+			inAttrs: map[string]model.DeviceAttribute{
+				"sn": {
 					Description: strPtr("sn description"),
 					Value:       "0003-newsn",
 				},
 			},
 
-			outAttrs: map[string]DeviceAttribute{
-				"mac": DeviceAttribute{
+			outAttrs: map[string]model.DeviceAttribute{
+				"mac": {
 					Description: strPtr("descr"),
 					Value:       "0003-mac",
 				},
-				"sn": DeviceAttribute{
+				"sn": {
 					Description: strPtr("sn description"),
 					Value:       "0003-newsn",
 				},
@@ -449,10 +475,10 @@ func TestMongoUpsertAttributes(t *testing.T) {
 		},
 
 		"dev exists, attributes exist, update one attr (descr only)": {
-			devs: []Device{
+			devs: []model.Device{
 				{
-					ID: DeviceID("0003"),
-					Attributes: map[string]DeviceAttribute{
+					ID: model.DeviceID("0003"),
+					Attributes: map[string]model.DeviceAttribute{
 						"mac": {
 							Name:        "mac",
 							Value:       "0003-mac",
@@ -467,29 +493,29 @@ func TestMongoUpsertAttributes(t *testing.T) {
 					CreatedTs: createdTs,
 				},
 			},
-			inDevId: DeviceID("0003"),
-			inAttrs: map[string]DeviceAttribute{
-				"sn": DeviceAttribute{
+			inDevId: model.DeviceID("0003"),
+			inAttrs: map[string]model.DeviceAttribute{
+				"sn": {
 					Description: strPtr("sn description"),
 				},
 			},
 
-			outAttrs: map[string]DeviceAttribute{
-				"mac": DeviceAttribute{
+			outAttrs: map[string]model.DeviceAttribute{
+				"mac": {
 					Description: strPtr("descr"),
 					Value:       "0003-mac",
 				},
-				"sn": DeviceAttribute{
+				"sn": {
 					Description: strPtr("sn description"),
 					Value:       "0003-sn",
 				},
 			},
 		},
 		"dev exists, attributes exist, update one attr (value only)": {
-			devs: []Device{
+			devs: []model.Device{
 				{
-					ID: DeviceID("0003"),
-					Attributes: map[string]DeviceAttribute{
+					ID: model.DeviceID("0003"),
+					Attributes: map[string]model.DeviceAttribute{
 						"mac": {
 							Name:        "mac",
 							Value:       "0003-mac",
@@ -504,29 +530,29 @@ func TestMongoUpsertAttributes(t *testing.T) {
 					CreatedTs: createdTs,
 				},
 			},
-			inDevId: DeviceID("0003"),
-			inAttrs: map[string]DeviceAttribute{
-				"sn": DeviceAttribute{
+			inDevId: model.DeviceID("0003"),
+			inAttrs: map[string]model.DeviceAttribute{
+				"sn": {
 					Value: "0003-newsn",
 				},
 			},
 
-			outAttrs: map[string]DeviceAttribute{
-				"mac": DeviceAttribute{
+			outAttrs: map[string]model.DeviceAttribute{
+				"mac": {
 					Description: strPtr("descr"),
 					Value:       "0003-mac",
 				},
-				"sn": DeviceAttribute{
+				"sn": {
 					Description: strPtr("descr"),
 					Value:       "0003-newsn",
 				},
 			},
 		},
 		"dev exists, attributes exist, update one attr (value only, change type)": {
-			devs: []Device{
+			devs: []model.Device{
 				{
-					ID: DeviceID("0003"),
-					Attributes: map[string]DeviceAttribute{
+					ID: model.DeviceID("0003"),
+					Attributes: map[string]model.DeviceAttribute{
 						"mac": {
 							Name:        "mac",
 							Value:       "0003-mac",
@@ -541,19 +567,19 @@ func TestMongoUpsertAttributes(t *testing.T) {
 					CreatedTs: createdTs,
 				},
 			},
-			inDevId: DeviceID("0003"),
-			inAttrs: map[string]DeviceAttribute{
-				"sn": DeviceAttribute{
+			inDevId: model.DeviceID("0003"),
+			inAttrs: map[string]model.DeviceAttribute{
+				"sn": {
 					Value: []string{"0003-sn-1", "0003-sn-2"},
 				},
 			},
 
-			outAttrs: map[string]DeviceAttribute{
-				"mac": DeviceAttribute{
+			outAttrs: map[string]model.DeviceAttribute{
+				"mac": {
 					Description: strPtr("descr"),
 					Value:       "0003-mac",
 				},
-				"sn": DeviceAttribute{
+				"sn": {
 					Description: strPtr("descr"),
 					//[]interface{} instead of []string - otherwise DeepEquals fails where it really shouldn't
 					Value: []interface{}{"0003-sn-1", "0003-sn-2"},
@@ -561,86 +587,86 @@ func TestMongoUpsertAttributes(t *testing.T) {
 			},
 		},
 		"dev exists, no attributes exist, upsert new attrs (val + descr)": {
-			devs: []Device{
+			devs: []model.Device{
 				{
-					ID:        DeviceID("0003"),
+					ID:        model.DeviceID("0003"),
 					CreatedTs: createdTs,
 				},
 			},
-			inDevId: DeviceID("0003"),
-			inAttrs: map[string]DeviceAttribute{
-				"ip": DeviceAttribute{
+			inDevId: model.DeviceID("0003"),
+			inAttrs: map[string]model.DeviceAttribute{
+				"ip": {
 					Value:       []string{"1.2.3.4", "1.2.3.5"},
 					Description: strPtr("ip addr array"),
 				},
-				"mac": DeviceAttribute{
+				"mac": {
 					Value:       "0006-mac",
 					Description: strPtr("mac addr"),
 				},
 			},
 
-			outAttrs: map[string]DeviceAttribute{
-				"ip": DeviceAttribute{
+			outAttrs: map[string]model.DeviceAttribute{
+				"ip": {
 					Value:       []interface{}{"1.2.3.4", "1.2.3.5"},
 					Description: strPtr("ip addr array"),
 				},
-				"mac": DeviceAttribute{
+				"mac": {
 					Value:       "0006-mac",
 					Description: strPtr("mac addr"),
 				},
 			},
 		},
 		"dev doesn't exist, upsert new attr (descr + val)": {
-			devs:    []Device{},
-			inDevId: DeviceID("0099"),
-			inAttrs: map[string]DeviceAttribute{
-				"ip": DeviceAttribute{
+			devs:    []model.Device{},
+			inDevId: model.DeviceID("0099"),
+			inAttrs: map[string]model.DeviceAttribute{
+				"ip": {
 					Description: strPtr("ip addr array"),
 					Value:       []string{"1.2.3.4", "1.2.3.5"},
 				},
 			},
 
-			outAttrs: map[string]DeviceAttribute{
-				"ip": DeviceAttribute{
+			outAttrs: map[string]model.DeviceAttribute{
+				"ip": {
 					Description: strPtr("ip addr array"),
 					Value:       []interface{}{"1.2.3.4", "1.2.3.5"},
 				},
 			},
 		},
 		"dev doesn't exist, upsert new attr (val only)": {
-			devs:    []Device{},
-			inDevId: DeviceID("0099"),
-			inAttrs: map[string]DeviceAttribute{
-				"ip": DeviceAttribute{
+			devs:    []model.Device{},
+			inDevId: model.DeviceID("0099"),
+			inAttrs: map[string]model.DeviceAttribute{
+				"ip": {
 					Value: []string{"1.2.3.4", "1.2.3.5"},
 				},
 			},
 
-			outAttrs: map[string]DeviceAttribute{
-				"ip": DeviceAttribute{
+			outAttrs: map[string]model.DeviceAttribute{
+				"ip": {
 					Value: []interface{}{"1.2.3.4", "1.2.3.5"},
 				},
 			},
 		},
 		"dev doesn't exist, upsert with new attrs (val + descr)": {
-			inDevId: DeviceID("0099"),
-			inAttrs: map[string]DeviceAttribute{
-				"ip": DeviceAttribute{
+			inDevId: model.DeviceID("0099"),
+			inAttrs: map[string]model.DeviceAttribute{
+				"ip": {
 					Value:       []string{"1.2.3.4", "1.2.3.5"},
 					Description: strPtr("ip addr array"),
 				},
-				"mac": DeviceAttribute{
+				"mac": {
 					Value:       "0099-mac",
 					Description: strPtr("mac addr"),
 				},
 			},
 
-			outAttrs: map[string]DeviceAttribute{
-				"ip": DeviceAttribute{
+			outAttrs: map[string]model.DeviceAttribute{
+				"ip": {
 					Value:       []interface{}{"1.2.3.4", "1.2.3.5"},
 					Description: strPtr("ip addr array"),
 				},
-				"mac": DeviceAttribute{
+				"mac": {
 					Value:       "0099-mac",
 					Description: strPtr("mac addr"),
 				},
@@ -667,7 +693,7 @@ func TestMongoUpsertAttributes(t *testing.T) {
 		assert.NoError(t, err, "UpsertAttributes failed")
 
 		//get the device back
-		var dev Device
+		var dev model.Device
 		err = s.DB(DbName).C(DbDevicesColl).FindId(tc.inDevId).One(&dev)
 		assert.NoError(t, err, "error getting device")
 
@@ -694,37 +720,37 @@ func TestMongoUpdateDeviceGroup(t *testing.T) {
 	}
 
 	testCases := map[string]struct {
-		InputDeviceID  DeviceID
-		InputGroupName GroupName
-		InputDevice    *Device
+		InputDeviceID  model.DeviceID
+		InputGroupName model.GroupName
+		InputDevice    *model.Device
 		OutputError    error
 	}{
 		"update group for device with empty device id": {
-			InputDeviceID:  DeviceID(""),
-			InputGroupName: GroupName("abc"),
+			InputDeviceID:  model.DeviceID(""),
+			InputGroupName: model.GroupName("abc"),
 			InputDevice:    nil,
-			OutputError:    ErrDevNotFound,
+			OutputError:    store.ErrDevNotFound,
 		},
 		"update group for device, device not found": {
-			InputDeviceID:  DeviceID("2"),
-			InputGroupName: GroupName("abc"),
+			InputDeviceID:  model.DeviceID("2"),
+			InputGroupName: model.GroupName("abc"),
 			InputDevice:    nil,
-			OutputError:    ErrDevNotFound,
+			OutputError:    store.ErrDevNotFound,
 		},
 		"update group for device, group exists": {
-			InputDeviceID:  DeviceID("1"),
-			InputGroupName: GroupName("abc"),
-			InputDevice: &Device{
-				ID:    DeviceID("1"),
-				Group: GroupName("def"),
+			InputDeviceID:  model.DeviceID("1"),
+			InputGroupName: model.GroupName("abc"),
+			InputDevice: &model.Device{
+				ID:    model.DeviceID("1"),
+				Group: model.GroupName("def"),
 			},
 		},
 		"update group for device, group does not exist": {
-			InputDeviceID:  DeviceID("1"),
-			InputGroupName: GroupName("abc"),
-			InputDevice: &Device{
-				ID:    DeviceID("1"),
-				Group: GroupName(""),
+			InputDeviceID:  model.DeviceID("1"),
+			InputGroupName: model.GroupName("abc"),
+			InputDevice: &model.Device{
+				ID:    model.DeviceID("1"),
+				Group: model.GroupName(""),
 			},
 		},
 	}
@@ -751,7 +777,7 @@ func TestMongoUpdateDeviceGroup(t *testing.T) {
 			assert.NoError(t, err, "expected no error")
 
 			groupsColl := session.DB(DbName).C(DbDevicesColl)
-			count, err := groupsColl.Find(bson.M{"group": GroupName("abc")}).Count()
+			count, err := groupsColl.Find(bson.M{"group": model.GroupName("abc")}).Count()
 			assert.NoError(t, err, "expected no error")
 
 			assert.Equal(t, 1, count)
@@ -770,7 +796,7 @@ func boolPtr(b bool) *bool {
 	return &b
 }
 
-func compare(a, b DeviceAttributes) bool {
+func compare(a, b model.DeviceAttributes) bool {
 	if len(a) != len(b) {
 		return false
 	}
@@ -801,37 +827,37 @@ func compare(a, b DeviceAttributes) bool {
 
 func TestMongoUnsetDevicesGroupWithGroupName(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping TestMongoUnsetDevicesGroupWithGroupName in short mode.")
+		t.Skip("skipping TestMongoUnsetDevicesGroupWithmodel.GroupName in short mode.")
 	}
 
 	testCases := map[string]struct {
-		InputDeviceID  DeviceID
-		InputGroupName GroupName
-		InputDevice    *Device
+		InputDeviceID  model.DeviceID
+		InputGroupName model.GroupName
+		InputDevice    *model.Device
 		OutputError    error
 	}{
 		"unset group for device with group id, device not found": {
-			InputDeviceID:  DeviceID("1"),
-			InputGroupName: GroupName("e16c71ec"),
+			InputDeviceID:  model.DeviceID("1"),
+			InputGroupName: model.GroupName("e16c71ec"),
 			InputDevice:    nil,
-			OutputError:    ErrDevNotFound,
+			OutputError:    store.ErrDevNotFound,
 		},
 		"unset group for device, ok": {
-			InputDeviceID:  DeviceID("1"),
-			InputGroupName: GroupName("e16c71ec"),
-			InputDevice: &Device{
-				ID:    DeviceID("1"),
-				Group: GroupName("e16c71ec"),
+			InputDeviceID:  model.DeviceID("1"),
+			InputGroupName: model.GroupName("e16c71ec"),
+			InputDevice: &model.Device{
+				ID:    model.DeviceID("1"),
+				Group: model.GroupName("e16c71ec"),
 			},
 		},
 		"unset group for device with incorrect group name provided": {
-			InputDeviceID:  DeviceID("1"),
-			InputGroupName: GroupName("other-group-name"),
-			InputDevice: &Device{
-				ID:    DeviceID("1"),
-				Group: GroupName("e16c71ec"),
+			InputDeviceID:  model.DeviceID("1"),
+			InputGroupName: model.GroupName("other-group-name"),
+			InputDevice: &model.Device{
+				ID:    model.DeviceID("1"),
+				Group: model.GroupName("e16c71ec"),
 			},
-			OutputError: ErrDevNotFound,
+			OutputError: store.ErrDevNotFound,
 		},
 	}
 
@@ -857,7 +883,7 @@ func TestMongoUnsetDevicesGroupWithGroupName(t *testing.T) {
 			assert.NoError(t, err, "expected no error")
 
 			groupsColl := session.DB(DbName).C(DbDevicesColl)
-			count, err := groupsColl.Find(bson.M{"group": GroupName("e16c71ec")}).Count()
+			count, err := groupsColl.Find(bson.M{"group": model.GroupName("e16c71ec")}).Count()
 			assert.NoError(t, err, "expected no error")
 
 			assert.Equal(t, 0, count)
@@ -874,50 +900,50 @@ func TestMongoListGroups(t *testing.T) {
 	}
 
 	testCases := map[string]struct {
-		InputDevices []Device
-		OutputGroups []GroupName
+		InputDevices []model.Device
+		OutputGroups []model.GroupName
 	}{
 		"groups foo, bar": {
-			InputDevices: []Device{
+			InputDevices: []model.Device{
 				{
-					ID:    DeviceID("1"),
-					Group: GroupName("foo"),
+					ID:    model.DeviceID("1"),
+					Group: model.GroupName("foo"),
 				},
 				{
-					ID:    DeviceID("2"),
-					Group: GroupName("foo"),
+					ID:    model.DeviceID("2"),
+					Group: model.GroupName("foo"),
 				},
 				{
-					ID:    DeviceID("3"),
-					Group: GroupName("foo"),
+					ID:    model.DeviceID("3"),
+					Group: model.GroupName("foo"),
 				},
 				{
-					ID:    DeviceID("4"),
-					Group: GroupName("bar"),
+					ID:    model.DeviceID("4"),
+					Group: model.GroupName("bar"),
 				},
 				{
-					ID:    DeviceID("5"),
-					Group: GroupName(""),
+					ID:    model.DeviceID("5"),
+					Group: model.GroupName(""),
 				},
 			},
-			OutputGroups: []GroupName{"foo", "bar"},
+			OutputGroups: []model.GroupName{"foo", "bar"},
 		},
 		"no groups": {
-			InputDevices: []Device{
+			InputDevices: []model.Device{
 				{
-					ID:    DeviceID("1"),
-					Group: GroupName(""),
+					ID:    model.DeviceID("1"),
+					Group: model.GroupName(""),
 				},
 				{
-					ID:    DeviceID("2"),
-					Group: GroupName(""),
+					ID:    model.DeviceID("2"),
+					Group: model.GroupName(""),
 				},
 				{
-					ID:    DeviceID("3"),
-					Group: GroupName(""),
+					ID:    model.DeviceID("3"),
+					Group: model.GroupName(""),
 				},
 			},
-			OutputGroups: []GroupName{},
+			OutputGroups: []model.GroupName{},
 		},
 	}
 
@@ -958,57 +984,57 @@ func TestGetDevicesByGroup(t *testing.T) {
 		t.Skip("skipping TestGetDevicesByGroup in short mode.")
 	}
 
-	inputDevices := []Device{
-		Device{
-			ID:    DeviceID("1"),
-			Group: GroupName("dev"),
+	inputDevices := []model.Device{
+		{
+			ID:    model.DeviceID("1"),
+			Group: model.GroupName("dev"),
 		},
-		Device{
-			ID:    DeviceID("2"),
-			Group: GroupName("prod"),
+		{
+			ID:    model.DeviceID("2"),
+			Group: model.GroupName("prod"),
 		},
-		Device{
-			ID:    DeviceID("3"),
-			Group: GroupName("test"),
+		{
+			ID:    model.DeviceID("3"),
+			Group: model.GroupName("test"),
 		},
-		Device{
-			ID:    DeviceID("4"),
-			Group: GroupName("prod"),
+		{
+			ID:    model.DeviceID("4"),
+			Group: model.GroupName("prod"),
 		},
-		Device{
-			ID:    DeviceID("5"),
-			Group: GroupName("prod"),
+		{
+			ID:    model.DeviceID("5"),
+			Group: model.GroupName("prod"),
 		},
-		Device{
-			ID:    DeviceID("6"),
-			Group: GroupName("dev"),
+		{
+			ID:    model.DeviceID("6"),
+			Group: model.GroupName("dev"),
 		},
-		Device{
-			ID:    DeviceID("7"),
-			Group: GroupName("test"),
+		{
+			ID:    model.DeviceID("7"),
+			Group: model.GroupName("test"),
 		},
-		Device{
-			ID:    DeviceID("8"),
-			Group: GroupName("dev"),
+		{
+			ID:    model.DeviceID("8"),
+			Group: model.GroupName("dev"),
 		},
 	}
 
 	testCases := map[string]struct {
-		InputGroupName GroupName
+		InputGroupName model.GroupName
 		InputSkip      int
 		InputLimit     int
-		OutputDevices  []DeviceID
+		OutputDevices  []model.DeviceID
 		OutputError    error
 	}{
 		"no skip, no limit": {
 			InputGroupName: "dev",
 			InputSkip:      0,
 			InputLimit:     0,
-			OutputDevices: []DeviceID{
+			OutputDevices: []model.DeviceID{
 
-				DeviceID("1"),
-				DeviceID("6"),
-				DeviceID("8"),
+				model.DeviceID("1"),
+				model.DeviceID("6"),
+				model.DeviceID("8"),
 			},
 			OutputError: nil,
 		},
@@ -1016,9 +1042,9 @@ func TestGetDevicesByGroup(t *testing.T) {
 			InputGroupName: "prod",
 			InputSkip:      0,
 			InputLimit:     2,
-			OutputDevices: []DeviceID{
-				DeviceID("2"),
-				DeviceID("4"),
+			OutputDevices: []model.DeviceID{
+				model.DeviceID("2"),
+				model.DeviceID("4"),
 			},
 			OutputError: nil,
 		},
@@ -1026,8 +1052,8 @@ func TestGetDevicesByGroup(t *testing.T) {
 			InputGroupName: "dev",
 			InputSkip:      2,
 			InputLimit:     0,
-			OutputDevices: []DeviceID{
-				DeviceID("8"),
+			OutputDevices: []model.DeviceID{
+				model.DeviceID("8"),
 			},
 			OutputError: nil,
 		},
@@ -1035,8 +1061,8 @@ func TestGetDevicesByGroup(t *testing.T) {
 			InputGroupName: "prod",
 			InputSkip:      1,
 			InputLimit:     1,
-			OutputDevices: []DeviceID{
-				DeviceID("4"),
+			OutputDevices: []model.DeviceID{
+				model.DeviceID("4"),
 			},
 			OutputError: nil,
 		},
@@ -1044,7 +1070,7 @@ func TestGetDevicesByGroup(t *testing.T) {
 			InputGroupName: "dev",
 			InputSkip:      10,
 			InputLimit:     1,
-			OutputDevices:  []DeviceID{},
+			OutputDevices:  []model.DeviceID{},
 			OutputError:    nil,
 		},
 		"group doesn't exist": {
@@ -1052,7 +1078,7 @@ func TestGetDevicesByGroup(t *testing.T) {
 			InputSkip:      0,
 			InputLimit:     0,
 			OutputDevices:  nil,
-			OutputError:    ErrGroupNotFound,
+			OutputError:    store.ErrGroupNotFound,
 		},
 	}
 
@@ -1089,35 +1115,35 @@ func TestGetDeviceGroup(t *testing.T) {
 		t.Skip("skipping TestGetDeviceGroup in short mode.")
 	}
 
-	inputDevices := []Device{
-		Device{
-			ID:    DeviceID("1"),
-			Group: GroupName("dev"),
+	inputDevices := []model.Device{
+		{
+			ID:    model.DeviceID("1"),
+			Group: model.GroupName("dev"),
 		},
-		Device{
-			ID: DeviceID("2"),
+		{
+			ID: model.DeviceID("2"),
 		},
 	}
 
 	testCases := map[string]struct {
-		InputDeviceID DeviceID
-		OutputGroup   GroupName
+		InputDeviceID model.DeviceID
+		OutputGroup   model.GroupName
 		OutputError   error
 	}{
 		"dev has group": {
-			InputDeviceID: DeviceID("1"),
-			OutputGroup:   GroupName("dev"),
+			InputDeviceID: model.DeviceID("1"),
+			OutputGroup:   model.GroupName("dev"),
 			OutputError:   nil,
 		},
 		"dev has no group": {
-			InputDeviceID: DeviceID("2"),
+			InputDeviceID: model.DeviceID("2"),
 			OutputGroup:   "",
 			OutputError:   nil,
 		},
 		"dev doesn't exist": {
-			InputDeviceID: DeviceID("3"),
+			InputDeviceID: model.DeviceID("3"),
 			OutputGroup:   "",
-			OutputError:   ErrDevNotFound,
+			OutputError:   store.ErrDevNotFound,
 		},
 	}
 
@@ -1200,37 +1226,37 @@ func TestMongoDeleteDevice(t *testing.T) {
 		t.Skip("skipping TestMongoDeleteDevice in short mode.")
 	}
 
-	inputDevs := []Device{
-		Device{ID: DeviceID("0")},
-		Device{ID: DeviceID("1")},
+	inputDevs := []model.Device{
+		{ID: model.DeviceID("0")},
+		{ID: model.DeviceID("1")},
 	}
 
 	testCases := map[string]struct {
-		inputId  DeviceID
-		expected []Device
+		inputId  model.DeviceID
+		expected []model.Device
 		err      error
 	}{
 		"existing 1": {
-			inputId: DeviceID("0"),
-			expected: []Device{
-				Device{ID: DeviceID("1")},
+			inputId: model.DeviceID("0"),
+			expected: []model.Device{
+				{ID: model.DeviceID("1")},
 			},
 			err: nil,
 		},
 		"existing 2": {
-			inputId: DeviceID("1"),
-			expected: []Device{
-				Device{ID: DeviceID("0")},
+			inputId: model.DeviceID("1"),
+			expected: []model.Device{
+				{ID: model.DeviceID("0")},
 			},
 			err: nil,
 		},
 		"doesn't exist": {
-			inputId: DeviceID("3"),
-			expected: []Device{
-				Device{ID: DeviceID("0")},
-				Device{ID: DeviceID("1")},
+			inputId: model.DeviceID("3"),
+			expected: []model.Device{
+				{ID: model.DeviceID("0")},
+				{ID: model.DeviceID("1")},
 			},
-			err: ErrDevNotFound,
+			err: store.ErrDevNotFound,
 		},
 	}
 
@@ -1256,7 +1282,7 @@ func TestMongoDeleteDevice(t *testing.T) {
 		} else {
 			assert.NoError(t, err, "failed to delete device")
 
-			var outDevs []Device
+			var outDevs []model.Device
 			err := session.DB(DbName).C(DbDevicesColl).Find(nil).All(&outDevs)
 			assert.NoError(t, err, "failed to verify devices")
 

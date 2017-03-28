@@ -11,7 +11,7 @@
 //    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
-package main
+package http
 
 import (
 	"encoding/base64"
@@ -28,9 +28,12 @@ import (
 	"github.com/mendersoftware/go-lib-micro/requestlog"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
-	. "github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/mock"
 
-	"github.com/mendersoftware/inventory/config"
+	inventory "github.com/mendersoftware/inventory/inv"
+	minventory "github.com/mendersoftware/inventory/inv/mocks"
+	"github.com/mendersoftware/inventory/model"
+	"github.com/mendersoftware/inventory/store"
 	"github.com/mendersoftware/inventory/utils"
 )
 
@@ -91,18 +94,18 @@ func makeMockApiHandler(t *testing.T, f InventoryFactory) http.Handler {
 	return api.MakeHandler()
 }
 
-func mockListDevices(num int) []Device {
-	var devs []Device
+func mockListDevices(num int) []model.Device {
+	var devs []model.Device
 	for i := 0; i < num; i++ {
-		devs = append(devs, Device{ID: DeviceID(strconv.Itoa(i))})
+		devs = append(devs, model.Device{ID: model.DeviceID(strconv.Itoa(i))})
 	}
 	return devs
 }
 
-func mockListDeviceIDs(num int) []DeviceID {
-	var devs []DeviceID
+func mockListDeviceIDs(num int) []model.DeviceID {
+	var devs []model.DeviceID
 	for i := 0; i < num; i++ {
-		devs = append(devs, DeviceID(strconv.Itoa(i)))
+		devs = append(devs, model.DeviceID(strconv.Itoa(i)))
 	}
 	return devs
 }
@@ -263,16 +266,16 @@ func TestApiInventoryGetDevices(t *testing.T) {
 
 	for name, testCase := range testCases {
 		t.Logf("test case: %s", name)
-		inv := MockInventoryApp{}
+		inv := minventory.InventoryApp{}
 		inv.On("ListDevices",
-			AnythingOfType("int"),
-			AnythingOfType("int"),
-			AnythingOfType("[]main.Filter"),
-			AnythingOfType("*main.Sort"),
-			AnythingOfType("*bool"),
+			mock.AnythingOfType("int"),
+			mock.AnythingOfType("int"),
+			mock.AnythingOfType("[]store.Filter"),
+			mock.AnythingOfType("*store.Sort"),
+			mock.AnythingOfType("*bool"),
 		).Return(mockListDevices(testCase.listDevicesNum), testCase.listDevicesErr)
 
-		factory := func(c config.Reader, l *log.Logger) (InventoryApp, error) {
+		factory := func(l *log.Logger) (inventory.InventoryApp, error) {
 			return &inv, nil
 		}
 		apih := makeMockApiHandler(t, factory)
@@ -309,7 +312,7 @@ func TestApiInventoryAddDevice(t *testing.T) {
 			inventoryErr: nil,
 			JSONResponseParams: utils.JSONResponseParams{
 				OutputStatus:     http.StatusBadRequest,
-				OutputBodyObject: RestError("failed to decode request body: json: cannot unmarshal string into Go value of type main.Device"),
+				OutputBodyObject: RestError("failed to decode request body: json: cannot unmarshal string into Go value of type model.Device"),
 			},
 		},
 		"body formatted ok, all fields present": {
@@ -342,7 +345,7 @@ func TestApiInventoryAddDevice(t *testing.T) {
 			inventoryErr: nil,
 			JSONResponseParams: utils.JSONResponseParams{
 				OutputStatus:     http.StatusBadRequest,
-				OutputBodyObject: RestError("failed to decode request body: json: cannot unmarshal number into Go value of type []main.DeviceAttribute"),
+				OutputBodyObject: RestError("failed to decode request body: json: cannot unmarshal number into Go struct field Device.attributes of type []model.DeviceAttribute"),
 			},
 		},
 		"body formatted ok, 'id' missing": {
@@ -415,7 +418,7 @@ func TestApiInventoryAddDevice(t *testing.T) {
 					"id": "id-0001",
 				},
 			),
-			inventoryErr: errors.Wrap(ErrDuplicatedDeviceId, "failed to add device"),
+			inventoryErr: errors.Wrap(store.ErrDuplicatedDeviceId, "failed to add device"),
 			JSONResponseParams: utils.JSONResponseParams{
 				OutputStatus:     http.StatusConflict,
 				OutputBodyObject: RestError("device with specified ID already exists"),
@@ -425,10 +428,10 @@ func TestApiInventoryAddDevice(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Logf("test case: %s", name)
-		inv := MockInventoryApp{}
-		inv.On("AddDevice", AnythingOfType("*main.Device")).Return(tc.inventoryErr)
+		inv := minventory.InventoryApp{}
+		inv.On("AddDevice", mock.AnythingOfType("*model.Device")).Return(tc.inventoryErr)
 
-		factory := func(c config.Reader, l *log.Logger) (InventoryApp, error) {
+		factory := func(l *log.Logger) (inventory.InventoryApp, error) {
 			return &inv, nil
 		}
 		apih := makeMockApiHandler(t, factory)
@@ -499,14 +502,14 @@ func TestApiInventoryUpsertAttributes(t *testing.T) {
 			inventoryErr: nil,
 			resp: utils.JSONResponseParams{
 				OutputStatus:     http.StatusBadRequest,
-				OutputBodyObject: RestError("failed to decode request body: json: cannot unmarshal string into Go value of type []main.DeviceAttribute"),
+				OutputBodyObject: RestError("failed to decode request body: json: cannot unmarshal string into Go value of type []model.DeviceAttribute"),
 			},
 		},
 
 		"body formatted ok, attribute name missing": {
 			inReq: test.MakeSimpleRequest("PATCH",
 				"http://1.2.3.4/api/0.1.0/attributes",
-				[]DeviceAttribute{
+				[]model.DeviceAttribute{
 					{
 						Name:        "name1",
 						Value:       "value1",
@@ -531,7 +534,7 @@ func TestApiInventoryUpsertAttributes(t *testing.T) {
 		"body formatted ok, attributes ok (all fields)": {
 			inReq: test.MakeSimpleRequest("PATCH",
 				"http://1.2.3.4/api/0.1.0/attributes",
-				[]DeviceAttribute{
+				[]model.DeviceAttribute{
 					{
 						Name:        "name1",
 						Value:       "value1",
@@ -557,7 +560,7 @@ func TestApiInventoryUpsertAttributes(t *testing.T) {
 		"body formatted ok, attributes ok (all fields, arrays)": {
 			inReq: test.MakeSimpleRequest("PATCH",
 				"http://1.2.3.4/api/0.1.0/attributes",
-				[]DeviceAttribute{
+				[]model.DeviceAttribute{
 					{
 						Name:        "name1",
 						Value:       []interface{}{"foo", "bar"},
@@ -583,7 +586,7 @@ func TestApiInventoryUpsertAttributes(t *testing.T) {
 		"body formatted ok, attributes ok (values only)": {
 			inReq: test.MakeSimpleRequest("PATCH",
 				"http://1.2.3.4/api/0.1.0/attributes",
-				[]DeviceAttribute{
+				[]model.DeviceAttribute{
 					{
 						Name:  "name1",
 						Value: "value1",
@@ -607,7 +610,7 @@ func TestApiInventoryUpsertAttributes(t *testing.T) {
 		"body formatted ok, attributes ok (all fields), inventory err": {
 			inReq: test.MakeSimpleRequest("PATCH",
 				"http://1.2.3.4/api/0.1.0/attributes",
-				[]DeviceAttribute{
+				[]model.DeviceAttribute{
 					{
 						Name:        "name1",
 						Value:       "value1",
@@ -633,11 +636,11 @@ func TestApiInventoryUpsertAttributes(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Logf("test case: %s", name)
-		inv := MockInventoryApp{}
+		inv := minventory.InventoryApp{}
 
-		inv.On("UpsertAttributes", AnythingOfType("main.DeviceID"), AnythingOfType("main.DeviceAttributes")).Return(tc.inventoryErr)
+		inv.On("UpsertAttributes", mock.AnythingOfType("model.DeviceID"), mock.AnythingOfType("model.DeviceAttributes")).Return(tc.inventoryErr)
 
-		factory := func(c config.Reader, l *log.Logger) (InventoryApp, error) {
+		factory := func(l *log.Logger) (inventory.InventoryApp, error) {
 			return &inv, nil
 		}
 		apih := makeMockApiHandler(t, factory)
@@ -684,9 +687,9 @@ func TestApiInventoryDeleteDeviceGroup(t *testing.T) {
 				"http://1.2.3.4/api/0.1.0/devices/123/group/g1", nil),
 			JSONResponseParams: utils.JSONResponseParams{
 				OutputStatus:     http.StatusNotFound,
-				OutputBodyObject: RestError(ErrDevNotFound.Error()),
+				OutputBodyObject: RestError(store.ErrDevNotFound.Error()),
 			},
-			inventoryErr: ErrDevNotFound,
+			inventoryErr: store.ErrDevNotFound,
 		},
 		"internal error": {
 			inReq: test.MakeSimpleRequest("DELETE",
@@ -701,10 +704,10 @@ func TestApiInventoryDeleteDeviceGroup(t *testing.T) {
 
 	for name, tc := range tcases {
 		t.Logf("test case: %s", name)
-		inv := MockInventoryApp{}
-		inv.On("UnsetDeviceGroup", AnythingOfType("main.DeviceID"), AnythingOfType("main.GroupName")).Return(tc.inventoryErr)
+		inv := minventory.InventoryApp{}
+		inv.On("UnsetDeviceGroup", mock.AnythingOfType("model.DeviceID"), mock.AnythingOfType("model.GroupName")).Return(tc.inventoryErr)
 
-		factory := func(c config.Reader, l *log.Logger) (InventoryApp, error) {
+		factory := func(l *log.Logger) (inventory.InventoryApp, error) {
 			return &inv, nil
 		}
 		apih := makeMockApiHandler(t, factory)
@@ -738,9 +741,9 @@ func TestApiInventoryAddDeviceToGroup(t *testing.T) {
 				InventoryApiGroup{"abc"}),
 			JSONResponseParams: utils.JSONResponseParams{
 				OutputStatus:     http.StatusNotFound,
-				OutputBodyObject: RestError(ErrDevNotFound.Error()),
+				OutputBodyObject: RestError(store.ErrDevNotFound.Error()),
 			},
-			inventoryErr: ErrDevNotFound,
+			inventoryErr: store.ErrDevNotFound,
 		},
 		"empty group name": {
 			inReq: test.MakeSimpleRequest("PUT",
@@ -775,10 +778,10 @@ func TestApiInventoryAddDeviceToGroup(t *testing.T) {
 
 	for name, tc := range tcases {
 		t.Logf("test case: %s", name)
-		inv := MockInventoryApp{}
-		inv.On("UpdateDeviceGroup", AnythingOfType("main.DeviceID"), AnythingOfType("main.GroupName")).Return(tc.inventoryErr)
+		inv := minventory.InventoryApp{}
+		inv.On("UpdateDeviceGroup", mock.AnythingOfType("model.DeviceID"), mock.AnythingOfType("model.GroupName")).Return(tc.inventoryErr)
 
-		factory := func(c config.Reader, l *log.Logger) (InventoryApp, error) {
+		factory := func(l *log.Logger) (inventory.InventoryApp, error) {
 			return &inv, nil
 		}
 		apih := makeMockApiHandler(t, factory)
@@ -794,13 +797,13 @@ func TestApiListGroups(t *testing.T) {
 		utils.JSONResponseParams
 
 		inReq        *http.Request
-		outputGroups []GroupName
+		outputGroups []model.GroupName
 
 		inventoryErr error
 	}{
 		"some groups": {
 			inReq:        test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/groups", nil),
-			outputGroups: []GroupName{"foo", "bar"},
+			outputGroups: []model.GroupName{"foo", "bar"},
 			JSONResponseParams: utils.JSONResponseParams{
 				OutputStatus:     http.StatusOK,
 				OutputBodyObject: []string{"foo", "bar"},
@@ -825,10 +828,10 @@ func TestApiListGroups(t *testing.T) {
 
 	for name, tc := range tcases {
 		t.Logf("test case: %s", name)
-		inv := MockInventoryApp{}
+		inv := minventory.InventoryApp{}
 		inv.On("ListGroups").Return(tc.outputGroups, tc.inventoryErr)
 
-		factory := func(c config.Reader, l *log.Logger) (InventoryApp, error) {
+		factory := func(l *log.Logger) (inventory.InventoryApp, error) {
 			return &inv, nil
 		}
 		apih := makeMockApiHandler(t, factory)
@@ -844,36 +847,36 @@ func TestApiGetDevice(t *testing.T) {
 		utils.JSONResponseParams
 
 		inReq        *http.Request
-		inDevId      DeviceID
-		outputDevice *Device
+		inDevId      model.DeviceID
+		outputDevice *model.Device
 		inventoryErr error
 	}{
 		"no device": {
-			inDevId:      DeviceID("1"),
+			inDevId:      model.DeviceID("1"),
 			inReq:        test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices/1", nil),
 			outputDevice: nil,
 			JSONResponseParams: utils.JSONResponseParams{
 				OutputStatus:     http.StatusNotFound,
-				OutputBodyObject: RestError(ErrDevNotFound.Error()),
+				OutputBodyObject: RestError(store.ErrDevNotFound.Error()),
 			},
 		},
 		"some device": {
-			inDevId: DeviceID("2"),
+			inDevId: model.DeviceID("2"),
 			inReq:   test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices/2", nil),
-			outputDevice: &Device{
-				ID:    DeviceID("2"),
-				Group: GroupName("foo"),
+			outputDevice: &model.Device{
+				ID:    model.DeviceID("2"),
+				Group: model.GroupName("foo"),
 			},
 			JSONResponseParams: utils.JSONResponseParams{
 				OutputStatus: http.StatusOK,
-				OutputBodyObject: Device{
-					ID:    DeviceID("2"),
-					Group: GroupName("foo"),
+				OutputBodyObject: model.Device{
+					ID:    model.DeviceID("2"),
+					Group: model.GroupName("foo"),
 				},
 			},
 		},
 		"error": {
-			inDevId: DeviceID("3"),
+			inDevId: model.DeviceID("3"),
 			inReq:   test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices/3", nil),
 			JSONResponseParams: utils.JSONResponseParams{
 				OutputStatus:     http.StatusInternalServerError,
@@ -885,10 +888,10 @@ func TestApiGetDevice(t *testing.T) {
 
 	for name, tc := range tcases {
 		t.Logf("test case: %s", name)
-		inv := MockInventoryApp{}
+		inv := minventory.InventoryApp{}
 		inv.On("GetDevice", tc.inDevId).Return(tc.outputDevice, tc.inventoryErr)
 
-		factory := func(c config.Reader, l *log.Logger) (InventoryApp, error) {
+		factory := func(l *log.Logger) (inventory.InventoryApp, error) {
 			return &inv, nil
 		}
 		apih := makeMockApiHandler(t, factory)
@@ -969,7 +972,7 @@ func TestApiInventoryGetDevicesByGroup(t *testing.T) {
 		},
 		"inv.ListDevicesByGroup error - group not found": {
 			listDevicesNum: 5,
-			listDevicesErr: ErrGroupNotFound,
+			listDevicesErr: store.ErrGroupNotFound,
 			inReq:          test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/groups/foo/devices?page=4&per_page=5", nil),
 			resp: utils.JSONResponseParams{
 				OutputStatus:     404,
@@ -991,14 +994,14 @@ func TestApiInventoryGetDevicesByGroup(t *testing.T) {
 
 	for name, testCase := range testCases {
 		t.Logf("test case: %s", name)
-		inv := MockInventoryApp{}
+		inv := minventory.InventoryApp{}
 		inv.On("ListDevicesByGroup",
-			AnythingOfType("main.GroupName"),
-			AnythingOfType("int"),
-			AnythingOfType("int"),
+			mock.AnythingOfType("model.GroupName"),
+			mock.AnythingOfType("int"),
+			mock.AnythingOfType("int"),
 		).Return(mockListDeviceIDs(testCase.listDevicesNum), testCase.listDevicesErr)
 
-		factory := func(c config.Reader, l *log.Logger) (InventoryApp, error) {
+		factory := func(l *log.Logger) (inventory.InventoryApp, error) {
 			return &inv, nil
 		}
 		apih := makeMockApiHandler(t, factory)
@@ -1015,7 +1018,7 @@ func TestApiGetDeviceGroup(t *testing.T) {
 
 		inReq *http.Request
 
-		inventoryGroup GroupName
+		inventoryGroup model.GroupName
 		inventoryErr   error
 	}{
 
@@ -1028,7 +1031,7 @@ func TestApiGetDeviceGroup(t *testing.T) {
 
 		"device with group": {
 			inReq:          test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices/1/group", nil),
-			inventoryGroup: GroupName("dev"),
+			inventoryGroup: model.GroupName("dev"),
 			inventoryErr:   nil,
 
 			JSONResponseParams: utils.JSONResponseParams{
@@ -1038,7 +1041,7 @@ func TestApiGetDeviceGroup(t *testing.T) {
 		},
 		"device without group": {
 			inReq:          test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices/1/group", nil),
-			inventoryGroup: GroupName(""),
+			inventoryGroup: model.GroupName(""),
 			inventoryErr:   nil,
 
 			JSONResponseParams: utils.JSONResponseParams{
@@ -1048,17 +1051,17 @@ func TestApiGetDeviceGroup(t *testing.T) {
 		},
 		"device not found": {
 			inReq:          test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices/1/group", nil),
-			inventoryGroup: GroupName(""),
-			inventoryErr:   ErrDevNotFound,
+			inventoryGroup: model.GroupName(""),
+			inventoryErr:   store.ErrDevNotFound,
 
 			JSONResponseParams: utils.JSONResponseParams{
 				OutputStatus:     http.StatusNotFound,
-				OutputBodyObject: RestError(ErrDevNotFound.Error()),
+				OutputBodyObject: RestError(store.ErrDevNotFound.Error()),
 			},
 		},
 		"generic inventory error": {
 			inReq:          test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices/1/group", nil),
-			inventoryGroup: GroupName(""),
+			inventoryGroup: model.GroupName(""),
 			inventoryErr:   errors.New("inventory: internal error"),
 
 			JSONResponseParams: utils.JSONResponseParams{
@@ -1070,10 +1073,10 @@ func TestApiGetDeviceGroup(t *testing.T) {
 
 	for name, tc := range tcases {
 		t.Logf("test case: %s", name)
-		inv := MockInventoryApp{}
-		inv.On("GetDeviceGroup", AnythingOfType("main.DeviceID")).Return(tc.inventoryGroup, tc.inventoryErr)
+		inv := minventory.InventoryApp{}
+		inv.On("GetDeviceGroup", mock.AnythingOfType("model.DeviceID")).Return(tc.inventoryGroup, tc.inventoryErr)
 
-		factory := func(c config.Reader, l *log.Logger) (InventoryApp, error) {
+		factory := func(l *log.Logger) (inventory.InventoryApp, error) {
 			return &inv, nil
 		}
 		apih := makeMockApiHandler(t, factory)
@@ -1090,26 +1093,26 @@ func TestApiDeleteDevice(t *testing.T) {
 		utils.JSONResponseParams
 
 		inReq        *http.Request
-		inDevId      DeviceID
+		inDevId      model.DeviceID
 		inventoryErr error
 	}{
 		"no device": {
-			inDevId:      DeviceID("1"),
+			inDevId:      model.DeviceID("1"),
 			inReq:        test.MakeSimpleRequest("DELETE", "http://1.2.3.4/api/0.1.0/devices/1", nil),
-			inventoryErr: ErrDevNotFound,
+			inventoryErr: store.ErrDevNotFound,
 			JSONResponseParams: utils.JSONResponseParams{
 				OutputStatus: http.StatusNoContent,
 			},
 		},
 		"some device": {
-			inDevId: DeviceID("2"),
+			inDevId: model.DeviceID("2"),
 			inReq:   test.MakeSimpleRequest("DELETE", "http://1.2.3.4/api/0.1.0/devices/2", nil),
 			JSONResponseParams: utils.JSONResponseParams{
 				OutputStatus: http.StatusNoContent,
 			},
 		},
 		"error": {
-			inDevId: DeviceID("3"),
+			inDevId: model.DeviceID("3"),
 			inReq:   test.MakeSimpleRequest("DELETE", "http://1.2.3.4/api/0.1.0/devices/3", nil),
 			JSONResponseParams: utils.JSONResponseParams{
 				OutputStatus:     http.StatusInternalServerError,
@@ -1123,10 +1126,10 @@ func TestApiDeleteDevice(t *testing.T) {
 		t.Run(fmt.Sprintf("test case: %s", name), func(t *testing.T) {
 			t.Parallel()
 
-			inv := MockInventoryApp{}
+			inv := minventory.InventoryApp{}
 			inv.On("DeleteDevice", tc.inDevId).Return(tc.inventoryErr)
 
-			factory := func(c config.Reader, l *log.Logger) (InventoryApp, error) {
+			factory := func(l *log.Logger) (inventory.InventoryApp, error) {
 				return &inv, nil
 			}
 			apih := makeMockApiHandler(t, factory)
