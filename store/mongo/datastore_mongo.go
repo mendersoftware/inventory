@@ -87,8 +87,8 @@ func (db *DataStoreMongo) GetDevices(skip int, limit int, filters []store.Filter
 		default:
 			if filter.ValueFloat != nil {
 				queryFilters = append(queryFilters, bson.M{"$or": []bson.M{
-					bson.M{field: bson.M{op: filter.Value}},
-					bson.M{field: bson.M{op: filter.ValueFloat}},
+					{field: bson.M{op: filter.Value}},
+					{field: bson.M{op: filter.ValueFloat}},
 				}})
 			} else {
 				queryFilters = append(queryFilters, bson.M{field: bson.M{op: filter.Value}})

@@ -132,7 +132,7 @@ func parseFilterParams(r *rest.Request) ([]store.Filter, error) {
 	knownParams := []string{utils.PageName, utils.PerPageName, queryParamSort, queryParamHasGroup}
 	filters := make([]store.Filter, 0)
 	var filter store.Filter
-	for name, _ := range r.URL.Query() {
+	for name := range r.URL.Query() {
 		if utils.ContainsString(name, knownParams) {
 			continue
 		}
