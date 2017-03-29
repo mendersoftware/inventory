@@ -1096,8 +1096,7 @@ func TestApiDeleteDevice(t *testing.T) {
 			inReq:        test.MakeSimpleRequest("DELETE", "http://1.2.3.4/api/0.1.0/devices/1", nil),
 			inventoryErr: ErrDevNotFound,
 			JSONResponseParams: utils.JSONResponseParams{
-				OutputStatus:     http.StatusNotFound,
-				OutputBodyObject: RestError(ErrDevNotFound.Error()),
+				OutputStatus: http.StatusNoContent,
 			},
 		},
 		"some device": {
