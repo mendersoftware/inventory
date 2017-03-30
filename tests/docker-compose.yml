@@ -10,4 +10,6 @@ services:
             - mender-inventory
     mender-inventory:
             # built/tagged locally and only used for testing
-            image: mendersoftware/inventory:pr
+            image: mendersoftware/inventory:prtest
+            volumes:
+                - "${TESTS_DIR}:/testing"
