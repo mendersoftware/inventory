@@ -12,17 +12,21 @@
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
 
-package main
+package mongo
 
 import (
+	"context"
 	"fmt"
-	"github.com/pkg/errors"
-	"gopkg.in/mgo.v2"
-	"gopkg.in/mgo.v2/bson"
 	"sync"
 	"time"
 
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
+	"github.com/pkg/errors"
+	"gopkg.in/mgo.v2"
+	"gopkg.in/mgo.v2/bson"
+
+	"github.com/mendersoftware/inventory/model"
+	"github.com/mendersoftware/inventory/store"
 )
 
 const (
@@ -44,8 +48,6 @@ var (
 
 	// once ensures mgoMaster is created only once
 	once sync.Once
-
-	ErrGroupNotFound = errors.New("group not found")
 )
 
 type DataStoreMongo struct {
@@ -71,11 +73,11 @@ func NewDataStoreMongo(host string) (*DataStoreMongo, error) {
 	return db, nil
 }
 
-func (db *DataStoreMongo) GetDevices(skip int, limit int, filters []Filter, sort *Sort, hasGroup *bool) ([]Device, error) {
+func (db *DataStoreMongo) GetDevices(skip int, limit int, filters []store.Filter, sort *store.Sort, hasGroup *bool) ([]model.Device, error) {
 	s := db.session.Copy()
 	defer s.Close()
 	c := s.DB(DbName).C(DbDevicesColl)
-	res := []Device{}
+	res := []model.Device{}
 
 	queryFilters := make([]bson.M, 0)
 	for _, filter := range filters {
@@ -85,8 +87,8 @@ func (db *DataStoreMongo) GetDevices(skip int, limit int, filters []Filter, sort
 		default:
 			if filter.ValueFloat != nil {
 				queryFilters = append(queryFilters, bson.M{"$or": []bson.M{
-					bson.M{field: bson.M{op: filter.Value}},
-					bson.M{field: bson.M{op: filter.ValueFloat}},
+					{field: bson.M{op: filter.Value}},
+					{field: bson.M{op: filter.ValueFloat}},
 				}})
 			} else {
 				queryFilters = append(queryFilters, bson.M{field: bson.M{op: filter.Value}})
@@ -125,12 +127,12 @@ func (db *DataStoreMongo) GetDevices(skip int, limit int, filters []Filter, sort
 	return res, nil
 }
 
-func (db *DataStoreMongo) GetDevice(id DeviceID) (*Device, error) {
+func (db *DataStoreMongo) GetDevice(id model.DeviceID) (*model.Device, error) {
 	s := db.session.Copy()
 	defer s.Close()
 	c := s.DB(DbName).C(DbDevicesColl)
 
-	res := Device{}
+	res := model.Device{}
 
 	err := c.FindId(id).One(&res)
 
@@ -145,7 +147,7 @@ func (db *DataStoreMongo) GetDevice(id DeviceID) (*Device, error) {
 	return &res, nil
 }
 
-func (db *DataStoreMongo) AddDevice(dev *Device) error {
+func (db *DataStoreMongo) AddDevice(dev *model.Device) error {
 	s := db.session.Copy()
 	defer s.Close()
 	c := s.DB(DbName).C(DbDevicesColl)
@@ -153,14 +155,14 @@ func (db *DataStoreMongo) AddDevice(dev *Device) error {
 	err := c.Insert(dev)
 	if err != nil {
 		if mgo.IsDup(err) {
-			return ErrDuplicatedDeviceId
+			return store.ErrDuplicatedDeviceId
 		}
 		return errors.Wrap(err, "failed to store device")
 	}
 	return nil
 }
 
-func (db *DataStoreMongo) UpsertAttributes(id DeviceID, attrs DeviceAttributes) error {
+func (db *DataStoreMongo) UpsertAttributes(id model.DeviceID, attrs model.DeviceAttributes) error {
 	s := db.session.Copy()
 	defer s.Close()
 	c := s.DB(DbName).C(DbDevicesColl)
@@ -179,7 +181,7 @@ func (db *DataStoreMongo) UpsertAttributes(id DeviceID, attrs DeviceAttributes) 
 }
 
 // prepare an attribute upsert doc based on DeviceAttributes map
-func makeAttrUpsert(attrs DeviceAttributes) map[string]interface{} {
+func makeAttrUpsert(attrs model.DeviceAttributes) map[string]interface{} {
 	var fieldName string
 	upsert := map[string]interface{}{}
 
@@ -201,15 +203,15 @@ func makeAttrUpsert(attrs DeviceAttributes) map[string]interface{} {
 	return upsert
 }
 
-func mongoOperator(co ComparisonOperator) string {
+func mongoOperator(co store.ComparisonOperator) string {
 	switch co {
-	case Eq:
+	case store.Eq:
 		return "$eq"
 	}
 	return ""
 }
 
-func (db *DataStoreMongo) UnsetDeviceGroup(id DeviceID, groupName GroupName) error {
+func (db *DataStoreMongo) UnsetDeviceGroup(id model.DeviceID, groupName model.GroupName) error {
 	s := db.session.Copy()
 	defer s.Close()
 
@@ -226,34 +228,34 @@ func (db *DataStoreMongo) UnsetDeviceGroup(id DeviceID, groupName GroupName) err
 	}
 	if _, err := s.DB(DbName).C(DbDevicesColl).Find(query).Apply(update, nil); err != nil {
 		if err.Error() == mgo.ErrNotFound.Error() {
-			return ErrDevNotFound
+			return store.ErrDevNotFound
 		}
 		return err
 	}
 	return nil
 }
 
-func (db *DataStoreMongo) UpdateDeviceGroup(devId DeviceID, newGroup GroupName) error {
+func (db *DataStoreMongo) UpdateDeviceGroup(devId model.DeviceID, newGroup model.GroupName) error {
 	s := db.session.Copy()
 	defer s.Close()
 	c := s.DB(DbName).C(DbDevicesColl)
 
-	err := c.UpdateId(devId, bson.M{"$set": &Device{Group: newGroup}})
+	err := c.UpdateId(devId, bson.M{"$set": &model.Device{Group: newGroup}})
 	if err != nil {
 		if err == mgo.ErrNotFound {
-			return ErrDevNotFound
+			return store.ErrDevNotFound
 		}
 		return errors.Wrap(err, "failed to update device group")
 	}
 	return nil
 }
 
-func (db *DataStoreMongo) ListGroups() ([]GroupName, error) {
+func (db *DataStoreMongo) ListGroups() ([]model.GroupName, error) {
 	s := db.session.Copy()
 	defer s.Close()
 	c := s.DB(DbName).C(DbDevicesColl)
 
-	var groups []GroupName
+	var groups []model.GroupName
 	err := c.Find(bson.M{}).Distinct("group", &groups)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to list device groups")
@@ -261,7 +263,7 @@ func (db *DataStoreMongo) ListGroups() ([]GroupName, error) {
 	return groups, nil
 }
 
-func (db *DataStoreMongo) GetDevicesByGroup(group GroupName, skip, limit int) ([]DeviceID, error) {
+func (db *DataStoreMongo) GetDevicesByGroup(group model.GroupName, skip, limit int) ([]model.DeviceID, error) {
 	s := db.session.Copy()
 	defer s.Close()
 	c := s.DB(DbName).C(DbDevicesColl)
@@ -269,17 +271,17 @@ func (db *DataStoreMongo) GetDevicesByGroup(group GroupName, skip, limit int) ([
 	filter := bson.M{DbDevGroup: group}
 
 	//first, find if the group exists at all, i.e. if any dev is assigned
-	var dev Device
+	var dev model.Device
 	err := c.Find(filter).One(&dev)
 	if err != nil {
 		if err == mgo.ErrNotFound {
-			return nil, ErrGroupNotFound
+			return nil, store.ErrGroupNotFound
 		} else {
 			return nil, errors.Wrap(err, "failed to get devices for group")
 		}
 	}
 
-	res := []Device{}
+	res := []model.Device{}
 
 	//get group's devices; select only the '_id' field
 	err = c.Find(filter).Select(bson.M{"_id": 1}).Skip(skip).Limit(limit).Sort("_id").All(&res)
@@ -287,7 +289,7 @@ func (db *DataStoreMongo) GetDevicesByGroup(group GroupName, skip, limit int) ([
 		return nil, errors.Wrap(err, "failed to get devices for group")
 	}
 
-	resIds := make([]DeviceID, len(res))
+	resIds := make([]model.DeviceID, len(res))
 	for i, d := range res {
 		resIds[i] = d.ID
 	}
@@ -295,17 +297,17 @@ func (db *DataStoreMongo) GetDevicesByGroup(group GroupName, skip, limit int) ([
 	return resIds, nil
 }
 
-func (db *DataStoreMongo) GetDeviceGroup(id DeviceID) (GroupName, error) {
+func (db *DataStoreMongo) GetDeviceGroup(id model.DeviceID) (model.GroupName, error) {
 	s := db.session.Copy()
 	defer s.Close()
 	c := s.DB(DbName).C(DbDevicesColl)
 
-	var dev Device
+	var dev model.Device
 
 	err := c.FindId(id).Select(bson.M{"group": 1}).One(&dev)
 	if err != nil {
 		if err == mgo.ErrNotFound {
-			return "", ErrDevNotFound
+			return "", store.ErrDevNotFound
 		} else {
 			return "", errors.Wrap(err, "failed to get device")
 		}
@@ -314,13 +316,13 @@ func (db *DataStoreMongo) GetDeviceGroup(id DeviceID) (GroupName, error) {
 	return dev.Group, nil
 }
 
-func (db *DataStoreMongo) DeleteDevice(id DeviceID) error {
+func (db *DataStoreMongo) DeleteDevice(id model.DeviceID) error {
 	s := db.session.Copy()
 	defer s.Close()
 
 	if err := s.DB(DbName).C(DbDevicesColl).RemoveId(id); err != nil {
 		if err.Error() == mgo.ErrNotFound.Error() {
-			return ErrDevNotFound
+			return store.ErrDevNotFound
 		}
 		return err
 	}
@@ -328,7 +330,7 @@ func (db *DataStoreMongo) DeleteDevice(id DeviceID) error {
 	return nil
 }
 
-func (db *DataStoreMongo) Migrate(version string, migrations []migrate.Migration) error {
+func (db *DataStoreMongo) Migrate(ctx context.Context, version string, migrations []migrate.Migration) error {
 	m := migrate.DummyMigrator{
 		Session: db.session,
 		Db:      DbName,
@@ -339,7 +341,7 @@ func (db *DataStoreMongo) Migrate(version string, migrations []migrate.Migration
 		return errors.Wrap(err, "failed to parse service version")
 	}
 
-	err = m.Apply(ver, migrations)
+	err = m.Apply(ctx, *ver, migrations)
 	if err != nil {
 		return errors.Wrap(err, "failed to apply migrations")
 	}

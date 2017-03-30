@@ -12,57 +12,56 @@
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
 
-package main
+package store
 
 import (
 	"errors"
 
-	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
+	"github.com/mendersoftware/inventory/model"
 )
 
 var (
 	ErrDuplicatedDeviceId = errors.New("Duplicated device id")
 	// device not found
 	ErrDevNotFound = errors.New("Device not found")
+
+	ErrGroupNotFound = errors.New("group not found")
 )
 
 type DataStore interface {
-	GetDevices(skip int, limit int, filters []Filter, sort *Sort, hasGroup *bool) ([]Device, error)
+	GetDevices(skip int, limit int, filters []Filter, sort *Sort, hasGroup *bool) ([]model.Device, error)
 
 	// find a device with given `id`, returns the device or nil,
 	// if device was not found, error and returned device are nil
-	GetDevice(id DeviceID) (*Device, error)
+	GetDevice(id model.DeviceID) (*model.Device, error)
 
 	// insert device into data store
 	//
-	// ds.AddDevice(&Device{
+	// ds.AddDevice(&model.Device{
 	// 	ID: "foo",
 	// 	Attributes: map[string]string{"token": "123"),
 	// })
-	AddDevice(dev *Device) error
+	AddDevice(dev *model.Device) error
 
 	// delete device and all attributes
-	DeleteDevice(id DeviceID) error
+	DeleteDevice(id model.DeviceID) error
 
 	// Updates the device attributes in a differential manner.
 	// Nonexistent attributes are created, existing are overwritten; the device resource is also created if necessary.
-	UpsertAttributes(id DeviceID, attrs DeviceAttributes) error
+	UpsertAttributes(id model.DeviceID, attrs model.DeviceAttributes) error
 
 	// Unset group in device with `id`
-	UnsetDeviceGroup(id DeviceID, groupName GroupName) error
+	UnsetDeviceGroup(id model.DeviceID, groupName model.GroupName) error
 
 	// Updates device group
-	UpdateDeviceGroup(devid DeviceID, group GroupName) error
+	UpdateDeviceGroup(devid model.DeviceID, group model.GroupName) error
 
 	// List groups
-	ListGroups() ([]GroupName, error)
+	ListGroups() ([]model.GroupName, error)
 
 	// Lists devices belonging to a group
-	GetDevicesByGroup(group GroupName, skip, limit int) ([]DeviceID, error)
+	GetDevicesByGroup(group model.GroupName, skip, limit int) ([]model.DeviceID, error)
 
 	// Get device's group
-	GetDeviceGroup(id DeviceID) (GroupName, error)
-
-	// Run migrations
-	Migrate(version string, migrations []migrate.Migration) error
+	GetDeviceGroup(id model.DeviceID) (model.GroupName, error)
 }

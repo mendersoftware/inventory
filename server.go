@@ -14,11 +14,16 @@
 package main
 
 import (
-	"github.com/ant0ine/go-json-rest/rest"
-	"github.com/mendersoftware/inventory/config"
-	"github.com/mendersoftware/inventory/log"
-	"github.com/pkg/errors"
 	"net/http"
+
+	"github.com/ant0ine/go-json-rest/rest"
+	"github.com/mendersoftware/go-lib-micro/log"
+	"github.com/pkg/errors"
+
+	api_http "github.com/mendersoftware/inventory/api/http"
+	"github.com/mendersoftware/inventory/config"
+	inventory "github.com/mendersoftware/inventory/inv"
+	"github.com/mendersoftware/inventory/store/mongo"
 )
 
 func SetupAPI(stacktype string) (*rest.Api, error) {
@@ -40,7 +45,16 @@ func RunServer(c config.Reader) error {
 
 	l := log.New(log.Ctx{})
 
-	invapi := NewInventoryApiHandlers(GetInventory)
+	invapi := api_http.NewInventoryApiHandlers(
+		func(l *log.Logger) (inventory.InventoryApp, error) {
+			d, err := mongo.NewDataStoreMongo(c.GetString(SettingDb))
+			if err != nil {
+				return nil, errors.Wrap(err, "database connection failed")
+			}
+
+			inv := inventory.NewInventory(d)
+			return inv, nil
+		})
 
 	api, err := SetupAPI(c.GetString(SettingMiddleware))
 	if err != nil {

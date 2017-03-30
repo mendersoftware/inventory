@@ -17,7 +17,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/ant0ine/go-json-rest/rest"
-	"github.com/mendersoftware/inventory/requestlog"
+	"github.com/mendersoftware/go-lib-micro/requestlog"
 	"net"
 	"os"
 	"strings"
@@ -29,7 +29,7 @@ type AccessLogFormat string
 
 const (
 	DefaultLogFormat = "%t %S\033[0m \033[36;1m%Dμs\033[0m \"%r\" \033[1;30m%u \"%{User-Agent}i\"\033[0m"
-	SimpleLogFormat = "%s %Dμs \"%r\" %u \"%{User-Agent}i\""
+	SimpleLogFormat  = "%s %Dμs %r %u %{User-Agent}i"
 )
 
 // AccesLogMiddleware is a customized version of the AccessLogApacheMiddleware.

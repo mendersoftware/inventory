@@ -12,15 +12,16 @@
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
 
-package main_test
+package mongo_test
 
 import (
 	"io/ioutil"
 	"os"
 	"testing"
 
-	"gopkg.in/mgo.v2/dbtest"
 	"log"
+
+	"gopkg.in/mgo.v2/dbtest"
 )
 
 var db *dbtest.DBServer

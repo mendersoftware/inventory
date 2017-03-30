@@ -11,18 +11,22 @@
 //    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
-package requestid
+package store
 
-import (
-	"github.com/ant0ine/go-json-rest/rest"
+type ComparisonOperator int
+
+const (
+	Eq ComparisonOperator = 1 << iota
 )
 
-// GetReqId helper for retrieving current request Id
-func GetReqId(r *rest.Request) string {
-	reqid := r.Env[RequestIdHeader]
-	if reqid != nil {
-		return reqid.(string)
-	}
+type Filter struct {
+	AttrName   string
+	Value      string
+	ValueFloat *float64
+	Operator   ComparisonOperator
+}
 
-	return ""
+type Sort struct {
+	AttrName  string
+	Ascending bool
 }

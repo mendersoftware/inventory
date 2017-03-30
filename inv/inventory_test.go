@@ -11,18 +11,23 @@
 //    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
-package main
+package inv
 
 import (
 	"errors"
 	"fmt"
-	"github.com/stretchr/testify/assert"
-	. "github.com/stretchr/testify/mock"
 	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+
+	"github.com/mendersoftware/inventory/model"
+	"github.com/mendersoftware/inventory/store"
+	mstore "github.com/mendersoftware/inventory/store/mocks"
 )
 
-func invForTest(d DataStore) InventoryApp {
+func invForTest(d store.DataStore) InventoryApp {
 	return &Inventory{db: d}
 }
 
@@ -33,34 +38,34 @@ func boolPtr(value bool) *bool {
 func TestInventoryListDevices(t *testing.T) {
 	t.Parallel()
 
-	group := GroupName("asd")
+	group := model.GroupName("asd")
 	testCases := map[string]struct {
 		inHasGroup      *bool
-		datastoreFilter []Filter
+		datastoreFilter []store.Filter
 		datastoreError  error
 		outError        error
-		outDevices      []Device
+		outDevices      []model.Device
 	}{
 		"has group nil": {
 			inHasGroup:      nil,
 			datastoreFilter: nil,
 			datastoreError:  nil,
 			outError:        nil,
-			outDevices:      []Device{Device{ID: DeviceID("1")}},
+			outDevices:      []model.Device{{ID: model.DeviceID("1")}},
 		},
 		"has group true": {
 			inHasGroup:      boolPtr(true),
 			datastoreFilter: nil,
 			datastoreError:  nil,
 			outError:        nil,
-			outDevices:      []Device{Device{ID: DeviceID("1"), Group: group}},
+			outDevices:      []model.Device{{ID: model.DeviceID("1"), Group: group}},
 		},
 		"has group false": {
 			inHasGroup:      boolPtr(false),
 			datastoreFilter: nil,
 			datastoreError:  nil,
 			outError:        nil,
-			outDevices:      []Device{Device{ID: DeviceID("1")}},
+			outDevices:      []model.Device{{ID: model.DeviceID("1")}},
 		},
 		"datastore error": {
 			inHasGroup:      nil,
@@ -74,13 +79,13 @@ func TestInventoryListDevices(t *testing.T) {
 	for name, tc := range testCases {
 		t.Logf("test case: %s", name)
 
-		db := &MockDataStore{}
+		db := &mstore.DataStore{}
 		db.On("GetDevices",
-			AnythingOfType("int"),
-			AnythingOfType("int"),
+			mock.AnythingOfType("int"),
+			mock.AnythingOfType("int"),
 			tc.datastoreFilter,
-			AnythingOfType("*main.Sort"),
-			AnythingOfType("*bool"),
+			mock.AnythingOfType("*store.Sort"),
+			mock.AnythingOfType("*bool"),
 		).Return(tc.outDevices, tc.datastoreError)
 		i := invForTest(db)
 
@@ -100,23 +105,23 @@ func TestInventoryListDevices(t *testing.T) {
 func TestInventoryGetDevice(t *testing.T) {
 	t.Parallel()
 
-	group := GroupName("asd")
+	group := model.GroupName("asd")
 	testCases := map[string]struct {
-		devid          DeviceID
+		devid          model.DeviceID
 		datastoreError error
 		outError       error
-		outDevice      *Device
+		outDevice      *model.Device
 	}{
 		"has device": {
-			devid:     DeviceID("1"),
-			outDevice: &Device{ID: DeviceID("1"), Group: group},
+			devid:     model.DeviceID("1"),
+			outDevice: &model.Device{ID: model.DeviceID("1"), Group: group},
 		},
 		"no device": {
-			devid:     DeviceID("2"),
+			devid:     model.DeviceID("2"),
 			outDevice: nil,
 		},
 		"datastore error": {
-			devid:          DeviceID("3"),
+			devid:          model.DeviceID("3"),
 			datastoreError: errors.New("db connection failed"),
 			outError:       errors.New("failed to fetch device: db connection failed"),
 		},
@@ -125,9 +130,9 @@ func TestInventoryGetDevice(t *testing.T) {
 	for name, tc := range testCases {
 		t.Logf("test case: %s", name)
 
-		db := &MockDataStore{}
+		db := &mstore.DataStore{}
 		db.On("GetDevice",
-			AnythingOfType("DeviceID"),
+			mock.AnythingOfType("model.DeviceID"),
 		).Return(tc.outDevice, tc.datastoreError)
 		i := invForTest(db)
 
@@ -152,7 +157,7 @@ func TestInventoryAddDevice(t *testing.T) {
 	t.Parallel()
 
 	testCases := map[string]struct {
-		inDevice       *Device
+		inDevice       *model.Device
 		datastoreError error
 		outError       error
 	}{
@@ -162,12 +167,12 @@ func TestInventoryAddDevice(t *testing.T) {
 			outError:       errors.New("no device given"),
 		},
 		"datastore success": {
-			inDevice:       &Device{},
+			inDevice:       &model.Device{},
 			datastoreError: nil,
 			outError:       nil,
 		},
 		"datastore error": {
-			inDevice:       &Device{},
+			inDevice:       &model.Device{},
 			datastoreError: errors.New("db connection failed"),
 			outError:       errors.New("failed to add device: db connection failed"),
 		},
@@ -176,8 +181,8 @@ func TestInventoryAddDevice(t *testing.T) {
 	for name, tc := range testCases {
 		t.Logf("test case: %s", name)
 
-		db := &MockDataStore{}
-		db.On("AddDevice", AnythingOfType("*main.Device")).
+		db := &mstore.DataStore{}
+		db.On("AddDevice", mock.AnythingOfType("*model.Device")).
 			Return(tc.datastoreError)
 		i := invForTest(db)
 
@@ -213,12 +218,12 @@ func TestInventoryUpsertAttributes(t *testing.T) {
 	for name, tc := range testCases {
 		t.Logf("test case: %s", name)
 
-		db := &MockDataStore{}
-		db.On("UpsertAttributes", AnythingOfType("main.DeviceID"), AnythingOfType("main.DeviceAttributes")).
+		db := &mstore.DataStore{}
+		db.On("UpsertAttributes", mock.AnythingOfType("model.DeviceID"), mock.AnythingOfType("model.DeviceAttributes")).
 			Return(tc.datastoreError)
 		i := invForTest(db)
 
-		err := i.UpsertAttributes("devid", DeviceAttributes{})
+		err := i.UpsertAttributes("devid", model.DeviceAttributes{})
 
 		if tc.outError != nil {
 			if assert.Error(t, err) {
@@ -234,26 +239,26 @@ func TestInventoryUnsetDeviceGroup(t *testing.T) {
 	t.Parallel()
 
 	testCases := map[string]struct {
-		inDeviceID     DeviceID
-		inGroupName    GroupName
+		inDeviceID     model.DeviceID
+		inGroupName    model.GroupName
 		datastoreError error
 		outError       error
 	}{
 		"empty device ID, not found": {
-			inDeviceID:     DeviceID(""),
-			inGroupName:    GroupName("gr1"),
-			datastoreError: ErrDevNotFound,
-			outError:       ErrDevNotFound,
+			inDeviceID:     model.DeviceID(""),
+			inGroupName:    model.GroupName("gr1"),
+			datastoreError: store.ErrDevNotFound,
+			outError:       store.ErrDevNotFound,
 		},
 		"device group name not matching": {
-			inDeviceID:     DeviceID("1"),
-			inGroupName:    GroupName("not-matching"),
-			datastoreError: ErrDevNotFound,
-			outError:       ErrDevNotFound,
+			inDeviceID:     model.DeviceID("1"),
+			inGroupName:    model.GroupName("not-matching"),
+			datastoreError: store.ErrDevNotFound,
+			outError:       store.ErrDevNotFound,
 		},
 		"datastore success": {
-			inDeviceID:     DeviceID("1"),
-			inGroupName:    GroupName("gr1"),
+			inDeviceID:     model.DeviceID("1"),
+			inGroupName:    model.GroupName("gr1"),
 			datastoreError: nil,
 			outError:       nil,
 		},
@@ -262,8 +267,8 @@ func TestInventoryUnsetDeviceGroup(t *testing.T) {
 	for name, tc := range testCases {
 		t.Logf("test case: %s", name)
 
-		db := &MockDataStore{}
-		db.On("UnsetDeviceGroup", AnythingOfType("main.DeviceID"), AnythingOfType("main.GroupName")).
+		db := &mstore.DataStore{}
+		db.On("UnsetDeviceGroup", mock.AnythingOfType("model.DeviceID"), mock.AnythingOfType("model.GroupName")).
 			Return(tc.datastoreError)
 		i := invForTest(db)
 
@@ -283,20 +288,20 @@ func TestInventoryUpdateDeviceGroup(t *testing.T) {
 	t.Parallel()
 
 	testCases := map[string]struct {
-		inDeviceID     DeviceID
-		inGroupName    GroupName
+		inDeviceID     model.DeviceID
+		inGroupName    model.GroupName
 		datastoreError error
 		outError       error
 	}{
 		"empty device ID, not found": {
-			inDeviceID:     DeviceID(""),
-			inGroupName:    GroupName("gr1"),
-			datastoreError: ErrDevNotFound,
+			inDeviceID:     model.DeviceID(""),
+			inGroupName:    model.GroupName("gr1"),
+			datastoreError: store.ErrDevNotFound,
 			outError:       errors.New("failed to add device to group: Device not found"),
 		},
 		"datastore success": {
-			inDeviceID:     DeviceID("1"),
-			inGroupName:    GroupName("gr1"),
+			inDeviceID:     model.DeviceID("1"),
+			inGroupName:    model.GroupName("gr1"),
 			datastoreError: nil,
 			outError:       nil,
 		},
@@ -305,8 +310,8 @@ func TestInventoryUpdateDeviceGroup(t *testing.T) {
 	for name, tc := range testCases {
 		t.Logf("test case: %s", name)
 
-		db := &MockDataStore{}
-		db.On("UpdateDeviceGroup", AnythingOfType("main.DeviceID"), AnythingOfType("main.GroupName")).
+		db := &mstore.DataStore{}
+		db.On("UpdateDeviceGroup", mock.AnythingOfType("model.DeviceID"), mock.AnythingOfType("model.GroupName")).
 			Return(tc.datastoreError)
 		i := invForTest(db)
 
@@ -326,22 +331,22 @@ func TestInventoryListGroups(t *testing.T) {
 	t.Parallel()
 
 	testCases := map[string]struct {
-		inputGroups    []GroupName
+		inputGroups    []model.GroupName
 		datastoreError error
-		outputGroups   []GroupName
+		outputGroups   []model.GroupName
 		outError       error
 	}{
 		"some groups": {
-			inputGroups:  []GroupName{"foo", "bar"},
-			outputGroups: []GroupName{"foo", "bar"},
+			inputGroups:  []model.GroupName{"foo", "bar"},
+			outputGroups: []model.GroupName{"foo", "bar"},
 		},
 		"no groups - nil": {
 			inputGroups:  nil,
-			outputGroups: []GroupName{},
+			outputGroups: []model.GroupName{},
 		},
 		"no groups - empty slice": {
-			inputGroups:  []GroupName{},
-			outputGroups: []GroupName{},
+			inputGroups:  []model.GroupName{},
+			outputGroups: []model.GroupName{},
 		},
 		"error": {
 			datastoreError: errors.New("random error"),
@@ -352,7 +357,7 @@ func TestInventoryListGroups(t *testing.T) {
 	for name, tc := range testCases {
 		t.Logf("test case: %s", name)
 
-		db := &MockDataStore{}
+		db := &mstore.DataStore{}
 
 		db.On("ListGroups").Return(tc.inputGroups, tc.datastoreError)
 		i := invForTest(db)
@@ -376,24 +381,24 @@ func TestInventoryListDevicesByGroup(t *testing.T) {
 	testCases := map[string]struct {
 		DatastoreError error
 		OutError       string
-		OutDevices     []DeviceID
+		OutDevices     []model.DeviceID
 	}{
 		"success": {
 			DatastoreError: nil,
 			OutError:       "",
-			OutDevices: []DeviceID{
-				DeviceID("1"),
-				DeviceID("2"),
-				DeviceID("3"),
+			OutDevices: []model.DeviceID{
+				model.DeviceID("1"),
+				model.DeviceID("2"),
+				model.DeviceID("3"),
 			},
 		},
 		"success - empty list": {
 			DatastoreError: nil,
 			OutError:       "",
-			OutDevices:     []DeviceID{},
+			OutDevices:     []model.DeviceID{},
 		},
 		"datastore error - group not found": {
-			DatastoreError: ErrGroupNotFound,
+			DatastoreError: store.ErrGroupNotFound,
 			OutError:       "group not found",
 			OutDevices:     nil,
 		},
@@ -407,12 +412,12 @@ func TestInventoryListDevicesByGroup(t *testing.T) {
 	for name, tc := range testCases {
 		t.Logf("test case: %s", name)
 
-		db := &MockDataStore{}
+		db := &mstore.DataStore{}
 
 		db.On("GetDevicesByGroup",
-			AnythingOfType("main.GroupName"),
-			AnythingOfType("int"),
-			AnythingOfType("int"),
+			mock.AnythingOfType("model.GroupName"),
+			mock.AnythingOfType("int"),
+			mock.AnythingOfType("int"),
 		).Return(tc.OutDevices, tc.DatastoreError)
 
 		i := invForTest(db)
@@ -437,43 +442,43 @@ func TestInventoryGetDeviceGroup(t *testing.T) {
 
 	testCases := map[string]struct {
 		DatastoreError error
-		DatastoreGroup GroupName
+		DatastoreGroup model.GroupName
 		OutError       error
-		OutGroup       GroupName
+		OutGroup       model.GroupName
 	}{
 		"success - device has group": {
 			DatastoreError: nil,
-			DatastoreGroup: GroupName("dev"),
+			DatastoreGroup: model.GroupName("dev"),
 			OutError:       nil,
-			OutGroup:       GroupName("dev"),
+			OutGroup:       model.GroupName("dev"),
 		},
 		"success - device has no group": {
 			DatastoreError: nil,
-			DatastoreGroup: GroupName(""),
+			DatastoreGroup: model.GroupName(""),
 			OutError:       nil,
-			OutGroup:       GroupName(""),
+			OutGroup:       model.GroupName(""),
 		},
 		"datastore error - device not found": {
-			DatastoreError: ErrDevNotFound,
-			DatastoreGroup: GroupName(""),
-			OutError:       ErrDevNotFound,
-			OutGroup:       GroupName(""),
+			DatastoreError: store.ErrDevNotFound,
+			DatastoreGroup: model.GroupName(""),
+			OutError:       store.ErrDevNotFound,
+			OutGroup:       model.GroupName(""),
 		},
 		"datastore error - generic": {
 			DatastoreError: errors.New("datastore error"),
-			DatastoreGroup: GroupName(""),
+			DatastoreGroup: model.GroupName(""),
 			OutError:       errors.New("failed to get device's group: datastore error"),
-			OutGroup:       GroupName(""),
+			OutGroup:       model.GroupName(""),
 		},
 	}
 
 	for name, tc := range testCases {
 		t.Logf("test case: %s", name)
 
-		db := &MockDataStore{}
+		db := &mstore.DataStore{}
 
 		db.On("GetDeviceGroup",
-			AnythingOfType("main.DeviceID"),
+			mock.AnythingOfType("model.DeviceID"),
 		).Return(tc.OutGroup, tc.DatastoreError)
 
 		i := invForTest(db)
@@ -503,8 +508,8 @@ func TestInventoryDeleteDevice(t *testing.T) {
 			outError:       nil,
 		},
 		"no device": {
-			datastoreError: ErrDevNotFound,
-			outError:       ErrDevNotFound,
+			datastoreError: store.ErrDevNotFound,
+			outError:       store.ErrDevNotFound,
 		},
 		"datastore error": {
 			datastoreError: errors.New("db connection failed"),
@@ -515,13 +520,13 @@ func TestInventoryDeleteDevice(t *testing.T) {
 	for name, tc := range testCases {
 		t.Run(fmt.Sprintf("test case: %s", name), func(t *testing.T) {
 
-			db := &MockDataStore{}
+			db := &mstore.DataStore{}
 			db.On("DeleteDevice",
-				AnythingOfType("DeviceID"),
+				mock.AnythingOfType("DeviceID"),
 			).Return(tc.datastoreError)
 			i := invForTest(db)
 
-			err := i.DeleteDevice(DeviceID("foo"))
+			err := i.DeleteDevice(model.DeviceID("foo"))
 
 			if tc.outError != nil {
 				if assert.Error(t, err) {
@@ -537,7 +542,7 @@ func TestInventoryDeleteDevice(t *testing.T) {
 func TestNewInventory(t *testing.T) {
 	t.Parallel()
 
-	i := NewInventory(&MockDataStore{})
+	i := NewInventory(&mstore.DataStore{})
 
 	assert.NotNil(t, i)
 }

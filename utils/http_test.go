@@ -14,11 +14,12 @@
 package utils
 
 import (
-	"github.com/ant0ine/go-json-rest/rest"
-	"github.com/stretchr/testify/assert"
 	"net/http"
 	neturl "net/url"
 	"testing"
+
+	"github.com/ant0ine/go-json-rest/rest"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestMsgQueryParmInvalid(t *testing.T) {

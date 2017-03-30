@@ -11,12 +11,14 @@
 //    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
-package main
+package http
 
 import (
-	"github.com/ant0ine/go-json-rest/rest"
-	"github.com/mendersoftware/inventory/utils"
 	"net/http"
+
+	"github.com/ant0ine/go-json-rest/rest"
+
+	"github.com/mendersoftware/inventory/utils"
 )
 
 type HttpOptionsGenerator func(methods []string) rest.HandlerFunc
