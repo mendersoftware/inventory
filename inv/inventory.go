@@ -46,7 +46,7 @@ func NewInventory(d store.DataStore) *Inventory {
 }
 
 func (i *Inventory) ListDevices(ctx context.Context, skip int, limit int, filters []store.Filter, sort *store.Sort, hasGroup *bool) ([]model.Device, error) {
-	devs, err := i.db.GetDevices(skip, limit, filters, sort, hasGroup)
+	devs, err := i.db.GetDevices(ctx, skip, limit, filters, sort, hasGroup)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to fetch devices")
 	}
@@ -55,7 +55,7 @@ func (i *Inventory) ListDevices(ctx context.Context, skip int, limit int, filter
 }
 
 func (i *Inventory) GetDevice(ctx context.Context, id model.DeviceID) (*model.Device, error) {
-	dev, err := i.db.GetDevice(id)
+	dev, err := i.db.GetDevice(ctx, id)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to fetch device")
 	}
@@ -69,7 +69,7 @@ func (i *Inventory) AddDevice(ctx context.Context, dev *model.Device) error {
 	now := time.Now()
 	dev.CreatedTs = now
 	dev.UpdatedTs = now
-	err := i.db.AddDevice(dev)
+	err := i.db.AddDevice(ctx, dev)
 	if err != nil {
 		return errors.Wrap(err, "failed to add device")
 	}
@@ -77,7 +77,7 @@ func (i *Inventory) AddDevice(ctx context.Context, dev *model.Device) error {
 }
 
 func (i *Inventory) DeleteDevice(ctx context.Context, id model.DeviceID) error {
-	err := i.db.DeleteDevice(id)
+	err := i.db.DeleteDevice(ctx, id)
 	switch err {
 	case nil:
 		return nil
@@ -89,7 +89,7 @@ func (i *Inventory) DeleteDevice(ctx context.Context, id model.DeviceID) error {
 }
 
 func (i *Inventory) UpsertAttributes(ctx context.Context, id model.DeviceID, attrs model.DeviceAttributes) error {
-	if err := i.db.UpsertAttributes(id, attrs); err != nil {
+	if err := i.db.UpsertAttributes(ctx, id, attrs); err != nil {
 		return errors.Wrap(err, "failed to upsert attributes in db")
 	}
 
@@ -97,7 +97,7 @@ func (i *Inventory) UpsertAttributes(ctx context.Context, id model.DeviceID, att
 }
 
 func (i *Inventory) UnsetDeviceGroup(ctx context.Context, id model.DeviceID, groupName model.GroupName) error {
-	err := i.db.UnsetDeviceGroup(id, groupName)
+	err := i.db.UnsetDeviceGroup(ctx, id, groupName)
 	if err != nil {
 		if err.Error() == store.ErrDevNotFound.Error() {
 			return err
@@ -108,7 +108,7 @@ func (i *Inventory) UnsetDeviceGroup(ctx context.Context, id model.DeviceID, gro
 }
 
 func (i *Inventory) UpdateDeviceGroup(ctx context.Context, devid model.DeviceID, group model.GroupName) error {
-	err := i.db.UpdateDeviceGroup(devid, group)
+	err := i.db.UpdateDeviceGroup(ctx, devid, group)
 	if err != nil {
 		return errors.Wrap(err, "failed to add device to group")
 	}
@@ -116,7 +116,7 @@ func (i *Inventory) UpdateDeviceGroup(ctx context.Context, devid model.DeviceID,
 }
 
 func (i *Inventory) ListGroups(ctx context.Context) ([]model.GroupName, error) {
-	groups, err := i.db.ListGroups()
+	groups, err := i.db.ListGroups(ctx)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to list groups")
 	}
@@ -128,7 +128,7 @@ func (i *Inventory) ListGroups(ctx context.Context) ([]model.GroupName, error) {
 }
 
 func (i *Inventory) ListDevicesByGroup(ctx context.Context, group model.GroupName, skip, limit int) ([]model.DeviceID, error) {
-	ids, err := i.db.GetDevicesByGroup(group, skip, limit)
+	ids, err := i.db.GetDevicesByGroup(ctx, group, skip, limit)
 	if err != nil {
 		if err == store.ErrGroupNotFound {
 			return nil, err
@@ -141,7 +141,7 @@ func (i *Inventory) ListDevicesByGroup(ctx context.Context, group model.GroupNam
 }
 
 func (i *Inventory) GetDeviceGroup(ctx context.Context, id model.DeviceID) (model.GroupName, error) {
-	group, err := i.db.GetDeviceGroup(id)
+	group, err := i.db.GetDeviceGroup(ctx, id)
 	if err != nil {
 		if err == store.ErrDevNotFound {
 			return "", err
