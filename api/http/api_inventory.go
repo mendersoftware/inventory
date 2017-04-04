@@ -200,7 +200,7 @@ func (i *InventoryHandlers) GetDevicesHandler(w rest.ResponseWriter, r *rest.Req
 	}
 
 	//get one extra device to see if there's a 'next' page
-	devs, err := inv.ListDevices(int((page-1)*perPage), int(perPage+1), filters, sort, hasGroup)
+	devs, err := inv.ListDevices(ctx, int((page-1)*perPage), int(perPage+1), filters, sort, hasGroup)
 	if err != nil {
 		restErrWithLogInternal(w, r, l, err)
 		return
@@ -234,7 +234,7 @@ func (i *InventoryHandlers) GetDeviceHandler(w rest.ResponseWriter, r *rest.Requ
 		return
 	}
 
-	dev, err := inv.GetDevice(model.DeviceID(deviceID))
+	dev, err := inv.GetDevice(ctx, model.DeviceID(deviceID))
 	if err != nil {
 		restErrWithLogInternal(w, r, l, err)
 		return
@@ -260,7 +260,7 @@ func (i *InventoryHandlers) DeleteDeviceHandler(w rest.ResponseWriter, r *rest.R
 		return
 	}
 
-	err = inv.DeleteDevice(model.DeviceID(deviceID))
+	err = inv.DeleteDevice(ctx, model.DeviceID(deviceID))
 
 	if err != nil && err != store.ErrDevNotFound {
 		restErrWithLogInternal(w, r, l, err)
@@ -287,7 +287,7 @@ func (i *InventoryHandlers) AddDeviceHandler(w rest.ResponseWriter, r *rest.Requ
 		return
 	}
 
-	err = inv.AddDevice(dev)
+	err = inv.AddDevice(ctx, dev)
 	if err != nil {
 		if cause := errors.Cause(err); cause != nil && cause == store.ErrDuplicatedDeviceId {
 			restErrWithLogMsg(w, r, l, err, http.StatusConflict, "device with specified ID already exists")
@@ -327,7 +327,7 @@ func (i *InventoryHandlers) PatchDeviceAttributesHandler(w rest.ResponseWriter, 
 		return
 	}
 
-	err = inv.UpsertAttributes(model.DeviceID(idata.Subject), attrs)
+	err = inv.UpsertAttributes(ctx, model.DeviceID(idata.Subject), attrs)
 	if err != nil {
 		restErrWithLogInternal(w, r, l, err)
 		return
@@ -350,7 +350,7 @@ func (i *InventoryHandlers) DeleteDeviceGroupHandler(w rest.ResponseWriter, r *r
 		return
 	}
 
-	err = inv.UnsetDeviceGroup(model.DeviceID(deviceID), model.GroupName(groupName))
+	err = inv.UnsetDeviceGroup(ctx, model.DeviceID(deviceID), model.GroupName(groupName))
 	if err != nil {
 		cause := errors.Cause(err)
 		if cause != nil {
@@ -392,7 +392,7 @@ func (i *InventoryHandlers) AddDeviceToGroupHandler(w rest.ResponseWriter, r *re
 		return
 	}
 
-	err = inv.UpdateDeviceGroup(model.DeviceID(devId), model.GroupName(group.Group))
+	err = inv.UpdateDeviceGroup(ctx, model.DeviceID(devId), model.GroupName(group.Group))
 	if err != nil {
 		if cause := errors.Cause(err); cause != nil && cause == store.ErrDevNotFound {
 			restErrWithLog(w, r, l, err, http.StatusNotFound)
@@ -424,7 +424,7 @@ func (i *InventoryHandlers) GetDevicesByGroup(w rest.ResponseWriter, r *rest.Req
 	}
 
 	//get one extra device to see if there's a 'next' page
-	ids, err := inv.ListDevicesByGroup(model.GroupName(group), int((page-1)*perPage), int(perPage+1))
+	ids, err := inv.ListDevicesByGroup(ctx, model.GroupName(group), int((page-1)*perPage), int(perPage+1))
 	if err != nil {
 		if err == store.ErrGroupNotFound {
 			restErrWithLog(w, r, l, err, http.StatusNotFound)
@@ -493,7 +493,7 @@ func (i *InventoryHandlers) GetGroupsHandler(w rest.ResponseWriter, r *rest.Requ
 		return
 	}
 
-	groups, err := inv.ListGroups()
+	groups, err := inv.ListGroups(ctx)
 	if err != nil {
 		restErrWithLogInternal(w, r, l, err)
 		return
@@ -519,7 +519,7 @@ func (i *InventoryHandlers) GetDeviceGroupHandler(w rest.ResponseWriter, r *rest
 		return
 	}
 
-	group, err := inv.GetDeviceGroup(model.DeviceID(deviceID))
+	group, err := inv.GetDeviceGroup(ctx, model.DeviceID(deviceID))
 	if err != nil {
 		if err == store.ErrDevNotFound {
 			restErrWithLog(w, r, l, store.ErrDevNotFound, http.StatusNotFound)
