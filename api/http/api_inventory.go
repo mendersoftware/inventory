@@ -22,7 +22,6 @@ import (
 	"github.com/asaskevich/govalidator"
 	"github.com/mendersoftware/go-lib-micro/log"
 	"github.com/mendersoftware/go-lib-micro/requestid"
-	"github.com/mendersoftware/go-lib-micro/requestlog"
 	"github.com/pkg/errors"
 
 	inventory "github.com/mendersoftware/inventory/inv"
@@ -166,7 +165,9 @@ func parseFilterParams(r *rest.Request) ([]store.Filter, error) {
 }
 
 func (i *InventoryHandlers) GetDevicesHandler(w rest.ResponseWriter, r *rest.Request) {
-	l := requestlog.GetRequestLogger(r.Env)
+	ctx := r.Context()
+
+	l := log.FromContext(ctx)
 
 	page, perPage, err := utils.ParsePagination(r)
 	if err != nil {
@@ -221,8 +222,11 @@ func (i *InventoryHandlers) GetDevicesHandler(w rest.ResponseWriter, r *rest.Req
 }
 
 func (i *InventoryHandlers) GetDeviceHandler(w rest.ResponseWriter, r *rest.Request) {
+	ctx := r.Context()
+
+	l := log.FromContext(ctx)
+
 	deviceID := r.PathParam("id")
-	l := requestlog.GetRequestLogger(r.Env)
 
 	inv, err := i.createInventory(l)
 	if err != nil {
@@ -244,8 +248,11 @@ func (i *InventoryHandlers) GetDeviceHandler(w rest.ResponseWriter, r *rest.Requ
 }
 
 func (i *InventoryHandlers) DeleteDeviceHandler(w rest.ResponseWriter, r *rest.Request) {
+	ctx := r.Context()
+
+	l := log.FromContext(ctx)
+
 	deviceID := r.PathParam("id")
-	l := requestlog.GetRequestLogger(r.Env)
 
 	inv, err := i.createInventory(l)
 	if err != nil {
@@ -264,7 +271,9 @@ func (i *InventoryHandlers) DeleteDeviceHandler(w rest.ResponseWriter, r *rest.R
 }
 
 func (i *InventoryHandlers) AddDeviceHandler(w rest.ResponseWriter, r *rest.Request) {
-	l := requestlog.GetRequestLogger(r.Env)
+	ctx := r.Context()
+
+	l := log.FromContext(ctx)
 
 	dev, err := parseDevice(r)
 	if err != nil {
@@ -293,7 +302,9 @@ func (i *InventoryHandlers) AddDeviceHandler(w rest.ResponseWriter, r *rest.Requ
 }
 
 func (i *InventoryHandlers) PatchDeviceAttributesHandler(w rest.ResponseWriter, r *rest.Request) {
-	l := requestlog.GetRequestLogger(r.Env)
+	ctx := r.Context()
+
+	l := log.FromContext(ctx)
 
 	//get device ID from JWT token
 	idata, err := identity.ExtractIdentityFromHeaders(r.Header)
@@ -326,7 +337,9 @@ func (i *InventoryHandlers) PatchDeviceAttributesHandler(w rest.ResponseWriter, 
 }
 
 func (i *InventoryHandlers) DeleteDeviceGroupHandler(w rest.ResponseWriter, r *rest.Request) {
-	l := requestlog.GetRequestLogger(r.Env)
+	ctx := r.Context()
+
+	l := log.FromContext(ctx)
 
 	deviceID := r.PathParam("id")
 	groupName := r.PathParam("name")
@@ -354,7 +367,10 @@ func (i *InventoryHandlers) DeleteDeviceGroupHandler(w rest.ResponseWriter, r *r
 }
 
 func (i *InventoryHandlers) AddDeviceToGroupHandler(w rest.ResponseWriter, r *rest.Request) {
-	l := requestlog.GetRequestLogger(r.Env)
+	ctx := r.Context()
+
+	l := log.FromContext(ctx)
+
 	devId := r.PathParam("id")
 
 	var group InventoryApiGroup
@@ -389,7 +405,9 @@ func (i *InventoryHandlers) AddDeviceToGroupHandler(w rest.ResponseWriter, r *re
 }
 
 func (i *InventoryHandlers) GetDevicesByGroup(w rest.ResponseWriter, r *rest.Request) {
-	l := requestlog.GetRequestLogger(r.Env)
+	ctx := r.Context()
+
+	l := log.FromContext(ctx)
 
 	group := r.PathParam("name")
 
@@ -465,7 +483,9 @@ func parseAttributes(r *rest.Request) (model.DeviceAttributes, error) {
 }
 
 func (i *InventoryHandlers) GetGroupsHandler(w rest.ResponseWriter, r *rest.Request) {
-	l := requestlog.GetRequestLogger(r.Env)
+	ctx := r.Context()
+
+	l := log.FromContext(ctx)
 
 	inv, err := i.createInventory(l)
 	if err != nil {
@@ -487,8 +507,11 @@ func (i *InventoryHandlers) GetGroupsHandler(w rest.ResponseWriter, r *rest.Requ
 }
 
 func (i *InventoryHandlers) GetDeviceGroupHandler(w rest.ResponseWriter, r *rest.Request) {
+	ctx := r.Context()
+
+	l := log.FromContext(ctx)
+
 	deviceID := r.PathParam("id")
-	l := requestlog.GetRequestLogger(r.Env)
 
 	inv, err := i.createInventory(l)
 	if err != nil {
