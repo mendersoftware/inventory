@@ -204,8 +204,10 @@ func TestMongoGetDevices(t *testing.T) {
 
 		store := NewDataStoreMongoWithSession(session)
 
+		ctx := context.Background()
+
 		//test
-		devs, err := store.GetDevices(tc.skip, tc.limit, tc.filters, tc.sort, tc.hasGroup)
+		devs, err := store.GetDevices(ctx, tc.skip, tc.limit, tc.filters, tc.sort, tc.hasGroup)
 		assert.NoError(t, err, "failed to get devices")
 
 		assert.Equal(t, len(tc.expected), len(devs))
@@ -257,7 +259,9 @@ func TestMongoGetDevice(t *testing.T) {
 			session.DB(DbName).C(DbDevicesColl).Insert(testCase.InputDevice)
 		}
 
-		dbdev, err := store.GetDevice(testCase.InputID)
+		ctx := context.Background()
+
+		dbdev, err := store.GetDevice(ctx, testCase.InputID)
 
 		if testCase.InputDevice != nil {
 			assert.NotNil(t, dbdev, "expected to device of ID %s to be found", testCase.InputDevice.ID)
@@ -343,7 +347,8 @@ func TestMongoAddDevice(t *testing.T) {
 		session := db.Session()
 		store := NewDataStoreMongoWithSession(session)
 
-		err := store.AddDevice(testCase.InputDevice)
+		ctx := context.Background()
+		err := store.AddDevice(ctx, testCase.InputDevice)
 
 		if testCase.OutputError != nil {
 			assert.EqualError(t, err, testCase.OutputError.Error())
@@ -689,7 +694,8 @@ func TestMongoUpsertAttributes(t *testing.T) {
 
 		//test
 		d := NewDataStoreMongoWithSession(s)
-		err := d.UpsertAttributes(tc.inDevId, tc.inAttrs)
+		ctx := context.Background()
+		err := d.UpsertAttributes(ctx, tc.inDevId, tc.inAttrs)
 		assert.NoError(t, err, "UpsertAttributes failed")
 
 		//get the device back
@@ -768,7 +774,9 @@ func TestMongoUpdateDeviceGroup(t *testing.T) {
 			session.DB(DbName).C(DbDevicesColl).Insert(testCase.InputDevice)
 		}
 
-		err := store.UpdateDeviceGroup(testCase.InputDeviceID, testCase.InputGroupName)
+		ctx := context.Background()
+
+		err := store.UpdateDeviceGroup(ctx, testCase.InputDeviceID, testCase.InputGroupName)
 		if testCase.OutputError != nil {
 			assert.Error(t, err, "expected error")
 
@@ -874,7 +882,9 @@ func TestMongoUnsetDevicesGroupWithGroupName(t *testing.T) {
 			session.DB(DbName).C(DbDevicesColl).Insert(testCase.InputDevice)
 		}
 
-		err := store.UnsetDeviceGroup(testCase.InputDeviceID, testCase.InputGroupName)
+		ctx := context.Background()
+
+		err := store.UnsetDeviceGroup(ctx, testCase.InputDeviceID, testCase.InputGroupName)
 		if testCase.OutputError != nil {
 			assert.Error(t, err, "expected error")
 
@@ -961,7 +971,8 @@ func TestMongoListGroups(t *testing.T) {
 		// Make sure we start test with empty database
 		store := NewDataStoreMongoWithSession(session)
 
-		groups, err := store.ListGroups()
+		ctx := context.Background()
+		groups, err := store.ListGroups(ctx)
 		assert.NoError(t, err, "expected no error")
 
 		t.Logf("groups: %v", groups)
@@ -1095,7 +1106,8 @@ func TestGetDevicesByGroup(t *testing.T) {
 
 		store := NewDataStoreMongoWithSession(session)
 
-		devs, err := store.GetDevicesByGroup(tc.InputGroupName, tc.InputSkip, tc.InputLimit)
+		ctx := context.Background()
+		devs, err := store.GetDevicesByGroup(ctx, tc.InputGroupName, tc.InputSkip, tc.InputLimit)
 
 		if tc.OutputError != nil {
 			assert.EqualError(t, err, tc.OutputError.Error())
@@ -1160,7 +1172,8 @@ func TestGetDeviceGroup(t *testing.T) {
 
 		store := NewDataStoreMongoWithSession(session)
 
-		group, err := store.GetDeviceGroup(tc.InputDeviceID)
+		ctx := context.Background()
+		group, err := store.GetDeviceGroup(ctx, tc.InputDeviceID)
 
 		if tc.OutputError != nil {
 			assert.EqualError(t, err, tc.OutputError.Error())
@@ -1275,8 +1288,10 @@ func TestMongoDeleteDevice(t *testing.T) {
 
 		store := NewDataStoreMongoWithSession(session)
 
+		ctx := context.Background()
+
 		//test
-		err := store.DeleteDevice(tc.inputId)
+		err := store.DeleteDevice(ctx, tc.inputId)
 		if tc.err != nil {
 			assert.EqualError(t, err, tc.err.Error())
 		} else {
