@@ -23,7 +23,6 @@ import (
 
 	"github.com/ant0ine/go-json-rest/rest"
 	"github.com/ant0ine/go-json-rest/rest/test"
-	"github.com/mendersoftware/go-lib-micro/log"
 	"github.com/mendersoftware/go-lib-micro/requestid"
 	"github.com/mendersoftware/go-lib-micro/requestlog"
 	"github.com/pkg/errors"
@@ -76,8 +75,8 @@ func runTestRequest(t *testing.T, handler http.Handler, req *http.Request, resp 
 	utils.CheckRecordedResponse(t, recorded, resp)
 }
 
-func makeMockApiHandler(t *testing.T, f InventoryFactory) http.Handler {
-	handlers := NewInventoryApiHandlers(f)
+func makeMockApiHandler(t *testing.T, i inventory.InventoryApp) http.Handler {
+	handlers := NewInventoryApiHandlers(i)
 	assert.NotNil(t, handlers)
 
 	app, err := handlers.GetApp()
@@ -275,10 +274,7 @@ func TestApiInventoryGetDevices(t *testing.T) {
 			mock.AnythingOfType("*bool"),
 		).Return(mockListDevices(testCase.listDevicesNum), testCase.listDevicesErr)
 
-		factory := func(l *log.Logger) (inventory.InventoryApp, error) {
-			return &inv, nil
-		}
-		apih := makeMockApiHandler(t, factory)
+		apih := makeMockApiHandler(t, &inv)
 
 		runTestRequest(t, apih, testCase.inReq, testCase.resp)
 	}
@@ -431,10 +427,7 @@ func TestApiInventoryAddDevice(t *testing.T) {
 		inv := minventory.InventoryApp{}
 		inv.On("AddDevice", mock.AnythingOfType("*model.Device")).Return(tc.inventoryErr)
 
-		factory := func(l *log.Logger) (inventory.InventoryApp, error) {
-			return &inv, nil
-		}
-		apih := makeMockApiHandler(t, factory)
+		apih := makeMockApiHandler(t, &inv)
 
 		runTestRequest(t, apih, tc.inReq, tc.JSONResponseParams)
 	}
@@ -640,10 +633,7 @@ func TestApiInventoryUpsertAttributes(t *testing.T) {
 
 		inv.On("UpsertAttributes", mock.AnythingOfType("model.DeviceID"), mock.AnythingOfType("model.DeviceAttributes")).Return(tc.inventoryErr)
 
-		factory := func(l *log.Logger) (inventory.InventoryApp, error) {
-			return &inv, nil
-		}
-		apih := makeMockApiHandler(t, factory)
+		apih := makeMockApiHandler(t, &inv)
 
 		rest.ErrorFieldName = "error"
 
@@ -707,10 +697,7 @@ func TestApiInventoryDeleteDeviceGroup(t *testing.T) {
 		inv := minventory.InventoryApp{}
 		inv.On("UnsetDeviceGroup", mock.AnythingOfType("model.DeviceID"), mock.AnythingOfType("model.GroupName")).Return(tc.inventoryErr)
 
-		factory := func(l *log.Logger) (inventory.InventoryApp, error) {
-			return &inv, nil
-		}
-		apih := makeMockApiHandler(t, factory)
+		apih := makeMockApiHandler(t, &inv)
 
 		runTestRequest(t, apih, tc.inReq, tc.JSONResponseParams)
 	}
@@ -781,10 +768,7 @@ func TestApiInventoryAddDeviceToGroup(t *testing.T) {
 		inv := minventory.InventoryApp{}
 		inv.On("UpdateDeviceGroup", mock.AnythingOfType("model.DeviceID"), mock.AnythingOfType("model.GroupName")).Return(tc.inventoryErr)
 
-		factory := func(l *log.Logger) (inventory.InventoryApp, error) {
-			return &inv, nil
-		}
-		apih := makeMockApiHandler(t, factory)
+		apih := makeMockApiHandler(t, &inv)
 
 		runTestRequest(t, apih, tc.inReq, tc.JSONResponseParams)
 	}
@@ -831,10 +815,7 @@ func TestApiListGroups(t *testing.T) {
 		inv := minventory.InventoryApp{}
 		inv.On("ListGroups").Return(tc.outputGroups, tc.inventoryErr)
 
-		factory := func(l *log.Logger) (inventory.InventoryApp, error) {
-			return &inv, nil
-		}
-		apih := makeMockApiHandler(t, factory)
+		apih := makeMockApiHandler(t, &inv)
 
 		runTestRequest(t, apih, tc.inReq, tc.JSONResponseParams)
 	}
@@ -891,10 +872,7 @@ func TestApiGetDevice(t *testing.T) {
 		inv := minventory.InventoryApp{}
 		inv.On("GetDevice", tc.inDevId).Return(tc.outputDevice, tc.inventoryErr)
 
-		factory := func(l *log.Logger) (inventory.InventoryApp, error) {
-			return &inv, nil
-		}
-		apih := makeMockApiHandler(t, factory)
+		apih := makeMockApiHandler(t, &inv)
 
 		runTestRequest(t, apih, tc.inReq, tc.JSONResponseParams)
 	}
@@ -1001,10 +979,7 @@ func TestApiInventoryGetDevicesByGroup(t *testing.T) {
 			mock.AnythingOfType("int"),
 		).Return(mockListDeviceIDs(testCase.listDevicesNum), testCase.listDevicesErr)
 
-		factory := func(l *log.Logger) (inventory.InventoryApp, error) {
-			return &inv, nil
-		}
-		apih := makeMockApiHandler(t, factory)
+		apih := makeMockApiHandler(t, &inv)
 
 		runTestRequest(t, apih, testCase.inReq, testCase.resp)
 	}
@@ -1076,10 +1051,7 @@ func TestApiGetDeviceGroup(t *testing.T) {
 		inv := minventory.InventoryApp{}
 		inv.On("GetDeviceGroup", mock.AnythingOfType("model.DeviceID")).Return(tc.inventoryGroup, tc.inventoryErr)
 
-		factory := func(l *log.Logger) (inventory.InventoryApp, error) {
-			return &inv, nil
-		}
-		apih := makeMockApiHandler(t, factory)
+		apih := makeMockApiHandler(t, &inv)
 
 		runTestRequest(t, apih, tc.inReq, tc.JSONResponseParams)
 	}
@@ -1129,10 +1101,7 @@ func TestApiDeleteDevice(t *testing.T) {
 			inv := minventory.InventoryApp{}
 			inv.On("DeleteDevice", tc.inDevId).Return(tc.inventoryErr)
 
-			factory := func(l *log.Logger) (inventory.InventoryApp, error) {
-				return &inv, nil
-			}
-			apih := makeMockApiHandler(t, factory)
+			apih := makeMockApiHandler(t, &inv)
 
 			runTestRequest(t, apih, tc.inReq, tc.JSONResponseParams)
 		})

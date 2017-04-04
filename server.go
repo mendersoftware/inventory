@@ -45,16 +45,14 @@ func RunServer(c config.Reader) error {
 
 	l := log.New(log.Ctx{})
 
-	invapi := api_http.NewInventoryApiHandlers(
-		func(l *log.Logger) (inventory.InventoryApp, error) {
-			d, err := mongo.NewDataStoreMongo(c.GetString(SettingDb))
-			if err != nil {
-				return nil, errors.Wrap(err, "database connection failed")
-			}
+	db, err := mongo.NewDataStoreMongo(c.GetString(SettingDb))
+	if err != nil {
+		return errors.Wrap(err, "database connection failed")
+	}
 
-			inv := inventory.NewInventory(d)
-			return inv, nil
-		})
+	inv := inventory.NewInventory(db)
+
+	invapi := api_http.NewInventoryApiHandlers(inv)
 
 	api, err := SetupAPI(c.GetString(SettingMiddleware))
 	if err != nil {
