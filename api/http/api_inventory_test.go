@@ -14,6 +14,7 @@
 package http
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -266,7 +267,11 @@ func TestApiInventoryGetDevices(t *testing.T) {
 	for name, testCase := range testCases {
 		t.Logf("test case: %s", name)
 		inv := minventory.InventoryApp{}
+
+		ctx := context.Background()
+
 		inv.On("ListDevices",
+			ctx,
 			mock.AnythingOfType("int"),
 			mock.AnythingOfType("int"),
 			mock.AnythingOfType("[]store.Filter"),
@@ -425,7 +430,12 @@ func TestApiInventoryAddDevice(t *testing.T) {
 	for name, tc := range testCases {
 		t.Logf("test case: %s", name)
 		inv := minventory.InventoryApp{}
-		inv.On("AddDevice", mock.AnythingOfType("*model.Device")).Return(tc.inventoryErr)
+
+		ctx := context.Background()
+
+		inv.On("AddDevice",
+			ctx,
+			mock.AnythingOfType("*model.Device")).Return(tc.inventoryErr)
 
 		apih := makeMockApiHandler(t, &inv)
 
@@ -631,7 +641,12 @@ func TestApiInventoryUpsertAttributes(t *testing.T) {
 		t.Logf("test case: %s", name)
 		inv := minventory.InventoryApp{}
 
-		inv.On("UpsertAttributes", mock.AnythingOfType("model.DeviceID"), mock.AnythingOfType("model.DeviceAttributes")).Return(tc.inventoryErr)
+		ctx := context.Background()
+
+		inv.On("UpsertAttributes",
+			ctx,
+			mock.AnythingOfType("model.DeviceID"),
+			mock.AnythingOfType("model.DeviceAttributes")).Return(tc.inventoryErr)
 
 		apih := makeMockApiHandler(t, &inv)
 
@@ -695,7 +710,13 @@ func TestApiInventoryDeleteDeviceGroup(t *testing.T) {
 	for name, tc := range tcases {
 		t.Logf("test case: %s", name)
 		inv := minventory.InventoryApp{}
-		inv.On("UnsetDeviceGroup", mock.AnythingOfType("model.DeviceID"), mock.AnythingOfType("model.GroupName")).Return(tc.inventoryErr)
+
+		ctx := context.Background()
+
+		inv.On("UnsetDeviceGroup",
+			ctx,
+			mock.AnythingOfType("model.DeviceID"),
+			mock.AnythingOfType("model.GroupName")).Return(tc.inventoryErr)
 
 		apih := makeMockApiHandler(t, &inv)
 
@@ -766,7 +787,13 @@ func TestApiInventoryAddDeviceToGroup(t *testing.T) {
 	for name, tc := range tcases {
 		t.Logf("test case: %s", name)
 		inv := minventory.InventoryApp{}
-		inv.On("UpdateDeviceGroup", mock.AnythingOfType("model.DeviceID"), mock.AnythingOfType("model.GroupName")).Return(tc.inventoryErr)
+
+		ctx := context.Background()
+
+		inv.On("UpdateDeviceGroup",
+			ctx,
+			mock.AnythingOfType("model.DeviceID"),
+			mock.AnythingOfType("model.GroupName")).Return(tc.inventoryErr)
 
 		apih := makeMockApiHandler(t, &inv)
 
@@ -813,7 +840,10 @@ func TestApiListGroups(t *testing.T) {
 	for name, tc := range tcases {
 		t.Logf("test case: %s", name)
 		inv := minventory.InventoryApp{}
-		inv.On("ListGroups").Return(tc.outputGroups, tc.inventoryErr)
+
+		ctx := context.Background()
+
+		inv.On("ListGroups", ctx).Return(tc.outputGroups, tc.inventoryErr)
 
 		apih := makeMockApiHandler(t, &inv)
 
@@ -870,7 +900,10 @@ func TestApiGetDevice(t *testing.T) {
 	for name, tc := range tcases {
 		t.Logf("test case: %s", name)
 		inv := minventory.InventoryApp{}
-		inv.On("GetDevice", tc.inDevId).Return(tc.outputDevice, tc.inventoryErr)
+
+		ctx := context.Background()
+
+		inv.On("GetDevice", ctx, tc.inDevId).Return(tc.outputDevice, tc.inventoryErr)
 
 		apih := makeMockApiHandler(t, &inv)
 
@@ -973,7 +1006,11 @@ func TestApiInventoryGetDevicesByGroup(t *testing.T) {
 	for name, testCase := range testCases {
 		t.Logf("test case: %s", name)
 		inv := minventory.InventoryApp{}
+
+		ctx := context.Background()
+
 		inv.On("ListDevicesByGroup",
+			ctx,
 			mock.AnythingOfType("model.GroupName"),
 			mock.AnythingOfType("int"),
 			mock.AnythingOfType("int"),
@@ -1049,7 +1086,12 @@ func TestApiGetDeviceGroup(t *testing.T) {
 	for name, tc := range tcases {
 		t.Logf("test case: %s", name)
 		inv := minventory.InventoryApp{}
-		inv.On("GetDeviceGroup", mock.AnythingOfType("model.DeviceID")).Return(tc.inventoryGroup, tc.inventoryErr)
+
+		ctx := context.Background()
+
+		inv.On("GetDeviceGroup",
+			ctx,
+			mock.AnythingOfType("model.DeviceID")).Return(tc.inventoryGroup, tc.inventoryErr)
 
 		apih := makeMockApiHandler(t, &inv)
 
@@ -1099,7 +1141,12 @@ func TestApiDeleteDevice(t *testing.T) {
 			t.Parallel()
 
 			inv := minventory.InventoryApp{}
-			inv.On("DeleteDevice", tc.inDevId).Return(tc.inventoryErr)
+
+			ctx := context.Background()
+
+			inv.On("DeleteDevice",
+				ctx,
+				tc.inDevId).Return(tc.inventoryErr)
 
 			apih := makeMockApiHandler(t, &inv)
 
