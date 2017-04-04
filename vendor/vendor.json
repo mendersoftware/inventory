@@ -164,6 +164,18 @@
 			"revisionTime": "2017-03-21T09:59:38Z"
 		},
 		{
+			"checksumSHA1": "5g82TR0Rw7j5wt6xfC6OoOxtMSE=",
+			"path": "github.com/mendersoftware/go-lib-micro/rest_utils",
+			"revision": "2fb25d89b70c3986322411f7af22403d5861dbe4",
+			"revisionTime": "2017-03-30T12:29:32Z"
+		},
+		{
+			"checksumSHA1": "6GY2jM77obcngaNEcfsPq7WqFZg=",
+			"path": "github.com/mendersoftware/go-lib-micro/strings",
+			"revision": "2fb25d89b70c3986322411f7af22403d5861dbe4",
+			"revisionTime": "2017-03-30T12:29:32Z"
+		},
+		{
 			"checksumSHA1": "0fSGYeqn0/5xQUyno83RnF12M1c=",
 			"path": "github.com/mendersoftware/mendertesting",
 			"revision": "91f40791075aa9be42fc0c60593204836a55d501",
