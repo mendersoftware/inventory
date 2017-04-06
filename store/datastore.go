@@ -15,6 +15,7 @@
 package store
 
 import (
+	"context"
 	"errors"
 
 	"github.com/mendersoftware/inventory/model"
@@ -29,11 +30,11 @@ var (
 )
 
 type DataStore interface {
-	GetDevices(skip int, limit int, filters []Filter, sort *Sort, hasGroup *bool) ([]model.Device, error)
+	GetDevices(ctx context.Context, skip int, limit int, filters []Filter, sort *Sort, hasGroup *bool) ([]model.Device, error)
 
 	// find a device with given `id`, returns the device or nil,
 	// if device was not found, error and returned device are nil
-	GetDevice(id model.DeviceID) (*model.Device, error)
+	GetDevice(ctx context.Context, id model.DeviceID) (*model.Device, error)
 
 	// insert device into data store
 	//
@@ -41,27 +42,27 @@ type DataStore interface {
 	// 	ID: "foo",
 	// 	Attributes: map[string]string{"token": "123"),
 	// })
-	AddDevice(dev *model.Device) error
+	AddDevice(ctx context.Context, dev *model.Device) error
 
 	// delete device and all attributes
-	DeleteDevice(id model.DeviceID) error
+	DeleteDevice(ctx context.Context, id model.DeviceID) error
 
 	// Updates the device attributes in a differential manner.
 	// Nonexistent attributes are created, existing are overwritten; the device resource is also created if necessary.
-	UpsertAttributes(id model.DeviceID, attrs model.DeviceAttributes) error
+	UpsertAttributes(ctx context.Context, id model.DeviceID, attrs model.DeviceAttributes) error
 
 	// Unset group in device with `id`
-	UnsetDeviceGroup(id model.DeviceID, groupName model.GroupName) error
+	UnsetDeviceGroup(ctx context.Context, id model.DeviceID, groupName model.GroupName) error
 
 	// Updates device group
-	UpdateDeviceGroup(devid model.DeviceID, group model.GroupName) error
+	UpdateDeviceGroup(ctx context.Context, devid model.DeviceID, group model.GroupName) error
 
 	// List groups
-	ListGroups() ([]model.GroupName, error)
+	ListGroups(ctx context.Context) ([]model.GroupName, error)
 
 	// Lists devices belonging to a group
-	GetDevicesByGroup(group model.GroupName, skip, limit int) ([]model.DeviceID, error)
+	GetDevicesByGroup(ctx context.Context, group model.GroupName, skip, limit int) ([]model.DeviceID, error)
 
 	// Get device's group
-	GetDeviceGroup(id model.DeviceID) (model.GroupName, error)
+	GetDeviceGroup(ctx context.Context, id model.DeviceID) (model.GroupName, error)
 }

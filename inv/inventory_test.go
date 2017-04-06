@@ -14,6 +14,7 @@
 package inv
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"reflect"
@@ -79,8 +80,11 @@ func TestInventoryListDevices(t *testing.T) {
 	for name, tc := range testCases {
 		t.Logf("test case: %s", name)
 
+		ctx := context.Background()
+
 		db := &mstore.DataStore{}
 		db.On("GetDevices",
+			ctx,
 			mock.AnythingOfType("int"),
 			mock.AnythingOfType("int"),
 			tc.datastoreFilter,
@@ -89,7 +93,7 @@ func TestInventoryListDevices(t *testing.T) {
 		).Return(tc.outDevices, tc.datastoreError)
 		i := invForTest(db)
 
-		devs, err := i.ListDevices(1, 10, nil, nil, tc.inHasGroup)
+		devs, err := i.ListDevices(ctx, 1, 10, nil, nil, tc.inHasGroup)
 
 		if tc.outError != nil {
 			if assert.Error(t, err) {
@@ -130,13 +134,16 @@ func TestInventoryGetDevice(t *testing.T) {
 	for name, tc := range testCases {
 		t.Logf("test case: %s", name)
 
+		ctx := context.Background()
+
 		db := &mstore.DataStore{}
 		db.On("GetDevice",
+			ctx,
 			mock.AnythingOfType("model.DeviceID"),
 		).Return(tc.outDevice, tc.datastoreError)
 		i := invForTest(db)
 
-		dev, err := i.GetDevice(tc.devid)
+		dev, err := i.GetDevice(ctx, tc.devid)
 
 		if tc.outError != nil {
 			if assert.Error(t, err) {
@@ -181,12 +188,16 @@ func TestInventoryAddDevice(t *testing.T) {
 	for name, tc := range testCases {
 		t.Logf("test case: %s", name)
 
+		ctx := context.Background()
+
 		db := &mstore.DataStore{}
-		db.On("AddDevice", mock.AnythingOfType("*model.Device")).
+		db.On("AddDevice",
+			ctx,
+			mock.AnythingOfType("*model.Device")).
 			Return(tc.datastoreError)
 		i := invForTest(db)
 
-		err := i.AddDevice(tc.inDevice)
+		err := i.AddDevice(ctx, tc.inDevice)
 
 		if tc.outError != nil {
 			if assert.Error(t, err) {
@@ -218,12 +229,17 @@ func TestInventoryUpsertAttributes(t *testing.T) {
 	for name, tc := range testCases {
 		t.Logf("test case: %s", name)
 
+		ctx := context.Background()
+
 		db := &mstore.DataStore{}
-		db.On("UpsertAttributes", mock.AnythingOfType("model.DeviceID"), mock.AnythingOfType("model.DeviceAttributes")).
+		db.On("UpsertAttributes",
+			ctx,
+			mock.AnythingOfType("model.DeviceID"),
+			mock.AnythingOfType("model.DeviceAttributes")).
 			Return(tc.datastoreError)
 		i := invForTest(db)
 
-		err := i.UpsertAttributes("devid", model.DeviceAttributes{})
+		err := i.UpsertAttributes(ctx, "devid", model.DeviceAttributes{})
 
 		if tc.outError != nil {
 			if assert.Error(t, err) {
@@ -267,12 +283,17 @@ func TestInventoryUnsetDeviceGroup(t *testing.T) {
 	for name, tc := range testCases {
 		t.Logf("test case: %s", name)
 
+		ctx := context.Background()
+
 		db := &mstore.DataStore{}
-		db.On("UnsetDeviceGroup", mock.AnythingOfType("model.DeviceID"), mock.AnythingOfType("model.GroupName")).
+		db.On("UnsetDeviceGroup",
+			ctx,
+			mock.AnythingOfType("model.DeviceID"),
+			mock.AnythingOfType("model.GroupName")).
 			Return(tc.datastoreError)
 		i := invForTest(db)
 
-		err := i.UnsetDeviceGroup(tc.inDeviceID, tc.inGroupName)
+		err := i.UnsetDeviceGroup(ctx, tc.inDeviceID, tc.inGroupName)
 
 		if tc.outError != nil {
 			if assert.Error(t, err) {
@@ -310,12 +331,17 @@ func TestInventoryUpdateDeviceGroup(t *testing.T) {
 	for name, tc := range testCases {
 		t.Logf("test case: %s", name)
 
+		ctx := context.Background()
+
 		db := &mstore.DataStore{}
-		db.On("UpdateDeviceGroup", mock.AnythingOfType("model.DeviceID"), mock.AnythingOfType("model.GroupName")).
+		db.On("UpdateDeviceGroup",
+			ctx,
+			mock.AnythingOfType("model.DeviceID"),
+			mock.AnythingOfType("model.GroupName")).
 			Return(tc.datastoreError)
 		i := invForTest(db)
 
-		err := i.UpdateDeviceGroup(tc.inDeviceID, tc.inGroupName)
+		err := i.UpdateDeviceGroup(ctx, tc.inDeviceID, tc.inGroupName)
 
 		if tc.outError != nil {
 			if assert.Error(t, err) {
@@ -357,12 +383,15 @@ func TestInventoryListGroups(t *testing.T) {
 	for name, tc := range testCases {
 		t.Logf("test case: %s", name)
 
+		ctx := context.Background()
+
 		db := &mstore.DataStore{}
 
-		db.On("ListGroups").Return(tc.inputGroups, tc.datastoreError)
+		db.On("ListGroups", ctx).
+			Return(tc.inputGroups, tc.datastoreError)
 		i := invForTest(db)
 
-		groups, err := i.ListGroups()
+		groups, err := i.ListGroups(ctx)
 
 		if tc.outError != nil {
 			if assert.Error(t, err) {
@@ -412,9 +441,12 @@ func TestInventoryListDevicesByGroup(t *testing.T) {
 	for name, tc := range testCases {
 		t.Logf("test case: %s", name)
 
+		ctx := context.Background()
+
 		db := &mstore.DataStore{}
 
 		db.On("GetDevicesByGroup",
+			ctx,
 			mock.AnythingOfType("model.GroupName"),
 			mock.AnythingOfType("int"),
 			mock.AnythingOfType("int"),
@@ -422,7 +454,7 @@ func TestInventoryListDevicesByGroup(t *testing.T) {
 
 		i := invForTest(db)
 
-		devs, err := i.ListDevicesByGroup("foo", 1, 1)
+		devs, err := i.ListDevicesByGroup(ctx, "foo", 1, 1)
 
 		if tc.OutError != "" {
 			if assert.Error(t, err) {
@@ -475,15 +507,18 @@ func TestInventoryGetDeviceGroup(t *testing.T) {
 	for name, tc := range testCases {
 		t.Logf("test case: %s", name)
 
+		ctx := context.Background()
+
 		db := &mstore.DataStore{}
 
 		db.On("GetDeviceGroup",
+			ctx,
 			mock.AnythingOfType("model.DeviceID"),
 		).Return(tc.OutGroup, tc.DatastoreError)
 
 		i := invForTest(db)
 
-		group, err := i.GetDeviceGroup("foo")
+		group, err := i.GetDeviceGroup(ctx, "foo")
 
 		if tc.OutError != nil {
 			if assert.Error(t, err) {
@@ -519,14 +554,16 @@ func TestInventoryDeleteDevice(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(fmt.Sprintf("test case: %s", name), func(t *testing.T) {
+			ctx := context.Background()
 
 			db := &mstore.DataStore{}
 			db.On("DeleteDevice",
+				ctx,
 				mock.AnythingOfType("DeviceID"),
 			).Return(tc.datastoreError)
 			i := invForTest(db)
 
-			err := i.DeleteDevice(model.DeviceID("foo"))
+			err := i.DeleteDevice(ctx, model.DeviceID("foo"))
 
 			if tc.outError != nil {
 				if assert.Error(t, err) {

@@ -73,7 +73,7 @@ func NewDataStoreMongo(host string) (*DataStoreMongo, error) {
 	return db, nil
 }
 
-func (db *DataStoreMongo) GetDevices(skip int, limit int, filters []store.Filter, sort *store.Sort, hasGroup *bool) ([]model.Device, error) {
+func (db *DataStoreMongo) GetDevices(ctx context.Context, skip int, limit int, filters []store.Filter, sort *store.Sort, hasGroup *bool) ([]model.Device, error) {
 	s := db.session.Copy()
 	defer s.Close()
 	c := s.DB(DbName).C(DbDevicesColl)
@@ -127,7 +127,7 @@ func (db *DataStoreMongo) GetDevices(skip int, limit int, filters []store.Filter
 	return res, nil
 }
 
-func (db *DataStoreMongo) GetDevice(id model.DeviceID) (*model.Device, error) {
+func (db *DataStoreMongo) GetDevice(ctx context.Context, id model.DeviceID) (*model.Device, error) {
 	s := db.session.Copy()
 	defer s.Close()
 	c := s.DB(DbName).C(DbDevicesColl)
@@ -147,7 +147,7 @@ func (db *DataStoreMongo) GetDevice(id model.DeviceID) (*model.Device, error) {
 	return &res, nil
 }
 
-func (db *DataStoreMongo) AddDevice(dev *model.Device) error {
+func (db *DataStoreMongo) AddDevice(ctx context.Context, dev *model.Device) error {
 	s := db.session.Copy()
 	defer s.Close()
 	c := s.DB(DbName).C(DbDevicesColl)
@@ -162,7 +162,7 @@ func (db *DataStoreMongo) AddDevice(dev *model.Device) error {
 	return nil
 }
 
-func (db *DataStoreMongo) UpsertAttributes(id model.DeviceID, attrs model.DeviceAttributes) error {
+func (db *DataStoreMongo) UpsertAttributes(ctx context.Context, id model.DeviceID, attrs model.DeviceAttributes) error {
 	s := db.session.Copy()
 	defer s.Close()
 	c := s.DB(DbName).C(DbDevicesColl)
@@ -211,7 +211,7 @@ func mongoOperator(co store.ComparisonOperator) string {
 	return ""
 }
 
-func (db *DataStoreMongo) UnsetDeviceGroup(id model.DeviceID, groupName model.GroupName) error {
+func (db *DataStoreMongo) UnsetDeviceGroup(ctx context.Context, id model.DeviceID, groupName model.GroupName) error {
 	s := db.session.Copy()
 	defer s.Close()
 
@@ -235,7 +235,7 @@ func (db *DataStoreMongo) UnsetDeviceGroup(id model.DeviceID, groupName model.Gr
 	return nil
 }
 
-func (db *DataStoreMongo) UpdateDeviceGroup(devId model.DeviceID, newGroup model.GroupName) error {
+func (db *DataStoreMongo) UpdateDeviceGroup(ctx context.Context, devId model.DeviceID, newGroup model.GroupName) error {
 	s := db.session.Copy()
 	defer s.Close()
 	c := s.DB(DbName).C(DbDevicesColl)
@@ -250,7 +250,7 @@ func (db *DataStoreMongo) UpdateDeviceGroup(devId model.DeviceID, newGroup model
 	return nil
 }
 
-func (db *DataStoreMongo) ListGroups() ([]model.GroupName, error) {
+func (db *DataStoreMongo) ListGroups(ctx context.Context) ([]model.GroupName, error) {
 	s := db.session.Copy()
 	defer s.Close()
 	c := s.DB(DbName).C(DbDevicesColl)
@@ -263,7 +263,7 @@ func (db *DataStoreMongo) ListGroups() ([]model.GroupName, error) {
 	return groups, nil
 }
 
-func (db *DataStoreMongo) GetDevicesByGroup(group model.GroupName, skip, limit int) ([]model.DeviceID, error) {
+func (db *DataStoreMongo) GetDevicesByGroup(ctx context.Context, group model.GroupName, skip, limit int) ([]model.DeviceID, error) {
 	s := db.session.Copy()
 	defer s.Close()
 	c := s.DB(DbName).C(DbDevicesColl)
@@ -297,7 +297,7 @@ func (db *DataStoreMongo) GetDevicesByGroup(group model.GroupName, skip, limit i
 	return resIds, nil
 }
 
-func (db *DataStoreMongo) GetDeviceGroup(id model.DeviceID) (model.GroupName, error) {
+func (db *DataStoreMongo) GetDeviceGroup(ctx context.Context, id model.DeviceID) (model.GroupName, error) {
 	s := db.session.Copy()
 	defer s.Close()
 	c := s.DB(DbName).C(DbDevicesColl)
@@ -316,7 +316,7 @@ func (db *DataStoreMongo) GetDeviceGroup(id model.DeviceID) (model.GroupName, er
 	return dev.Group, nil
 }
 
-func (db *DataStoreMongo) DeleteDevice(id model.DeviceID) error {
+func (db *DataStoreMongo) DeleteDevice(ctx context.Context, id model.DeviceID) error {
 	s := db.session.Copy()
 	defer s.Close()
 

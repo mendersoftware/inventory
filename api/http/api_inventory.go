@@ -21,8 +21,7 @@ import (
 	"github.com/ant0ine/go-json-rest/rest"
 	"github.com/asaskevich/govalidator"
 	"github.com/mendersoftware/go-lib-micro/log"
-	"github.com/mendersoftware/go-lib-micro/requestid"
-	"github.com/mendersoftware/go-lib-micro/requestlog"
+	u "github.com/mendersoftware/go-lib-micro/rest_utils"
 	"github.com/pkg/errors"
 
 	inventory "github.com/mendersoftware/inventory/inv"
@@ -58,16 +57,14 @@ type InventoryApiGroup struct {
 	Group string `json:"group" valid:"required"`
 }
 
-type InventoryFactory func(l *log.Logger) (inventory.InventoryApp, error)
-
 type InventoryHandlers struct {
-	createInventory InventoryFactory
+	inventory inventory.InventoryApp
 }
 
 // return an ApiHandler for device admission app
-func NewInventoryApiHandlers(invF InventoryFactory) ApiHandler {
+func NewInventoryApiHandlers(i inventory.InventoryApp) ApiHandler {
 	return &InventoryHandlers{
-		invF,
+		inventory: i,
 	}
 }
 
@@ -166,42 +163,38 @@ func parseFilterParams(r *rest.Request) ([]store.Filter, error) {
 }
 
 func (i *InventoryHandlers) GetDevicesHandler(w rest.ResponseWriter, r *rest.Request) {
-	l := requestlog.GetRequestLogger(r.Env)
+	ctx := r.Context()
+
+	l := log.FromContext(ctx)
 
 	page, perPage, err := utils.ParsePagination(r)
 	if err != nil {
-		restErrWithLog(w, r, l, err, http.StatusBadRequest)
+		u.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
 		return
 	}
 
 	hasGroup, err := utils.ParseQueryParmBool(r, queryParamHasGroup, false, nil)
 	if err != nil {
-		restErrWithLog(w, r, l, err, http.StatusBadRequest)
+		u.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
 		return
 	}
 
 	sort, err := parseSortParam(r)
 	if err != nil {
-		restErrWithLog(w, r, l, err, http.StatusBadRequest)
+		u.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
 		return
 	}
 
 	filters, err := parseFilterParams(r)
 	if err != nil {
-		restErrWithLog(w, r, l, err, http.StatusBadRequest)
-		return
-	}
-
-	inv, err := i.createInventory(l)
-	if err != nil {
-		restErrWithLogInternal(w, r, l, err)
+		u.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
 		return
 	}
 
 	//get one extra device to see if there's a 'next' page
-	devs, err := inv.ListDevices(int((page-1)*perPage), int(perPage+1), filters, sort, hasGroup)
+	devs, err := i.inventory.ListDevices(ctx, int((page-1)*perPage), int(perPage+1), filters, sort, hasGroup)
 	if err != nil {
-		restErrWithLogInternal(w, r, l, err)
+		u.RestErrWithLogInternal(w, r, l, err)
 		return
 	}
 
@@ -221,22 +214,19 @@ func (i *InventoryHandlers) GetDevicesHandler(w rest.ResponseWriter, r *rest.Req
 }
 
 func (i *InventoryHandlers) GetDeviceHandler(w rest.ResponseWriter, r *rest.Request) {
+	ctx := r.Context()
+
+	l := log.FromContext(ctx)
+
 	deviceID := r.PathParam("id")
-	l := requestlog.GetRequestLogger(r.Env)
 
-	inv, err := i.createInventory(l)
+	dev, err := i.inventory.GetDevice(ctx, model.DeviceID(deviceID))
 	if err != nil {
-		restErrWithLogInternal(w, r, l, err)
-		return
-	}
-
-	dev, err := inv.GetDevice(model.DeviceID(deviceID))
-	if err != nil {
-		restErrWithLogInternal(w, r, l, err)
+		u.RestErrWithLogInternal(w, r, l, err)
 		return
 	}
 	if dev == nil {
-		restErrWithLog(w, r, l, store.ErrDevNotFound, http.StatusNotFound)
+		u.RestErrWithLog(w, r, l, store.ErrDevNotFound, http.StatusNotFound)
 		return
 	}
 
@@ -244,19 +234,15 @@ func (i *InventoryHandlers) GetDeviceHandler(w rest.ResponseWriter, r *rest.Requ
 }
 
 func (i *InventoryHandlers) DeleteDeviceHandler(w rest.ResponseWriter, r *rest.Request) {
+	ctx := r.Context()
+
+	l := log.FromContext(ctx)
+
 	deviceID := r.PathParam("id")
-	l := requestlog.GetRequestLogger(r.Env)
 
-	inv, err := i.createInventory(l)
-	if err != nil {
-		restErrWithLogInternal(w, r, l, err)
-		return
-	}
-
-	err = inv.DeleteDevice(model.DeviceID(deviceID))
-
+	err := i.inventory.DeleteDevice(ctx, model.DeviceID(deviceID))
 	if err != nil && err != store.ErrDevNotFound {
-		restErrWithLogInternal(w, r, l, err)
+		u.RestErrWithLogInternal(w, r, l, err)
 		return
 	}
 
@@ -264,27 +250,23 @@ func (i *InventoryHandlers) DeleteDeviceHandler(w rest.ResponseWriter, r *rest.R
 }
 
 func (i *InventoryHandlers) AddDeviceHandler(w rest.ResponseWriter, r *rest.Request) {
-	l := requestlog.GetRequestLogger(r.Env)
+	ctx := r.Context()
+
+	l := log.FromContext(ctx)
 
 	dev, err := parseDevice(r)
 	if err != nil {
-		restErrWithLog(w, r, l, err, http.StatusBadRequest)
+		u.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
 		return
 	}
 
-	inv, err := i.createInventory(l)
-	if err != nil {
-		restErrWithLogInternal(w, r, l, err)
-		return
-	}
-
-	err = inv.AddDevice(dev)
+	err = i.inventory.AddDevice(ctx, dev)
 	if err != nil {
 		if cause := errors.Cause(err); cause != nil && cause == store.ErrDuplicatedDeviceId {
-			restErrWithLogMsg(w, r, l, err, http.StatusConflict, "device with specified ID already exists")
+			u.RestErrWithLogMsg(w, r, l, err, http.StatusConflict, "device with specified ID already exists")
 			return
 		}
-		restErrWithLogInternal(w, r, l, err)
+		u.RestErrWithLogInternal(w, r, l, err)
 		return
 	}
 
@@ -293,32 +275,28 @@ func (i *InventoryHandlers) AddDeviceHandler(w rest.ResponseWriter, r *rest.Requ
 }
 
 func (i *InventoryHandlers) PatchDeviceAttributesHandler(w rest.ResponseWriter, r *rest.Request) {
-	l := requestlog.GetRequestLogger(r.Env)
+	ctx := r.Context()
+
+	l := log.FromContext(ctx)
 
 	//get device ID from JWT token
 	idata, err := identity.ExtractIdentityFromHeaders(r.Header)
 	if err != nil {
-		restErrWithLogMsg(w, r, l, err, http.StatusUnauthorized, "unauthorized")
+		u.RestErrWithLogMsg(w, r, l, err, http.StatusUnauthorized, "unauthorized")
 		return
 	}
 
 	//extract attributes from body
 	attrs, err := parseAttributes(r)
 	if err != nil {
-		restErrWithLog(w, r, l, err, http.StatusBadRequest)
+		u.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
 		return
 	}
 
 	//upsert the attributes
-	inv, err := i.createInventory(l)
+	err = i.inventory.UpsertAttributes(ctx, model.DeviceID(idata.Subject), attrs)
 	if err != nil {
-		restErrWithLogInternal(w, r, l, err)
-		return
-	}
-
-	err = inv.UpsertAttributes(model.DeviceID(idata.Subject), attrs)
-	if err != nil {
-		restErrWithLogInternal(w, r, l, err)
+		u.RestErrWithLogInternal(w, r, l, err)
 		return
 	}
 
@@ -326,27 +304,23 @@ func (i *InventoryHandlers) PatchDeviceAttributesHandler(w rest.ResponseWriter, 
 }
 
 func (i *InventoryHandlers) DeleteDeviceGroupHandler(w rest.ResponseWriter, r *rest.Request) {
-	l := requestlog.GetRequestLogger(r.Env)
+	ctx := r.Context()
+
+	l := log.FromContext(ctx)
 
 	deviceID := r.PathParam("id")
 	groupName := r.PathParam("name")
 
-	inv, err := i.createInventory(l)
-	if err != nil {
-		restErrWithLogInternal(w, r, l, err)
-		return
-	}
-
-	err = inv.UnsetDeviceGroup(model.DeviceID(deviceID), model.GroupName(groupName))
+	err := i.inventory.UnsetDeviceGroup(ctx, model.DeviceID(deviceID), model.GroupName(groupName))
 	if err != nil {
 		cause := errors.Cause(err)
 		if cause != nil {
 			if cause.Error() == store.ErrDevNotFound.Error() {
-				restErrWithLog(w, r, l, err, http.StatusNotFound)
+				u.RestErrWithLog(w, r, l, err, http.StatusNotFound)
 				return
 			}
 		}
-		restErrWithLogInternal(w, r, l, err)
+		u.RestErrWithLogInternal(w, r, l, err)
 		return
 	}
 
@@ -354,64 +328,57 @@ func (i *InventoryHandlers) DeleteDeviceGroupHandler(w rest.ResponseWriter, r *r
 }
 
 func (i *InventoryHandlers) AddDeviceToGroupHandler(w rest.ResponseWriter, r *rest.Request) {
-	l := requestlog.GetRequestLogger(r.Env)
+	ctx := r.Context()
+
+	l := log.FromContext(ctx)
+
 	devId := r.PathParam("id")
 
 	var group InventoryApiGroup
 	err := r.DecodeJsonPayload(&group)
 	if err != nil {
-		restErrWithLog(
+		u.RestErrWithLog(
 			w, r, l, errors.Wrap(err, "failed to decode device group data"),
 			http.StatusBadRequest)
 		return
 	}
 	if _, err = govalidator.ValidateStruct(group); err != nil {
-		restErrWithLog(w, r, l, err, http.StatusBadRequest)
+		u.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
 		return
 	}
 
-	inv, err := i.createInventory(l)
-	if err != nil {
-		restErrWithLogInternal(w, r, l, err)
-		return
-	}
-
-	err = inv.UpdateDeviceGroup(model.DeviceID(devId), model.GroupName(group.Group))
+	err = i.inventory.UpdateDeviceGroup(ctx, model.DeviceID(devId), model.GroupName(group.Group))
 	if err != nil {
 		if cause := errors.Cause(err); cause != nil && cause == store.ErrDevNotFound {
-			restErrWithLog(w, r, l, err, http.StatusNotFound)
+			u.RestErrWithLog(w, r, l, err, http.StatusNotFound)
 			return
 		}
-		restErrWithLogInternal(w, r, l, err)
+		u.RestErrWithLogInternal(w, r, l, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
 
 func (i *InventoryHandlers) GetDevicesByGroup(w rest.ResponseWriter, r *rest.Request) {
-	l := requestlog.GetRequestLogger(r.Env)
+	ctx := r.Context()
+
+	l := log.FromContext(ctx)
 
 	group := r.PathParam("name")
 
 	page, perPage, err := utils.ParsePagination(r)
 	if err != nil {
-		restErrWithLog(w, r, l, err, http.StatusBadRequest)
-		return
-	}
-
-	inv, err := i.createInventory(l)
-	if err != nil {
-		restErrWithLogInternal(w, r, l, err)
+		u.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
 		return
 	}
 
 	//get one extra device to see if there's a 'next' page
-	ids, err := inv.ListDevicesByGroup(model.GroupName(group), int((page-1)*perPage), int(perPage+1))
+	ids, err := i.inventory.ListDevicesByGroup(ctx, model.GroupName(group), int((page-1)*perPage), int(perPage+1))
 	if err != nil {
 		if err == store.ErrGroupNotFound {
-			restErrWithLog(w, r, l, err, http.StatusNotFound)
+			u.RestErrWithLog(w, r, l, err, http.StatusNotFound)
 		} else {
-			restErrWithLogInternal(w, r, l, err)
+			u.RestErrWithLogInternal(w, r, l, err)
 		}
 		return
 	}
@@ -465,17 +432,13 @@ func parseAttributes(r *rest.Request) (model.DeviceAttributes, error) {
 }
 
 func (i *InventoryHandlers) GetGroupsHandler(w rest.ResponseWriter, r *rest.Request) {
-	l := requestlog.GetRequestLogger(r.Env)
+	ctx := r.Context()
 
-	inv, err := i.createInventory(l)
-	if err != nil {
-		restErrWithLogInternal(w, r, l, err)
-		return
-	}
+	l := log.FromContext(ctx)
 
-	groups, err := inv.ListGroups()
+	groups, err := i.inventory.ListGroups(ctx)
 	if err != nil {
-		restErrWithLogInternal(w, r, l, err)
+		u.RestErrWithLogInternal(w, r, l, err)
 		return
 	}
 
@@ -487,21 +450,18 @@ func (i *InventoryHandlers) GetGroupsHandler(w rest.ResponseWriter, r *rest.Requ
 }
 
 func (i *InventoryHandlers) GetDeviceGroupHandler(w rest.ResponseWriter, r *rest.Request) {
+	ctx := r.Context()
+
+	l := log.FromContext(ctx)
+
 	deviceID := r.PathParam("id")
-	l := requestlog.GetRequestLogger(r.Env)
 
-	inv, err := i.createInventory(l)
-	if err != nil {
-		restErrWithLogInternal(w, r, l, err)
-		return
-	}
-
-	group, err := inv.GetDeviceGroup(model.DeviceID(deviceID))
+	group, err := i.inventory.GetDeviceGroup(ctx, model.DeviceID(deviceID))
 	if err != nil {
 		if err == store.ErrDevNotFound {
-			restErrWithLog(w, r, l, store.ErrDevNotFound, http.StatusNotFound)
+			u.RestErrWithLog(w, r, l, store.ErrDevNotFound, http.StatusNotFound)
 		} else {
-			restErrWithLogInternal(w, r, l, err)
+			u.RestErrWithLogInternal(w, r, l, err)
 		}
 		return
 	}
@@ -513,32 +473,4 @@ func (i *InventoryHandlers) GetDeviceGroupHandler(w rest.ResponseWriter, r *rest
 	}
 
 	w.WriteJson(ret)
-}
-
-// return selected http code + error message directly taken from error
-// log error
-func restErrWithLog(w rest.ResponseWriter, r *rest.Request, l *log.Logger, e error, code int) {
-	restErrWithLogMsg(w, r, l, e, code, e.Error())
-}
-
-// return http 500, with an "internal error" message
-// log full error
-func restErrWithLogInternal(w rest.ResponseWriter, r *rest.Request, l *log.Logger, e error) {
-	msg := "internal error"
-	e = errors.Wrap(e, msg)
-	restErrWithLogMsg(w, r, l, e, http.StatusInternalServerError, msg)
-}
-
-// return an error code with an overriden message (to avoid exposing the details)
-// log full error
-func restErrWithLogMsg(w rest.ResponseWriter, r *rest.Request, l *log.Logger, e error, code int, msg string) {
-	w.WriteHeader(code)
-	err := w.WriteJson(map[string]string{
-		rest.ErrorFieldName: msg,
-		"request_id":        requestid.GetReqId(r),
-	})
-	if err != nil {
-		panic(err)
-	}
-	l.F(log.Ctx{}).Error(errors.Wrap(e, msg).Error())
 }
