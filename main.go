@@ -71,7 +71,7 @@ func main() {
 
 	err = db.Migrate(ctx, mongo.DbVersion, nil)
 	if err != nil {
-		l.Fatal("failed to run migrations")
+		l.Fatalf("failed to run migrations: %v", err)
 	}
 
 	l.Fatal(RunServer(config.Config))
