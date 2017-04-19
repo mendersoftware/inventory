@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
+	mstore "github.com/mendersoftware/go-lib-micro/store"
 	"github.com/pkg/errors"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
@@ -84,7 +85,7 @@ func NewDataStoreMongo(host string) (*DataStoreMongo, error) {
 func (db *DataStoreMongo) GetDevices(ctx context.Context, skip int, limit int, filters []store.Filter, sort *store.Sort, hasGroup *bool) ([]model.Device, error) {
 	s := db.session.Copy()
 	defer s.Close()
-	c := s.DB(DbName).C(DbDevicesColl)
+	c := s.DB(mstore.DbFromContext(ctx, DbName)).C(DbDevicesColl)
 	res := []model.Device{}
 
 	queryFilters := make([]bson.M, 0)
@@ -138,7 +139,7 @@ func (db *DataStoreMongo) GetDevices(ctx context.Context, skip int, limit int, f
 func (db *DataStoreMongo) GetDevice(ctx context.Context, id model.DeviceID) (*model.Device, error) {
 	s := db.session.Copy()
 	defer s.Close()
-	c := s.DB(DbName).C(DbDevicesColl)
+	c := s.DB(mstore.DbFromContext(ctx, DbName)).C(DbDevicesColl)
 
 	res := model.Device{}
 
@@ -158,7 +159,7 @@ func (db *DataStoreMongo) GetDevice(ctx context.Context, id model.DeviceID) (*mo
 func (db *DataStoreMongo) AddDevice(ctx context.Context, dev *model.Device) error {
 	s := db.session.Copy()
 	defer s.Close()
-	c := s.DB(DbName).C(DbDevicesColl)
+	c := s.DB(mstore.DbFromContext(ctx, DbName)).C(DbDevicesColl)
 
 	err := c.Insert(dev)
 	if err != nil {
@@ -173,7 +174,7 @@ func (db *DataStoreMongo) AddDevice(ctx context.Context, dev *model.Device) erro
 func (db *DataStoreMongo) UpsertAttributes(ctx context.Context, id model.DeviceID, attrs model.DeviceAttributes) error {
 	s := db.session.Copy()
 	defer s.Close()
-	c := s.DB(DbName).C(DbDevicesColl)
+	c := s.DB(mstore.DbFromContext(ctx, DbName)).C(DbDevicesColl)
 
 	update := makeAttrUpsert(attrs)
 
@@ -234,7 +235,7 @@ func (db *DataStoreMongo) UnsetDeviceGroup(ctx context.Context, id model.DeviceI
 			},
 		},
 	}
-	if _, err := s.DB(DbName).C(DbDevicesColl).Find(query).Apply(update, nil); err != nil {
+	if _, err := s.DB(mstore.DbFromContext(ctx, DbName)).C(DbDevicesColl).Find(query).Apply(update, nil); err != nil {
 		if err.Error() == mgo.ErrNotFound.Error() {
 			return store.ErrDevNotFound
 		}
@@ -246,7 +247,7 @@ func (db *DataStoreMongo) UnsetDeviceGroup(ctx context.Context, id model.DeviceI
 func (db *DataStoreMongo) UpdateDeviceGroup(ctx context.Context, devId model.DeviceID, newGroup model.GroupName) error {
 	s := db.session.Copy()
 	defer s.Close()
-	c := s.DB(DbName).C(DbDevicesColl)
+	c := s.DB(mstore.DbFromContext(ctx, DbName)).C(DbDevicesColl)
 
 	err := c.UpdateId(devId, bson.M{"$set": &model.Device{Group: newGroup}})
 	if err != nil {
@@ -261,7 +262,7 @@ func (db *DataStoreMongo) UpdateDeviceGroup(ctx context.Context, devId model.Dev
 func (db *DataStoreMongo) ListGroups(ctx context.Context) ([]model.GroupName, error) {
 	s := db.session.Copy()
 	defer s.Close()
-	c := s.DB(DbName).C(DbDevicesColl)
+	c := s.DB(mstore.DbFromContext(ctx, DbName)).C(DbDevicesColl)
 
 	var groups []model.GroupName
 	err := c.Find(bson.M{}).Distinct("group", &groups)
@@ -274,7 +275,7 @@ func (db *DataStoreMongo) ListGroups(ctx context.Context) ([]model.GroupName, er
 func (db *DataStoreMongo) GetDevicesByGroup(ctx context.Context, group model.GroupName, skip, limit int) ([]model.DeviceID, error) {
 	s := db.session.Copy()
 	defer s.Close()
-	c := s.DB(DbName).C(DbDevicesColl)
+	c := s.DB(mstore.DbFromContext(ctx, DbName)).C(DbDevicesColl)
 
 	filter := bson.M{DbDevGroup: group}
 
@@ -308,7 +309,7 @@ func (db *DataStoreMongo) GetDevicesByGroup(ctx context.Context, group model.Gro
 func (db *DataStoreMongo) GetDeviceGroup(ctx context.Context, id model.DeviceID) (model.GroupName, error) {
 	s := db.session.Copy()
 	defer s.Close()
-	c := s.DB(DbName).C(DbDevicesColl)
+	c := s.DB(mstore.DbFromContext(ctx, DbName)).C(DbDevicesColl)
 
 	var dev model.Device
 
@@ -328,7 +329,7 @@ func (db *DataStoreMongo) DeleteDevice(ctx context.Context, id model.DeviceID) e
 	s := db.session.Copy()
 	defer s.Close()
 
-	if err := s.DB(DbName).C(DbDevicesColl).RemoveId(id); err != nil {
+	if err := s.DB(mstore.DbFromContext(ctx, DbName)).C(DbDevicesColl).RemoveId(id); err != nil {
 		if err.Error() == mgo.ErrNotFound.Error() {
 			return store.ErrDevNotFound
 		}
@@ -341,7 +342,7 @@ func (db *DataStoreMongo) DeleteDevice(ctx context.Context, id model.DeviceID) e
 func (db *DataStoreMongo) Migrate(ctx context.Context, version string, migrations []migrate.Migration) error {
 	m := migrate.DummyMigrator{
 		Session: db.session,
-		Db:      DbName,
+		Db:      mstore.DbFromContext(ctx, DbName),
 	}
 
 	ver, err := migrate.NewVersion(version)
