@@ -45,11 +45,6 @@
 			"revisionTime": "2016-10-29T20:57:26Z"
 		},
 		{
-			"checksumSHA1": "a2yC46a1qsJomgY6rb+FkTFiqmE=",
-			"path": "github.com/davecgh/go-spew/spew/testdata",
-			"revision": "5215b55f46b2b919f50a1df0eaa5886afe4e3b3d"
-		},
-		{
 			"checksumSHA1": "5LrCq/ydlbL6pq1cdmuxiw7QV98=",
 			"path": "github.com/hashicorp/hcl",
 			"revision": "2604f3bda7e8960c1be1063709e7d7f0765048d0"
@@ -92,11 +87,6 @@
 		{
 			"checksumSHA1": "fNlXQCQEnb+B3k5UDL/r15xtSJY=",
 			"path": "github.com/hashicorp/hcl/json/token",
-			"revision": "2604f3bda7e8960c1be1063709e7d7f0765048d0"
-		},
-		{
-			"checksumSHA1": "CI6O4QNY9X7HDPHYJCHN2jPCcK0=",
-			"path": "github.com/hashicorp/hcl/testhelper",
 			"revision": "2604f3bda7e8960c1be1063709e7d7f0765048d0"
 		},
 		{
