@@ -7,6 +7,11 @@ services:
     - docker
     - mongodb
 
+cache:
+    pip: true
+    directories:
+        - node_modules
+
 # Golang version matrix
 go:
     - 1.8
