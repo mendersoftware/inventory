@@ -3,6 +3,11 @@ language: go
 # Forces travis to use VM insted container, required to be able to build containers.
 sudo: required
 
+cache:
+    pip: true
+    directories:
+        - node_modules
+
 services:
     - docker
     - mongodb
