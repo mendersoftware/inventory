@@ -21,6 +21,7 @@ import (
 	"github.com/mendersoftware/go-lib-micro/accesslog"
 	mcontext "github.com/mendersoftware/go-lib-micro/context"
 	"github.com/mendersoftware/go-lib-micro/customheader"
+	"github.com/mendersoftware/go-lib-micro/identity"
 	dlog "github.com/mendersoftware/go-lib-micro/log"
 	"github.com/mendersoftware/go-lib-micro/requestid"
 	"github.com/mendersoftware/go-lib-micro/requestlog"
@@ -60,6 +61,8 @@ var (
 				mcontext.RepackRequestIdToContext,
 			},
 		},
+
+		&identity.IdentityMiddleware{},
 	}
 
 	DefaultProdStack = []rest.Middleware{
@@ -88,6 +91,8 @@ var (
 				mcontext.RepackRequestIdToContext,
 			},
 		},
+
+		&identity.IdentityMiddleware{},
 	}
 
 	middlewareMap = map[string][]rest.Middleware{

@@ -84,6 +84,11 @@ func New(ctx Ctx) *Logger {
 	return NewFromLogger(Log, ctx)
 }
 
+// NewEmpty returns a new logger with empty context
+func NewEmpty() *Logger {
+	return New(Ctx{})
+}
+
 // NewFromLogger returns a new Logger derived from a given logrus.Logger,
 // instead of the global one.
 func NewFromLogger(log *logrus.Logger, ctx Ctx) *Logger {

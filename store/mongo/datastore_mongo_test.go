@@ -27,7 +27,9 @@ import (
 	"github.com/mendersoftware/inventory/store"
 	. "github.com/mendersoftware/inventory/store/mongo"
 
+	"github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
+	mstore "github.com/mendersoftware/go-lib-micro/store"
 )
 
 // test funcs
@@ -87,6 +89,7 @@ func TestMongoGetDevices(t *testing.T) {
 		filters  []store.Filter
 		sort     *store.Sort
 		hasGroup *bool
+		tenant   string
 	}{
 		"all devs, no skip, no limit": {
 			expected: inputDevs,
@@ -94,6 +97,14 @@ func TestMongoGetDevices(t *testing.T) {
 			limit:    20,
 			filters:  nil,
 			sort:     nil,
+		},
+		"all devs, no skip, no limit; with tenant": {
+			expected: inputDevs,
+			skip:     0,
+			limit:    20,
+			filters:  nil,
+			sort:     nil,
+			tenant:   "foo",
 		},
 		"all devs, with skip": {
 			expected: []model.Device{inputDevs[4], inputDevs[5], inputDevs[6], inputDevs[7]},
@@ -197,14 +208,19 @@ func TestMongoGetDevices(t *testing.T) {
 
 		session := db.Session()
 
+		ctx := context.Background()
+		if tc.tenant != "" {
+			ctx = identity.WithContext(ctx, &identity.Identity{
+				Tenant: tc.tenant,
+			})
+		}
+
 		for _, d := range inputDevs {
-			err := session.DB(DbName).C(DbDevicesColl).Insert(d)
+			err := session.DB(mstore.DbFromContext(ctx, DbName)).C(DbDevicesColl).Insert(d)
 			assert.NoError(t, err, "failed to setup input data")
 		}
 
 		store := NewDataStoreMongoWithSession(session)
-
-		ctx := context.Background()
 
 		//test
 		devs, err := store.GetDevices(ctx, tc.skip, tc.limit, tc.filters, tc.sort, tc.hasGroup)
@@ -225,15 +241,26 @@ func TestMongoGetDevice(t *testing.T) {
 	testCases := map[string]struct {
 		InputID     model.DeviceID
 		InputDevice *model.Device
+		tenant      string
 		OutputError error
 	}{
 		"no device and no ID given": {
 			InputID:     model.DeviceID(""),
 			InputDevice: nil,
 		},
+		"no device and no ID given; with tenant": {
+			InputID:     model.DeviceID(""),
+			InputDevice: nil,
+			tenant:      "foo",
+		},
 		"device with given ID not exists": {
 			InputID:     model.DeviceID("123"),
 			InputDevice: nil,
+		},
+		"device with given ID not exists; with tenant": {
+			InputID:     model.DeviceID("123"),
+			InputDevice: nil,
+			tenant:      "foo",
 		},
 		"device with given ID exists, no error": {
 			InputID: model.DeviceID("0002"),
@@ -243,6 +270,16 @@ func TestMongoGetDevice(t *testing.T) {
 					"mac": {Name: "mac", Value: "0002-mac"},
 				},
 			},
+		},
+		"device with given ID exists, no error; with tenant": {
+			InputID: model.DeviceID("0002"),
+			InputDevice: &model.Device{
+				ID: model.DeviceID("0002"),
+				Attributes: model.DeviceAttributes{
+					"mac": {Name: "mac", Value: "0002-mac"},
+				},
+			},
+			tenant: "foo",
 		},
 	}
 
@@ -255,11 +292,16 @@ func TestMongoGetDevice(t *testing.T) {
 		session := db.Session()
 		store := NewDataStoreMongoWithSession(session)
 
-		if testCase.InputDevice != nil {
-			session.DB(DbName).C(DbDevicesColl).Insert(testCase.InputDevice)
+		ctx := context.Background()
+		if testCase.tenant != "" {
+			ctx = identity.WithContext(ctx, &identity.Identity{
+				Tenant: testCase.tenant,
+			})
 		}
 
-		ctx := context.Background()
+		if testCase.InputDevice != nil {
+			session.DB(mstore.DbFromContext(ctx, DbName)).C(DbDevicesColl).Insert(testCase.InputDevice)
+		}
 
 		dbdev, err := store.GetDevice(ctx, testCase.InputID)
 
@@ -284,10 +326,16 @@ func TestMongoAddDevice(t *testing.T) {
 
 	testCases := map[string]struct {
 		InputDevice *model.Device
+		tenant      string
 		OutputError error
 	}{
 		"no device given": {
 			InputDevice: nil,
+			OutputError: errors.New("failed to store device: error parsing element 0 of field documents :: caused by :: wrong type for '0' field, expected object, found 0: null"),
+		},
+		"no device given; with tenant": {
+			InputDevice: nil,
+			tenant:      "foo",
 			OutputError: errors.New("failed to store device: error parsing element 0 of field documents :: caused by :: wrong type for '0' field, expected object, found 0: null"),
 		},
 		"valid device with one attribute, no error": {
@@ -297,6 +345,16 @@ func TestMongoAddDevice(t *testing.T) {
 					"mac": {Name: "mac", Value: "0002-mac"},
 				},
 			},
+			OutputError: nil,
+		},
+		"valid device with one attribute, no error; with tenant": {
+			InputDevice: &model.Device{
+				ID: model.DeviceID("0002"),
+				Attributes: model.DeviceAttributes{
+					"mac": {Name: "mac", Value: "0002-mac"},
+				},
+			},
+			tenant:      "foo",
 			OutputError: nil,
 		},
 		"valid device with two attributes, no error": {
@@ -348,6 +406,12 @@ func TestMongoAddDevice(t *testing.T) {
 		store := NewDataStoreMongoWithSession(session)
 
 		ctx := context.Background()
+		if testCase.tenant != "" {
+			ctx = identity.WithContext(ctx, &identity.Identity{
+				Tenant: testCase.tenant,
+			})
+		}
+
 		err := store.AddDevice(ctx, testCase.InputDevice)
 
 		if testCase.OutputError != nil {
@@ -356,7 +420,7 @@ func TestMongoAddDevice(t *testing.T) {
 			assert.NoError(t, err, "expected no error inserting to data store")
 
 			var dbdev *model.Device
-			devsColl := session.DB(DbName).C(DbDevicesColl)
+			devsColl := session.DB(mstore.DbFromContext(ctx, DbName)).C(DbDevicesColl)
 			err := devsColl.Find(nil).One(&dbdev)
 
 			assert.NoError(t, err, "expected no error")
@@ -396,9 +460,53 @@ func TestMongoUpsertAttributes(t *testing.T) {
 		inDevId model.DeviceID
 		inAttrs model.DeviceAttributes
 
+		tenant string
+
 		outAttrs model.DeviceAttributes
 	}{
 		"dev exists, attributes exist, update both attrs (descr + val)": {
+			devs: []model.Device{
+				{
+					ID: model.DeviceID("0003"),
+					Attributes: map[string]model.DeviceAttribute{
+						"mac": {
+							Name:        "mac",
+							Value:       "0003-mac",
+							Description: strPtr("descr"),
+						},
+						"sn": {
+							Name:        "sn",
+							Value:       "0003-sn",
+							Description: strPtr("descr"),
+						},
+					},
+					CreatedTs: createdTs,
+				},
+			},
+			inDevId: model.DeviceID("0003"),
+			inAttrs: map[string]model.DeviceAttribute{
+				"mac": {
+					Description: strPtr("mac description"),
+					Value:       "0003-newmac",
+				},
+				"sn": {
+					Description: strPtr("sn description"),
+					Value:       "0003-newsn",
+				},
+			},
+
+			outAttrs: map[string]model.DeviceAttribute{
+				"mac": {
+					Description: strPtr("mac description"),
+					Value:       "0003-newmac",
+				},
+				"sn": {
+					Description: strPtr("sn description"),
+					Value:       "0003-newsn",
+				},
+			},
+		},
+		"dev exists, attributes exist, update both attrs (descr + val); with tenant": {
 			devs: []model.Device{
 				{
 					ID: model.DeviceID("0003"),
@@ -687,14 +795,21 @@ func TestMongoUpsertAttributes(t *testing.T) {
 
 		s := db.Session()
 
+		ctx := context.Background()
+		if tc.tenant != "" {
+			ctx = identity.WithContext(ctx, &identity.Identity{
+				Tenant: tc.tenant,
+			})
+		}
+
 		for _, d := range tc.devs {
-			err := s.DB(DbName).C(DbDevicesColl).Insert(d)
+			err := s.DB(mstore.DbFromContext(ctx, DbName)).C(DbDevicesColl).Insert(d)
 			assert.NoError(t, err, "failed to setup input data")
 		}
 
 		//test
 		d := NewDataStoreMongoWithSession(s)
-		ctx := context.Background()
+
 		err := d.UpsertAttributes(ctx, tc.inDevId, tc.inAttrs)
 		assert.NoError(t, err, "UpsertAttributes failed")
 
@@ -729,12 +844,20 @@ func TestMongoUpdateDeviceGroup(t *testing.T) {
 		InputDeviceID  model.DeviceID
 		InputGroupName model.GroupName
 		InputDevice    *model.Device
+		tenant         string
 		OutputError    error
 	}{
 		"update group for device with empty device id": {
 			InputDeviceID:  model.DeviceID(""),
 			InputGroupName: model.GroupName("abc"),
 			InputDevice:    nil,
+			OutputError:    store.ErrDevNotFound,
+		},
+		"update group for device with empty device id; with tenant": {
+			InputDeviceID:  model.DeviceID(""),
+			InputGroupName: model.GroupName("abc"),
+			InputDevice:    nil,
+			tenant:         "foo",
 			OutputError:    store.ErrDevNotFound,
 		},
 		"update group for device, device not found": {
@@ -750,6 +873,15 @@ func TestMongoUpdateDeviceGroup(t *testing.T) {
 				ID:    model.DeviceID("1"),
 				Group: model.GroupName("def"),
 			},
+		},
+		"update group for device, group exists; with tenant": {
+			InputDeviceID:  model.DeviceID("1"),
+			InputGroupName: model.GroupName("abc"),
+			InputDevice: &model.Device{
+				ID:    model.DeviceID("1"),
+				Group: model.GroupName("def"),
+			},
+			tenant: "foo",
 		},
 		"update group for device, group does not exist": {
 			InputDeviceID:  model.DeviceID("1"),
@@ -770,11 +902,16 @@ func TestMongoUpdateDeviceGroup(t *testing.T) {
 		session := db.Session()
 		store := NewDataStoreMongoWithSession(session)
 
-		if testCase.InputDevice != nil {
-			session.DB(DbName).C(DbDevicesColl).Insert(testCase.InputDevice)
+		ctx := context.Background()
+		if testCase.tenant != "" {
+			ctx = identity.WithContext(ctx, &identity.Identity{
+				Tenant: testCase.tenant,
+			})
 		}
 
-		ctx := context.Background()
+		if testCase.InputDevice != nil {
+			session.DB(mstore.DbFromContext(ctx, DbName)).C(DbDevicesColl).Insert(testCase.InputDevice)
+		}
 
 		err := store.UpdateDeviceGroup(ctx, testCase.InputDeviceID, testCase.InputGroupName)
 		if testCase.OutputError != nil {
@@ -784,7 +921,7 @@ func TestMongoUpdateDeviceGroup(t *testing.T) {
 		} else {
 			assert.NoError(t, err, "expected no error")
 
-			groupsColl := session.DB(DbName).C(DbDevicesColl)
+			groupsColl := session.DB(mstore.DbFromContext(ctx, DbName)).C(DbDevicesColl)
 			count, err := groupsColl.Find(bson.M{"group": model.GroupName("abc")}).Count()
 			assert.NoError(t, err, "expected no error")
 
@@ -842,12 +979,20 @@ func TestMongoUnsetDevicesGroupWithGroupName(t *testing.T) {
 		InputDeviceID  model.DeviceID
 		InputGroupName model.GroupName
 		InputDevice    *model.Device
+		tenant         string
 		OutputError    error
 	}{
 		"unset group for device with group id, device not found": {
 			InputDeviceID:  model.DeviceID("1"),
 			InputGroupName: model.GroupName("e16c71ec"),
 			InputDevice:    nil,
+			OutputError:    store.ErrDevNotFound,
+		},
+		"unset group for device with group id, device not found; with tenant": {
+			InputDeviceID:  model.DeviceID("1"),
+			InputGroupName: model.GroupName("e16c71ec"),
+			InputDevice:    nil,
+			tenant:         "foo",
 			OutputError:    store.ErrDevNotFound,
 		},
 		"unset group for device, ok": {
@@ -858,6 +1003,15 @@ func TestMongoUnsetDevicesGroupWithGroupName(t *testing.T) {
 				Group: model.GroupName("e16c71ec"),
 			},
 		},
+		"unset group for device, ok; with tenant": {
+			InputDeviceID:  model.DeviceID("1"),
+			InputGroupName: model.GroupName("e16c71ec"),
+			InputDevice: &model.Device{
+				ID:    model.DeviceID("1"),
+				Group: model.GroupName("e16c71ec"),
+			},
+			tenant: "foo",
+		},
 		"unset group for device with incorrect group name provided": {
 			InputDeviceID:  model.DeviceID("1"),
 			InputGroupName: model.GroupName("other-group-name"),
@@ -865,6 +1019,16 @@ func TestMongoUnsetDevicesGroupWithGroupName(t *testing.T) {
 				ID:    model.DeviceID("1"),
 				Group: model.GroupName("e16c71ec"),
 			},
+			OutputError: store.ErrDevNotFound,
+		},
+		"unset group for device with incorrect group name provided; with tenant": {
+			InputDeviceID:  model.DeviceID("1"),
+			InputGroupName: model.GroupName("other-group-name"),
+			InputDevice: &model.Device{
+				ID:    model.DeviceID("1"),
+				Group: model.GroupName("e16c71ec"),
+			},
+			tenant:      "foo",
 			OutputError: store.ErrDevNotFound,
 		},
 	}
@@ -878,11 +1042,16 @@ func TestMongoUnsetDevicesGroupWithGroupName(t *testing.T) {
 		session := db.Session()
 		store := NewDataStoreMongoWithSession(session)
 
-		if testCase.InputDevice != nil {
-			session.DB(DbName).C(DbDevicesColl).Insert(testCase.InputDevice)
+		ctx := context.Background()
+		if testCase.tenant != "" {
+			ctx = identity.WithContext(ctx, &identity.Identity{
+				Tenant: testCase.tenant,
+			})
 		}
 
-		ctx := context.Background()
+		if testCase.InputDevice != nil {
+			session.DB(mstore.DbFromContext(ctx, DbName)).C(DbDevicesColl).Insert(testCase.InputDevice)
+		}
 
 		err := store.UnsetDeviceGroup(ctx, testCase.InputDeviceID, testCase.InputGroupName)
 		if testCase.OutputError != nil {
@@ -892,7 +1061,7 @@ func TestMongoUnsetDevicesGroupWithGroupName(t *testing.T) {
 		} else {
 			assert.NoError(t, err, "expected no error")
 
-			groupsColl := session.DB(DbName).C(DbDevicesColl)
+			groupsColl := session.DB(mstore.DbFromContext(ctx, DbName)).C(DbDevicesColl)
 			count, err := groupsColl.Find(bson.M{"group": model.GroupName("e16c71ec")}).Count()
 			assert.NoError(t, err, "expected no error")
 
@@ -911,6 +1080,7 @@ func TestMongoListGroups(t *testing.T) {
 
 	testCases := map[string]struct {
 		InputDevices []model.Device
+		tenant       string
 		OutputGroups []model.GroupName
 	}{
 		"groups foo, bar": {
@@ -938,6 +1108,32 @@ func TestMongoListGroups(t *testing.T) {
 			},
 			OutputGroups: []model.GroupName{"foo", "bar"},
 		},
+		"groups foo, bar; with tenant": {
+			InputDevices: []model.Device{
+				{
+					ID:    model.DeviceID("1"),
+					Group: model.GroupName("foo"),
+				},
+				{
+					ID:    model.DeviceID("2"),
+					Group: model.GroupName("foo"),
+				},
+				{
+					ID:    model.DeviceID("3"),
+					Group: model.GroupName("foo"),
+				},
+				{
+					ID:    model.DeviceID("4"),
+					Group: model.GroupName("bar"),
+				},
+				{
+					ID:    model.DeviceID("5"),
+					Group: model.GroupName(""),
+				},
+			},
+			tenant:       "foo",
+			OutputGroups: []model.GroupName{"foo", "bar"},
+		},
 		"no groups": {
 			InputDevices: []model.Device{
 				{
@@ -955,6 +1151,24 @@ func TestMongoListGroups(t *testing.T) {
 			},
 			OutputGroups: []model.GroupName{},
 		},
+		"no groups; with tenant": {
+			InputDevices: []model.Device{
+				{
+					ID:    model.DeviceID("1"),
+					Group: model.GroupName(""),
+				},
+				{
+					ID:    model.DeviceID("2"),
+					Group: model.GroupName(""),
+				},
+				{
+					ID:    model.DeviceID("3"),
+					Group: model.GroupName(""),
+				},
+			},
+			tenant:       "foo",
+			OutputGroups: []model.GroupName{},
+		},
 	}
 
 	for name, testCase := range testCases {
@@ -964,14 +1178,20 @@ func TestMongoListGroups(t *testing.T) {
 
 		session := db.Session()
 
+		ctx := context.Background()
+		if testCase.tenant != "" {
+			ctx = identity.WithContext(ctx, &identity.Identity{
+				Tenant: testCase.tenant,
+			})
+		}
+
 		for _, d := range testCase.InputDevices {
-			session.DB(DbName).C(DbDevicesColl).Insert(d)
+			session.DB(mstore.DbFromContext(ctx, DbName)).C(DbDevicesColl).Insert(d)
 		}
 
 		// Make sure we start test with empty database
 		store := NewDataStoreMongoWithSession(session)
 
-		ctx := context.Background()
 		groups, err := store.ListGroups(ctx)
 		assert.NoError(t, err, "expected no error")
 
@@ -1122,6 +1342,141 @@ func TestGetDevicesByGroup(t *testing.T) {
 	session.Close()
 }
 
+func TestGetDevicesByGroupWithTenant(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping TestGetDevicesByGroupWithTenant in short mode.")
+	}
+
+	inputDevices := []model.Device{
+		{
+			ID:    model.DeviceID("1"),
+			Group: model.GroupName("dev"),
+		},
+		{
+			ID:    model.DeviceID("2"),
+			Group: model.GroupName("prod"),
+		},
+		{
+			ID:    model.DeviceID("3"),
+			Group: model.GroupName("test"),
+		},
+		{
+			ID:    model.DeviceID("4"),
+			Group: model.GroupName("prod"),
+		},
+		{
+			ID:    model.DeviceID("5"),
+			Group: model.GroupName("prod"),
+		},
+		{
+			ID:    model.DeviceID("6"),
+			Group: model.GroupName("dev"),
+		},
+		{
+			ID:    model.DeviceID("7"),
+			Group: model.GroupName("test"),
+		},
+		{
+			ID:    model.DeviceID("8"),
+			Group: model.GroupName("dev"),
+		},
+	}
+
+	testCases := map[string]struct {
+		InputGroupName model.GroupName
+		InputSkip      int
+		InputLimit     int
+		OutputDevices  []model.DeviceID
+		OutputError    error
+	}{
+		"no skip, no limit": {
+			InputGroupName: "dev",
+			InputSkip:      0,
+			InputLimit:     0,
+			OutputDevices: []model.DeviceID{
+
+				model.DeviceID("1"),
+				model.DeviceID("6"),
+				model.DeviceID("8"),
+			},
+			OutputError: nil,
+		},
+		"no skip, limit": {
+			InputGroupName: "prod",
+			InputSkip:      0,
+			InputLimit:     2,
+			OutputDevices: []model.DeviceID{
+				model.DeviceID("2"),
+				model.DeviceID("4"),
+			},
+			OutputError: nil,
+		},
+		"skip, no limit": {
+			InputGroupName: "dev",
+			InputSkip:      2,
+			InputLimit:     0,
+			OutputDevices: []model.DeviceID{
+				model.DeviceID("8"),
+			},
+			OutputError: nil,
+		},
+		"skip + limit": {
+			InputGroupName: "prod",
+			InputSkip:      1,
+			InputLimit:     1,
+			OutputDevices: []model.DeviceID{
+				model.DeviceID("4"),
+			},
+			OutputError: nil,
+		},
+		"no results (past last page)": {
+			InputGroupName: "dev",
+			InputSkip:      10,
+			InputLimit:     1,
+			OutputDevices:  []model.DeviceID{},
+			OutputError:    nil,
+		},
+		"group doesn't exist": {
+			InputGroupName: "unknown",
+			InputSkip:      0,
+			InputLimit:     0,
+			OutputDevices:  nil,
+			OutputError:    store.ErrGroupNotFound,
+		},
+	}
+
+	db.Wipe()
+	session := db.Session()
+
+	for _, d := range inputDevices {
+		err := session.DB(DbName + "-foo").C(DbDevicesColl).Insert(d)
+		assert.NoError(t, err, "failed to setup input data")
+	}
+
+	for name, tc := range testCases {
+		t.Logf("test case: %s", name)
+
+		store := NewDataStoreMongoWithSession(session)
+
+		ctx := context.Background()
+		ctx = identity.WithContext(ctx, &identity.Identity{
+			Tenant: "foo",
+		})
+		devs, err := store.GetDevicesByGroup(ctx, tc.InputGroupName, tc.InputSkip, tc.InputLimit)
+
+		if tc.OutputError != nil {
+			assert.EqualError(t, err, tc.OutputError.Error())
+		} else {
+			assert.NoError(t, err, "expected no error")
+			if !reflect.DeepEqual(tc.OutputDevices, devs) {
+				assert.Fail(t, "expected: %v\nhave: %v", tc.OutputDevices, devs)
+			}
+		}
+	}
+
+	session.Close()
+}
+
 func TestGetDeviceGroup(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping TestGetDeviceGroup in short mode.")
@@ -1173,6 +1528,73 @@ func TestGetDeviceGroup(t *testing.T) {
 		store := NewDataStoreMongoWithSession(session)
 
 		ctx := context.Background()
+		group, err := store.GetDeviceGroup(ctx, tc.InputDeviceID)
+
+		if tc.OutputError != nil {
+			assert.EqualError(t, err, tc.OutputError.Error())
+		} else {
+			assert.NoError(t, err, "expected no error")
+			assert.Equal(t, tc.OutputGroup, group)
+		}
+	}
+
+	session.Close()
+}
+
+func TestGetDeviceGroupWithTenant(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping TestGetDeviceGroupWithTenant in short mode.")
+	}
+
+	inputDevices := []model.Device{
+		{
+			ID:    model.DeviceID("1"),
+			Group: model.GroupName("dev"),
+		},
+		{
+			ID: model.DeviceID("2"),
+		},
+	}
+
+	testCases := map[string]struct {
+		InputDeviceID model.DeviceID
+		OutputGroup   model.GroupName
+		OutputError   error
+	}{
+		"dev has group": {
+			InputDeviceID: model.DeviceID("1"),
+			OutputGroup:   model.GroupName("dev"),
+			OutputError:   nil,
+		},
+		"dev has no group": {
+			InputDeviceID: model.DeviceID("2"),
+			OutputGroup:   "",
+			OutputError:   nil,
+		},
+		"dev doesn't exist": {
+			InputDeviceID: model.DeviceID("3"),
+			OutputGroup:   "",
+			OutputError:   store.ErrDevNotFound,
+		},
+	}
+
+	db.Wipe()
+	session := db.Session()
+
+	for _, d := range inputDevices {
+		err := session.DB(DbName + "-foo").C(DbDevicesColl).Insert(d)
+		assert.NoError(t, err, "failed to setup input data")
+	}
+
+	for name, tc := range testCases {
+		t.Logf("test case: %s", name)
+
+		store := NewDataStoreMongoWithSession(session)
+
+		ctx := context.Background()
+		ctx = identity.WithContext(ctx, &identity.Identity{
+			Tenant: "foo",
+		})
 		group, err := store.GetDeviceGroup(ctx, tc.InputDeviceID)
 
 		if tc.OutputError != nil {
