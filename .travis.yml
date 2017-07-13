@@ -60,8 +60,8 @@ before_install:
     - sudo apt-get install -y nodejs mongodb-org
 
     - pip2.7 install -U --user paramiko fabric PyYAML pytest requests bravado pytest-xdist
-    - sudo npm install -g npm
-    - sudo npm install -g swagger-cli
+    - npm install -g npm
+    - npm install -g swagger-cli
 
     # Get our own Swagger verifier
     - wget https://raw.githubusercontent.com/mendersoftware/autodocs/master/verify_docs.py
