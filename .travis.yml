@@ -19,8 +19,6 @@ env:
     matrix:
         - JOB_TYPE=compile_and_basic_tests
         - JOB_TYPE=compile_and_acceptance_tests
-        - JOB_TYPE=compile_and_integration_tests_fast
-        - JOB_TYPE=compile_and_integration_tests_slow
 
     global:
         # Should be encrypted or set as private travis variables (in travis settings):
@@ -60,8 +58,8 @@ before_install:
     - sudo apt-get install -y nodejs mongodb-org
 
     - pip2.7 install -U --user paramiko fabric PyYAML pytest requests bravado pytest-xdist
-    - sudo npm install -g npm
-    - sudo npm install -g swagger-cli
+    - npm install -g npm
+    - npm install -g swagger-cli
 
     # Get our own Swagger verifier
     - wget https://raw.githubusercontent.com/mendersoftware/autodocs/master/verify_docs.py
@@ -112,7 +110,7 @@ script:
     # Execute go test on every local subpackage (resolved as dependencies) and generate covreage report for each.
     # Test packages pararell (xargs -P)
     - if [[ "$JOB_TYPE" = compile_and_basic_tests ]]; then
-        go list ./... | grep -v vendor | xargs -n1 -I {} -P 4 go test -v -covermode=atomic -coverprofile=../../../{}/coverage.txt {} ;
+        go list ./... | grep -v vendor | xargs -n1 -I {} -P 4 go test -v -covermode=atomic -coverprofile=../../../{}/coverage.txt {} || exit $? ;
       fi
 
     # Insert build information into compiled binary using ldflags
@@ -131,16 +129,6 @@ script:
           TESTS_DIR=$PWD/tests ./tests/run-test-environment acceptance $PWD/integration_new ./tests/docker-compose.yml );
       fi
 
-    - if [ "$JOB_TYPE" = compile_and_integration_tests_fast ]; then
-        sudo docker build -t $DOCKER_REPOSITORY:pr .;
-        ( cd $PWD/integration_new/tests && bash run.sh --runfast --docker-compose-file=../../tests/docker-compose-integration.yml );
-      fi
-
-    - if [ "$JOB_TYPE" = compile_and_integration_tests_slow ]; then
-        sudo docker build -t $DOCKER_REPOSITORY:pr .;
-        ( cd $PWD/integration_new/tests && bash run.sh --runslow --docker-compose-file=../../tests/docker-compose-integration.yml );
-      fi
-
 
 after_success:
     # Integrate with https://codecov.io
@@ -157,7 +145,7 @@ before_deploy:
     - if [ ! -z "$TRAVIS_TAG" ]; then export IMAGE_TAG=$TRAVIS_TAG; else export IMAGE_TAG=$TRAVIS_BRANCH; fi
 
     # Upload image to docker registry only on PUSH
-    - if [ "$JOB_TYPE" = compile_and_integration_tests_slow -o "$JOB_TYPE" = compile_and_integration_tests_fast ]; then
+    - if [ "$JOB_TYPE" = compile_and_basic_tests ]; then
         docker tag $DOCKER_REPOSITORY:pr $DOCKER_REPOSITORY:$IMAGE_TAG;
         docker login --email=$DOCKER_HUB_EMAIL --username=$DOCKER_HUB_USERNAME --password=$DOCKER_HUB_PASSWORD;
         docker push $DOCKER_REPOSITORY:$IMAGE_TAG;
