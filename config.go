@@ -26,6 +26,15 @@ const (
 
 	SettingDb        = "mongo"
 	SettingDbDefault = "mongo-inventory:27017"
+
+	SettingDbSSL        = "mongo_ssl"
+	SettingDbSSLDefault = false
+
+	SettingDbSSLSkipVerify        = "mongo_ssl_skipverify"
+	SettingDbSSLSkipVerifyDefault = false
+
+	SettingDbUsername = "mongo_username"
+	SettingDbPassword = "mongo_password"
 )
 
 var (
@@ -34,5 +43,7 @@ var (
 		{Key: SettingListen, Value: SettingListenDefault},
 		{Key: SettingMiddleware, Value: SettingMiddlewareDefault},
 		{Key: SettingDb, Value: SettingDbDefault},
+		{Key: SettingDbSSL, Value: SettingDbSSLDefault},
+		{Key: SettingDbSSLSkipVerify, Value: SettingDbSSLSkipVerifyDefault},
 	}
 )
