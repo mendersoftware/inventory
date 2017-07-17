@@ -54,7 +54,7 @@ class Client(object):
 
     def createDevice(self, attributes, deviceid=None, description="test device"):
         if not deviceid:
-            deviceid = "".join([format(i, "02x") for i in os.urandom(128)])
+            deviceid = "".join([format(i, "02x") for i in os.urandom(32)])
 
         deviceNew = self.deviceNew(id=deviceid, description=description, attributes=attributes)
         r, h = self.client.devices.post_devices(device=deviceNew, Authorization="foo").result()
