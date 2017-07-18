@@ -2,10 +2,13 @@ from bravado.swagger_model import load_file
 from bravado.client import SwaggerClient, RequestsClient
 from urllib import parse as urlparse
 from requests.utils import parse_header_links
+
 import os
 import requests
 import pytest
 import csv
+import logging
+
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
@@ -23,15 +26,22 @@ class Client(object):
     http_client = RequestsClient()
     http_client.session.verify = False
 
-    client = SwaggerClient.from_spec(load_file('management_api.yml'), config=config, http_client=http_client)
-    client.swagger_spec.api_url = "http://%s/api/%s" % (pytest.config.getoption("host"), pytest.config.getoption("api"))
+    client = SwaggerClient.from_spec(load_file(pytest.config.getoption("--management-spec")),
+                                     config=config, http_client=http_client)
+    client.swagger_spec.api_url = "http://%s/api/%s" % (pytest.config.getoption("host"),
+                                                        pytest.config.getoption("api"))
 
     group = client.get_model("Group")
     deviceNew = client.get_model("DeviceNew")
     inventoryAttribute = client.get_model("Attribute")
 
-    def getInventoryListFromFile(self, filename="inventory_items"):
+    log = logging.getLogger('Client')
+
+    def getInventoryListFromFile(self, filename=None):
         attributeList = []
+
+        if filename is None:
+            filename = pytest.config.getoption('--inventory-items')
 
         with open(filename) as inf:
             r = csv.reader(inf)
@@ -44,7 +54,7 @@ class Client(object):
 
     def createDevice(self, attributes, deviceid=None, description="test device"):
         if not deviceid:
-            deviceid = "".join([format(i, "02x") for i in os.urandom(128)])
+            deviceid = "".join([format(i, "02x") for i in os.urandom(32)])
 
         deviceNew = self.deviceNew(id=deviceid, description=description, attributes=attributes)
         r, h = self.client.devices.post_devices(device=deviceNew, Authorization="foo").result()
