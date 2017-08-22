@@ -6,9 +6,29 @@ listen: :8080
     # MongoDB is required to run the service
     # Format: [mongodb://][user:pass@]host1[:port1][,host2[:port2],...][?options]
     # Format doc: https://docs.mongodb.com/manual/reference/connection-string/
-    #
     # Defaults to: "mongo-inventory"
 mongo: mongo-inventory:27017
+
+    # Enable SSL for mongo connections
+    # Defaults to: false
+# mongo_ssl: false
+
+    # SkipVerify controls whether a mongo client verifies the
+    # server's certificate chain and host name.
+    # If InsecureSkipVerify is true, accepts any certificate
+    # presented by the server and any host name in that certificate.
+    # Defaults to: false
+# mongo_ssl_skipverify: false
+
+    # Mongodb username
+    # Overwrites username set in connection string.
+    # Defaults to: none
+# mongo_username: user
+
+    # Mongodb password
+    # Overwrites password set in connection string.
+    # Defaults to: none
+# mongo_password: secret
 
     # HTTP Server middleware environment
     # Available values:
@@ -16,6 +36,7 @@ mongo: mongo-inventory:27017
     #       development environment
     #   prod
     #       production environment
-    #
-    # Defaults to: prod
+   # Defaults to: prod
 # middleware: dev
+
+

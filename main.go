@@ -64,7 +64,16 @@ func main() {
 
 	ctx := context.Background()
 
-	db, err := mongo.NewDataStoreMongo(config.Config.GetString(SettingDb))
+	db, err := mongo.NewDataStoreMongo(
+		mongo.DataStoreMongoConfig{
+			ConnectionString: config.Config.GetString(SettingDb),
+
+			SSL:           config.Config.GetBool(SettingDbSSL),
+			SSLSkipVerify: config.Config.GetBool(SettingDbSSLSkipVerify),
+
+			Username: config.Config.GetString(SettingDbUsername),
+			Password: config.Config.GetString(SettingDbPassword),
+		})
 	if err != nil {
 		l.Fatal("failed to connect to db")
 	}

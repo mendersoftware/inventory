@@ -440,10 +440,10 @@ func TestNewDataStoreMongo(t *testing.T) {
 		t.Skip("skipping TestNewDataStoreMongo in short mode.")
 	}
 
-	ds, err := NewDataStoreMongo("illegal url")
+	ds, err := NewDataStoreMongo(DataStoreMongoConfig{ConnectionString: "illegal url"})
 
 	assert.Nil(t, ds)
-	assert.EqualError(t, err, "failed to open mgo session")
+	assert.EqualError(t, err, "failed to open mgo session: no reachable servers")
 }
 
 func TestMongoUpsertAttributes(t *testing.T) {
