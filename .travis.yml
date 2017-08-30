@@ -17,7 +17,7 @@ cache:
 
 env:
     matrix:
-        - JOB_TYPE=compile_and_basic_tests
+        - JOB_TYPE=compile_and_basic_testsjjj
         - JOB_TYPE=compile_and_acceptance_tests
 
     global:
