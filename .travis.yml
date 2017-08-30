@@ -28,7 +28,7 @@ env:
         # DOCKER_HUB_EMAIL
         # DOCKER_HUB_USERNAME
         # DOCKER_HUB_PASSWORD
-
+   
         # AWS S3 bucket name, to store updated docs
         - AWS_BUCKET_DOCS=mender-docs
 
