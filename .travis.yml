@@ -4,7 +4,7 @@ language: go
 sudo: required
 
 services:
-    - docker
+    - dockerd
     - mongodb
 
 # Golang version matrix
