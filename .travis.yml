@@ -109,13 +109,7 @@ script:
     # also including their coverage may introduce to much noice. Concentrate on the coverage of local packages.
     # Execute go test on every local subpackage (resolved as dependencies) and generate covreage report for each.
     # Test packages pararell (xargs -P)
-    # Also build the docker container (with embedded build info), that will be pushed to dockerhub later on.
-    - if [ "$JOB_TYPE" = compile_and_basic_tests ]; then
-        go list ./... | grep -v vendor | xargs -n1 -I {} -P 4 go test -v -covermode=atomic -coverprofile=../../../{}/coverage.txt {} || exit $? ;
 
-        CGO_ENABLED=0 go build -ldflags "-X main.Commit=`echo $TRAVIS_COMMIT` -X main.Tag=`echo $TRAVIS_TAG` -X main.Branch=`echo $TRAVIS_BRANCH` -X main.BuildNumber=`echo $TRAVIS_BUILD_NUMBER`" ;
-        sudo docker build -t $DOCKER_REPOSITORY:pr . ;
-      fi
 
 
     # Clone integration repo. for api testing (purposely after license checking..)
@@ -146,8 +140,6 @@ after_success:
 before_deploy:
     # Upload image to docker registry only on PUSH
     - if [ "$JOB_TYPE" = compile_and_basic_tests ]; then
-        if [ ! -z "$TRAVIS_TAG" ]; then export IMAGE_TAG=$TRAVIS_TAG; else export IMAGE_TAG=$TRAVIS_BRANCH; fi
-    
         docker tag $DOCKER_REPOSITORY:pr $DOCKER_REPOSITORY:$IMAGE_TAG;
         docker login --email=$DOCKER_HUB_EMAIL --username=$DOCKER_HUB_USERNAME --password=$DOCKER_HUB_PASSWORD;
         docker push $DOCKER_REPOSITORY:$IMAGE_TAG;
