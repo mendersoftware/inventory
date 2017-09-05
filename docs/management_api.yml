@@ -285,6 +285,8 @@ paths:
       responses:
         204:
           description: Success - the device was added to the group.
+        400:
+          description: Missing or malformed request params or body. See the error message for details.
         404:
           description: The device was not found.
           schema:
