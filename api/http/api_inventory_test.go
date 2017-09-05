@@ -737,7 +737,7 @@ func TestApiInventoryAddDeviceToGroup(t *testing.T) {
 		"ok": {
 			inReq: test.MakeSimpleRequest("PUT",
 				"http://1.2.3.4/api/0.1.0/devices/123/group",
-				InventoryApiGroup{"abc"}),
+				InventoryApiGroup{"_a-b-c_"}),
 			JSONResponseParams: utils.JSONResponseParams{
 				OutputStatus:     http.StatusNoContent,
 				OutputBodyObject: nil,
@@ -760,6 +760,26 @@ func TestApiInventoryAddDeviceToGroup(t *testing.T) {
 			JSONResponseParams: utils.JSONResponseParams{
 				OutputStatus:     http.StatusBadRequest,
 				OutputBodyObject: RestError("Group: non zero value required;"),
+			},
+			inventoryErr: nil,
+		},
+		"unsupported characters in group name": {
+			inReq: test.MakeSimpleRequest("PUT",
+				"http://1.2.3.4/api/0.1.0/devices/123/group",
+				InventoryApiGroup{"__+X@#$  ;"}),
+			JSONResponseParams: utils.JSONResponseParams{
+				OutputStatus:     http.StatusBadRequest,
+				OutputBodyObject: RestError("Group name can only contain: upper/lowercase alphanum, -(dash), _(underscore)"),
+			},
+			inventoryErr: nil,
+		},
+		"non-ASCII characters in group name": {
+			inReq: test.MakeSimpleRequest("PUT",
+				"http://1.2.3.4/api/0.1.0/devices/123/group",
+				InventoryApiGroup{"ęą"}),
+			JSONResponseParams: utils.JSONResponseParams{
+				OutputStatus:     http.StatusBadRequest,
+				OutputBodyObject: RestError("Group name can only contain: upper/lowercase alphanum, -(dash), _(underscore)"),
 			},
 			inventoryErr: nil,
 		},
