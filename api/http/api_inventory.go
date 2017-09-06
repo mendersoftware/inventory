@@ -29,6 +29,7 @@ import (
 	"github.com/mendersoftware/inventory/store"
 	"github.com/mendersoftware/inventory/utils"
 	"github.com/mendersoftware/inventory/utils/identity"
+	"regexp"
 )
 
 const (
@@ -344,6 +345,11 @@ func (i *InventoryHandlers) AddDeviceToGroupHandler(w rest.ResponseWriter, r *re
 	}
 	if _, err = govalidator.ValidateStruct(group); err != nil {
 		u.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
+		return
+	}
+
+	if !regexp.MustCompile("^[A-Za-z0-9_-]*$").MatchString(group.Group) {
+		u.RestErrWithLog(w, r, l, errors.New("Group name can only contain: upper/lowercase alphanum, -(dash), _(underscore)"), http.StatusBadRequest)
 		return
 	}
 
