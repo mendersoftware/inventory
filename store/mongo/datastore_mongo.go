@@ -16,7 +16,9 @@ package mongo
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
+	"net"
 	"sync"
 	"time"
 
@@ -51,6 +53,19 @@ var (
 	once sync.Once
 )
 
+type DataStoreMongoConfig struct {
+	// MGO connection string
+	ConnectionString string
+
+	// SSL support
+	SSL           bool
+	SSLSkipVerify bool
+
+	// Overwrites credentials provided in connection string if provided
+	Username string
+	Password string
+}
+
 type DataStoreMongo struct {
 	session *mgo.Session
 }
@@ -59,22 +74,58 @@ func NewDataStoreMongoWithSession(session *mgo.Session) *DataStoreMongo {
 	return &DataStoreMongo{session: session}
 }
 
-func NewDataStoreMongo(host string) (*DataStoreMongo, error) {
+func NewDataStoreMongo(config DataStoreMongoConfig) (*DataStoreMongo, error) {
 	//init master session
 	var err error
 	once.Do(func() {
-		masterSession, err = mgo.Dial(host)
-		if err == nil {
-			// force write ack with immediate journal file fsync
-			masterSession.SetSafe(&mgo.Safe{
-				W: 1,
-				J: true,
-			})
+
+		var dialInfo *mgo.DialInfo
+		dialInfo, err = mgo.ParseURL(config.ConnectionString)
+		if err != nil {
+			return
 		}
+
+		// Set 10s timeout - same as set by Dial
+		dialInfo.Timeout = 10 * time.Second
+
+		if config.Username != "" {
+			dialInfo.Username = config.Username
+		}
+		if config.Password != "" {
+			dialInfo.Password = config.Password
+		}
+
+		if config.SSL {
+			dialInfo.DialServer = func(addr *mgo.ServerAddr) (net.Conn, error) {
+
+				// Setup TLS
+				tlsConfig := &tls.Config{}
+				tlsConfig.InsecureSkipVerify = config.SSLSkipVerify
+
+				conn, err := tls.Dial("tcp", addr.String(), tlsConfig)
+				return conn, err
+			}
+		}
+
+		masterSession, err = mgo.DialWithInfo(dialInfo)
+		if err != nil {
+			return
+		}
+
+		// Validate connection
+		if err = masterSession.Ping(); err != nil {
+			return
+		}
+
+		// force write ack with immediate journal file fsync
+		masterSession.SetSafe(&mgo.Safe{
+			W: 1,
+			J: true,
+		})
 	})
 
 	if err != nil {
-		return nil, errors.New("failed to open mgo session")
+		return nil, errors.Wrap(err, "failed to open mgo session")
 	}
 
 	db := &DataStoreMongo{session: masterSession}

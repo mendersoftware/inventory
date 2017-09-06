@@ -98,8 +98,8 @@ class TestGroupCreation(Client):
 
     def test_generic_groups_1(self):
         self.deleteAllGroups()
-        total_groups = 100
-        items_per_group = 10
+        total_groups = 10
+        items_per_group = 2
         devices_in_groups = {}
 
         for i in range(total_groups):
@@ -109,7 +109,7 @@ class TestGroupCreation(Client):
                 devices_in_groups.setdefault(str(i), []).append(device)
                 self.client.devices.put_devices_id_group(group=group, id=device, Authorization="foo").result()
 
-        assert len(self.getAllGroups()) == 100
+        assert len(self.getAllGroups()) == 10
 
         groups = self.getAllGroups()
         for idx, g in enumerate(groups):
