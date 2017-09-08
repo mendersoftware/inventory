@@ -1614,20 +1614,28 @@ func TestMigrate(t *testing.T) {
 	}
 
 	testCases := map[string]struct {
-		version string
-		err     string
+		version     string
+		err         string
+		automigrate bool
 	}{
 		"0.1.0": {
-			version: "0.1.0",
-			err:     "",
+			version:     "0.1.0",
+			err:         "",
+			automigrate: true,
 		},
 		"1.2.3": {
-			version: "1.2.3",
-			err:     "",
+			version:     "1.2.3",
+			err:         "",
+			automigrate: true,
 		},
 		"0.1 error": {
-			version: "0.1",
-			err:     "failed to parse service version: failed to parse Version: unexpected EOF",
+			version:     "0.1",
+			err:         "failed to parse service version: failed to parse Version: unexpected EOF",
+			automigrate: true,
+		},
+		"0.1.0 no-automigrate": {
+			version: "0.1.0",
+			err:     "failed to apply migrations: db needs migration: inventory has version 0.0.0, needs version 0.1.0",
 		},
 	}
 
@@ -1638,7 +1646,11 @@ func TestMigrate(t *testing.T) {
 
 		store := NewDataStoreMongoWithSession(session)
 
-		err := store.Migrate(context.Background(), tc.version, nil)
+		if tc.automigrate {
+			store.WithAutomigrate()
+		}
+
+		err := store.Migrate(context.Background(), tc.version)
 		if tc.err == "" {
 			assert.NoError(t, err)
 			var out []migrate.MigrationEntry
