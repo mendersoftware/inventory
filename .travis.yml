@@ -124,7 +124,7 @@ script:
         git clone https://github.com/mendersoftware/integration.git integration_new ;
         cp integration_new/extra/travis-testing/* tests/ ;
 
-        CGO_ENABLED=0 go test -c -o inventory -coverpkg $(go list ./... | grep -v vendor | grep -v mock | grep -v test | tr  '\n' ,);
+        CGO_ENABLED=0 go test -c -o inventory-test -coverpkg $(go list ./... | grep -v vendor | grep -v mock | grep -v test | tr  '\n' ,);
         
         sudo docker build -f Dockerfile.acceptance-testing -t mendersoftware/inventory:prtest .;
         ( ./tests/build-acceptance ./tests ./docs/management_api.yml ./docs/devices_api.yml &&
