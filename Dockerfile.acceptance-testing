@@ -7,4 +7,4 @@ COPY ./inventory /usr/bin/
 COPY ./config.yaml /usr/bin/
 STOPSIGNAL SIGINT
 
-ENTRYPOINT ["/usr/bin/inventory", "-test.coverprofile=/testing/coverage-acceptance.txt", "-acceptance-tests", "-test.run=TestRunMain"]
+ENTRYPOINT ["/usr/bin/inventory", "-test.coverprofile=/testing/coverage-acceptance.txt", "-acceptance-tests", "-test.run=TestRunMain", "-cli-args=server --automigrate"]

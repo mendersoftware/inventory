@@ -22,6 +22,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/mendersoftware/go-lib-micro/log"
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
 	mstore "github.com/mendersoftware/go-lib-micro/store"
 	"github.com/pkg/errors"
@@ -67,7 +68,8 @@ type DataStoreMongoConfig struct {
 }
 
 type DataStoreMongo struct {
-	session *mgo.Session
+	session     *mgo.Session
+	automigrate bool
 }
 
 func NewDataStoreMongoWithSession(session *mgo.Session) *DataStoreMongo {
@@ -390,21 +392,47 @@ func (db *DataStoreMongo) DeleteDevice(ctx context.Context, id model.DeviceID) e
 	return nil
 }
 
-func (db *DataStoreMongo) Migrate(ctx context.Context, version string, migrations []migrate.Migration) error {
-	m := migrate.DummyMigrator{
-		Session: db.session,
-		Db:      mstore.DbFromContext(ctx, DbName),
+func (db *DataStoreMongo) Migrate(ctx context.Context, version string) error {
+	l := log.FromContext(ctx)
+
+	dbs, err := migrate.GetTenantDbs(db.session, mstore.IsTenantDb(DbName))
+	if err != nil {
+		return errors.Wrap(err, "failed go retrieve tenant DBs")
 	}
 
-	ver, err := migrate.NewVersion(version)
-	if err != nil {
-		return errors.Wrap(err, "failed to parse service version")
+	if len(dbs) == 0 {
+		dbs = []string{DbName}
 	}
 
-	err = m.Apply(ctx, *ver, migrations)
-	if err != nil {
-		return errors.Wrap(err, "failed to apply migrations")
+	if db.automigrate {
+		l.Infof("automigrate is ON, will apply migrations")
+	} else {
+		l.Infof("automigrate is OFF, will check db version compatibility")
+	}
+
+	for _, d := range dbs {
+		l.Infof("migrating %s", d)
+		m := migrate.DummyMigrator{
+			Session:     db.session,
+			Db:          mstore.DbFromContext(ctx, DbName),
+			Automigrate: db.automigrate,
+		}
+
+		ver, err := migrate.NewVersion(version)
+		if err != nil {
+			return errors.Wrap(err, "failed to parse service version")
+		}
+
+		err = m.Apply(ctx, *ver, nil)
+		if err != nil {
+			return errors.Wrap(err, "failed to apply migrations")
+		}
 	}
 
 	return nil
+}
+
+func (db *DataStoreMongo) WithAutomigrate() *DataStoreMongo {
+	db.automigrate = true
+	return db
 }
