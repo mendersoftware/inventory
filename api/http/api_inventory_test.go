@@ -37,6 +37,12 @@ import (
 	"github.com/mendersoftware/inventory/utils"
 )
 
+func contextMatcher() interface{} {
+	return mock.MatchedBy(func(c context.Context) bool {
+		return true
+	})
+}
+
 func ToJson(data interface{}) string {
 	j, _ := json.Marshal(data)
 	return string(j)
@@ -268,7 +274,7 @@ func TestApiInventoryGetDevices(t *testing.T) {
 		t.Logf("test case: %s", name)
 		inv := minventory.InventoryApp{}
 
-		ctx := context.Background()
+		ctx := contextMatcher()
 
 		inv.On("ListDevices",
 			ctx,
@@ -431,7 +437,7 @@ func TestApiInventoryAddDevice(t *testing.T) {
 		t.Logf("test case: %s", name)
 		inv := minventory.InventoryApp{}
 
-		ctx := context.Background()
+		ctx := contextMatcher()
 
 		inv.On("AddDevice",
 			ctx,
@@ -641,7 +647,7 @@ func TestApiInventoryUpsertAttributes(t *testing.T) {
 		t.Logf("test case: %s", name)
 		inv := minventory.InventoryApp{}
 
-		ctx := context.Background()
+		ctx := contextMatcher()
 
 		inv.On("UpsertAttributes",
 			ctx,
@@ -711,7 +717,7 @@ func TestApiInventoryDeleteDeviceGroup(t *testing.T) {
 		t.Logf("test case: %s", name)
 		inv := minventory.InventoryApp{}
 
-		ctx := context.Background()
+		ctx := contextMatcher()
 
 		inv.On("UnsetDeviceGroup",
 			ctx,
@@ -808,7 +814,7 @@ func TestApiInventoryAddDeviceToGroup(t *testing.T) {
 		t.Logf("test case: %s", name)
 		inv := minventory.InventoryApp{}
 
-		ctx := context.Background()
+		ctx := contextMatcher()
 
 		inv.On("UpdateDeviceGroup",
 			ctx,
@@ -861,7 +867,7 @@ func TestApiListGroups(t *testing.T) {
 		t.Logf("test case: %s", name)
 		inv := minventory.InventoryApp{}
 
-		ctx := context.Background()
+		ctx := contextMatcher()
 
 		inv.On("ListGroups", ctx).Return(tc.outputGroups, tc.inventoryErr)
 
@@ -921,7 +927,7 @@ func TestApiGetDevice(t *testing.T) {
 		t.Logf("test case: %s", name)
 		inv := minventory.InventoryApp{}
 
-		ctx := context.Background()
+		ctx := contextMatcher()
 
 		inv.On("GetDevice", ctx, tc.inDevId).Return(tc.outputDevice, tc.inventoryErr)
 
@@ -1027,7 +1033,7 @@ func TestApiInventoryGetDevicesByGroup(t *testing.T) {
 		t.Logf("test case: %s", name)
 		inv := minventory.InventoryApp{}
 
-		ctx := context.Background()
+		ctx := contextMatcher()
 
 		inv.On("ListDevicesByGroup",
 			ctx,
@@ -1107,7 +1113,7 @@ func TestApiGetDeviceGroup(t *testing.T) {
 		t.Logf("test case: %s", name)
 		inv := minventory.InventoryApp{}
 
-		ctx := context.Background()
+		ctx := contextMatcher()
 
 		inv.On("GetDeviceGroup",
 			ctx,
@@ -1162,7 +1168,7 @@ func TestApiDeleteDevice(t *testing.T) {
 
 			inv := minventory.InventoryApp{}
 
-			ctx := context.Background()
+			ctx := contextMatcher()
 
 			inv.On("DeleteDevice",
 				ctx,
