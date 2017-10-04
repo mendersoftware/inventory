@@ -57,13 +57,13 @@ class TestGroupCreation(Client):
         """
         self.deleteAllGroups()
 
-        for i in range(100):
+        for i in range(10):
             group = self.group(group="group" + str(i))
             self.client.devices.put_devices_id_group(group=group,
                                                      Authorization="foo",
                                                      id=self.createDevice(attributes=self.getInventoryListFromFile())).result()
 
-        assert len(self.client.groups.get_groups().result()[0]) == 100
+        assert len(self.client.groups.get_groups().result()[0]) == 10
         self.deleteAllGroups()
 
     def test_get_groups_3(self):
@@ -73,7 +73,7 @@ class TestGroupCreation(Client):
         self.deleteAllGroups()
 
         device = self.createDevice(attributes=self.getInventoryListFromFile())
-        for i in range(100):
+        for i in range(10):
             group = self.group(group="group" + str(i))
             self.client.devices.put_devices_id_group(group=group, id=device, Authorization="foo").result()
 
