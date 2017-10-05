@@ -8,6 +8,7 @@ import requests
 import pytest
 import csv
 import logging
+import subprocess
 
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 
@@ -128,3 +129,17 @@ class Client(object):
         for e in expected_data:
             if e not in inventoryItems:
                 assert False, "Inventory data is incorrect"
+
+
+class CliClient:
+    cmd = '/testing/inventory'
+
+    def migrate(self, tenant_id=None):
+        args = [
+            self.cmd,
+            'migrate']
+
+        if tenant_id:
+            args += ['--tenant', tenant_id]
+
+        subprocess.run(args, check=True)
