@@ -1,25 +1,34 @@
-from client import Client
+from common import inventory_attributes, management_client, clean_db, mongo
+
 import os
 import pytest
 
-class TestGroupRemoving(Client):
 
-    def test_delete_device(self):
-        d1 = self.createDevice(attributes=self.getInventoryListFromFile())
+@pytest.mark.usefixtures("clean_db")
+class TestGroupRemoving:
+
+    def test_delete_device(self, management_client, inventory_attributes):
+        d1 = management_client.createDevice(attributes=inventory_attributes)
         g1 = "group-test-3"
 
-        self.addDeviceToGroup(device=d1, group=self.group(group=g1))
-        assert len(self.getGroupDevices(g1)) == 1
+        management_client.addDeviceToGroup(device=d1,
+                                           group=management_client.group(group=g1))
+        assert len(management_client.getGroupDevices(g1)) == 1
 
-        self.deleteDeviceInGroup(device=d1, group=g1, expected_error=False)
-        assert len(self.getGroupDevices(g1, expected_error=True)) == 0
+        management_client.deleteDeviceInGroup(device=d1,
+                                              group=g1,
+                                              expected_error=False)
+        assert len(management_client.getGroupDevices(g1,
+                                                     expected_error=True)) == 0
 
-    def test_delete_device_non_existent_1(self):
+    def test_delete_device_non_existent_1(self, management_client):
         """ Delete non-existent device from non-existent group """
         g1 = "group-test-3-non-existent"
-        self.deleteDeviceInGroup(device="404 device", group=g1, expected_error=True)
+        management_client.deleteDeviceInGroup(device="404 device", group=g1,
+                                              expected_error=True)
 
-    def test_delete_device_non_existent_2(self):
+    def test_delete_device_non_existent_2(self, management_client, inventory_attributes):
         """ Delete existent device from non-existent group """
-        d1 = self.createDevice(attributes=self.getInventoryListFromFile())
-        self.deleteDeviceInGroup(device=d1, group="404 group", expected_error=True)
+        d1 = management_client.createDevice(attributes=inventory_attributes)
+        management_client.deleteDeviceInGroup(device=d1,
+                                              group="404 group", expected_error=True)

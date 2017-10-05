@@ -12,11 +12,14 @@
 #    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #    See the License for the specific language governing permissions and
 #    limitations under the License.
+import csv
+
 import pytest
 
 from pymongo import MongoClient
 
-from client import CliClient
+from client import CliClient, ManagementClient
+
 
 @pytest.fixture(scope="session")
 def mongo():
@@ -40,3 +43,27 @@ def clean_db(mongo):
 @pytest.fixture(scope="session")
 def cli():
     return CliClient()
+
+
+@pytest.fixture(scope="session")
+def management_client():
+    return ManagementClient()
+
+
+@pytest.fixture(scope="session")
+def inventory_attributes(management_client):
+    attributeList = []
+
+    filename = pytest.config.getoption('--inventory-items')
+
+    with open(filename) as inf:
+        r = csv.reader(inf)
+        for row in r:
+            n, v, d = row[0], row[1], row[2] if len(row) == 3 else None
+            # does it matter if you pass a field name = None?
+            attr = management_client.inventoryAttribute(name=n,
+                                                        value=v,
+                                                        description=d)
+            attributeList.append(attr)
+
+    return attributeList

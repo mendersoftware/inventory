@@ -15,7 +15,7 @@ from requests.packages.urllib3.exceptions import InsecureRequestWarning
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
 
-class Client(object):
+class ManagementClient:
     config = {
         'also_return_response': True,
         'validate_responses': False,
@@ -38,21 +38,6 @@ class Client(object):
 
     log = logging.getLogger('Client')
 
-    def getInventoryListFromFile(self, filename=None):
-        attributeList = []
-
-        if filename is None:
-            filename = pytest.config.getoption('--inventory-items')
-
-        with open(filename) as inf:
-            r = csv.reader(inf)
-            for row in r:
-                n, v, d = row[0], row[1], row[2] if len(row) == 3 else None
-                # does it matter if you pass a field name = None?
-                attributeList.append(self.inventoryAttribute(name=n, value=v, description=d))
-
-        return attributeList
-
     def createDevice(self, attributes, deviceid=None, description="test device"):
         if not deviceid:
             deviceid = "".join([format(i, "02x") for i in os.urandom(32)])
@@ -68,7 +53,8 @@ class Client(object):
                 self.deleteDeviceInGroup(g, d)
 
     def getAllDevices(self, page=1, sort=None, has_group=None):
-        r, h = self.client.devices.get_devices(page=page, sort=sort, has_group=has_group, Authorization="foo").result()
+        r, h = self.client.devices.get_devices(page=page, sort=sort, has_group=has_group,
+                                               Authorization="foo").result()
         for i in parse_header_links(h.headers["link"]):
             if i["rel"] == "next":
                 page = int(dict(urlparse.parse_qs(urlparse.urlsplit(i["url"]).query))["page"][0])
@@ -94,7 +80,8 @@ class Client(object):
 
     def deleteDeviceInGroup(self, group, device, expected_error=False):
         try:
-            r = self.client.devices.delete_devices_id_group_name(id=device, name=group, Authorization=False).result()
+            r = self.client.devices.delete_devices_id_group_name(id=device, name=group,
+                                                                 Authorization=False).result()
         except Exception:
             if expected_error:
                 return []
@@ -106,7 +93,8 @@ class Client(object):
 
     def addDeviceToGroup(self, group, device, expected_error=False):
         try:
-            r = self.client.devices.put_devices_id_group(group=group, id=device, Authorization=False).result()
+            r = self.client.devices.put_devices_id_group(group=group, id=device,
+                                                         Authorization=False).result()
         except Exception:
             if expected_error:
                 return []
@@ -115,20 +103,6 @@ class Client(object):
 
         else:
             return r
-
-    def verifyInventory(self, inventoryItems, expected_data=None):
-        if isinstance(expected_data, str):
-            expectedInventoryItems = self.getInventoryListFromFile(expected_data)
-        elif isinstance(expected_data, dict):
-            expectedInventoryItems = []
-            for k in expected_data.keys():
-                expectedInventoryItems.append(self.inventoryAttribute(name=k, value=expected_data[k]))
-
-        assert len(inventoryItems) == len(expected_data)
-
-        for e in expected_data:
-            if e not in inventoryItems:
-                assert False, "Inventory data is incorrect"
 
 
 class CliClient:
