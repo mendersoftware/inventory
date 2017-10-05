@@ -67,6 +67,18 @@ func doMain(args []string) {
 
 			Action: cmdServer,
 		},
+		{
+			Name:  "migrate",
+			Usage: "Run migrations",
+			Flags: []cli.Flag{
+				cli.StringFlag{
+					Name:  "tenant",
+					Usage: "Takes ID of specific tenant to migrate.",
+				},
+			},
+
+			Action: cmdMigrate,
+		},
 	}
 
 	app.Before = func(args *cli.Context) error {
@@ -89,6 +101,19 @@ func doMain(args []string) {
 	app.Run(args)
 }
 
+func makeDataStoreConfig() mongo.DataStoreMongoConfig {
+	return mongo.DataStoreMongoConfig{
+		ConnectionString: config.Config.GetString(SettingDb),
+
+		SSL:           config.Config.GetBool(SettingDbSSL),
+		SSLSkipVerify: config.Config.GetBool(SettingDbSSLSkipVerify),
+
+		Username: config.Config.GetString(SettingDbUsername),
+		Password: config.Config.GetString(SettingDbPassword),
+	}
+
+}
+
 func cmdServer(args *cli.Context) error {
 	devSetup := args.GlobalBool("dev")
 
@@ -99,16 +124,7 @@ func cmdServer(args *cli.Context) error {
 		config.Config.Set(SettingMiddleware, EnvDev)
 	}
 
-	db, err := mongo.NewDataStoreMongo(
-		mongo.DataStoreMongoConfig{
-			ConnectionString: config.Config.GetString(SettingDb),
-
-			SSL:           config.Config.GetBool(SettingDbSSL),
-			SSLSkipVerify: config.Config.GetBool(SettingDbSSLSkipVerify),
-
-			Username: config.Config.GetString(SettingDbUsername),
-			Password: config.Config.GetString(SettingDbPassword),
-		})
+	db, err := mongo.NewDataStoreMongo(makeDataStoreConfig())
 	if err != nil {
 		return cli.NewExitError(
 			fmt.Sprintf("failed to connect to db: %v", err),
@@ -133,6 +149,43 @@ func cmdServer(args *cli.Context) error {
 	err = RunServer(config.Config)
 	if err != nil {
 		return cli.NewExitError(err.Error(), 4)
+	}
+
+	return nil
+}
+
+func cmdMigrate(args *cli.Context) error {
+	tenantId := args.String("tenant")
+
+	l := log.New(log.Ctx{})
+
+	l.Printf("Inventory Service, version %s starting up",
+		CreateVersionString())
+
+	if tenantId != "" {
+		l.Printf("migrating tenant %v", tenantId)
+	} else {
+		l.Printf("migrating default tenant")
+	}
+
+	db, err := mongo.NewDataStoreMongo(makeDataStoreConfig())
+
+	if err != nil {
+		return cli.NewExitError(
+			fmt.Sprintf("failed to connect to db: %v", err),
+			3)
+	}
+
+	// we want to apply migrations
+	db.WithAutomigrate()
+
+	ctx := context.Background()
+
+	err = db.MigrateTenant(ctx, mongo.DbVersion, tenantId)
+	if err != nil {
+		return cli.NewExitError(
+			fmt.Sprintf("failed to run migrations: %v", err),
+			3)
 	}
 
 	return nil

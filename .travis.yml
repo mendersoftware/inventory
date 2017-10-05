@@ -111,11 +111,10 @@ script:
     # Also build the docker container (with embedded build info), that will be pushed to dockerhub later on.
     - if [ "$JOB_TYPE" = compile_and_basic_tests ]; then
         go list ./... | grep -v vendor | xargs -n1 -I {} -P 4 go test -v -covermode=atomic -coverprofile=../../../{}/coverage.txt {} || exit $? ;
-
-        CGO_ENABLED=0 go build -ldflags "-X main.Commit=`echo $TRAVIS_COMMIT` -X main.Tag=`echo $TRAVIS_TAG` -X main.Branch=`echo $TRAVIS_BRANCH` -X main.BuildNumber=`echo $TRAVIS_BUILD_NUMBER`" ;
-        sudo docker build -t $DOCKER_REPOSITORY:pr . ;
       fi
 
+    # Insert build information into compiled binary using ldflags
+    - CGO_ENABLED=0 go build -ldflags "-X main.Commit=`echo $TRAVIS_COMMIT` -X main.Tag=`echo $TRAVIS_TAG` -X main.Branch=`echo $TRAVIS_BRANCH` -X main.BuildNumber=`echo $TRAVIS_BUILD_NUMBER`"
 
     # Clone integration repo. for api testing (purposely after license checking..)
     # Copy script to testing directory
@@ -127,10 +126,13 @@ script:
         CGO_ENABLED=0 go test -c -o inventory-test -coverpkg $(go list ./... | grep -v vendor | grep -v mock | grep -v test | tr  '\n' ,);
         
         sudo docker build -f Dockerfile.acceptance-testing -t mendersoftware/inventory:prtest .;
-        ( ./tests/build-acceptance ./tests ./docs/management_api.yml ./docs/devices_api.yml &&
+        ( ./tests/build-acceptance ./tests ./docs/management_api.yml ./docs/devices_api.yml ./inventory &&
           TESTS_DIR=$PWD/tests ./tests/run-test-environment acceptance $PWD/integration_new ./tests/docker-compose.yml );
       fi
 
+    - if [ "$JOB_TYPE" = compile_and_basic_tests ] ; then
+        sudo docker build -t $DOCKER_REPOSITORY:pr .;
+      fi
 
 after_success:
     # Integrate with https://codecov.io
