@@ -14,4 +14,24 @@
 #    limitations under the License.
 import pytest
 
-apiURL = "http://%s/api/%s/auth_requests" % (pytest.config.getoption("devauth_host"), pytest.config.getoption("api"))
+from pymongo import MongoClient
+
+from client import CliClient
+
+@pytest.fixture(scope="session")
+def mongo():
+    return MongoClient('mender-mongo-inventory:27017')
+
+
+def mongo_cleanup(mongo):
+    dbs = mongo.database_names()
+    dbs = [d for d in dbs if d not in ['local', 'admin']]
+    for d in dbs:
+        mongo.drop_database(d)
+
+
+@pytest.yield_fixture(scope='function')
+def clean_db(mongo):
+    mongo_cleanup(mongo)
+    yield
+    mongo_cleanup(mongo)
