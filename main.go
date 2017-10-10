@@ -81,6 +81,7 @@ func doMain(args []string) {
 		},
 	}
 
+	app.Action = cmdServer
 	app.Before = func(args *cli.Context) error {
 		log.Setup(debug)
 
