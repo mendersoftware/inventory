@@ -25,7 +25,7 @@ import (
 
 // this inventory service interface
 type InventoryApp interface {
-	ListDevices(ctx context.Context, skip int, limit int, filters []store.Filter, sort *store.Sort, hasGroup *bool) ([]model.Device, error)
+	ListDevices(ctx context.Context, skip int, limit int, filters []store.Filter, sort *store.Sort, hasGroup *bool, groupName string) ([]model.Device, error)
 	GetDevice(ctx context.Context, id model.DeviceID) (*model.Device, error)
 	AddDevice(ctx context.Context, d *model.Device) error
 	UpsertAttributes(ctx context.Context, id model.DeviceID, attrs model.DeviceAttributes) error
@@ -48,8 +48,9 @@ func NewInventory(d store.DataStore, tenantKeeper store.TenantDataKeeper,
 	return &inventory{db: d, tenantKeeper: tenantKeeper}
 }
 
-func (i *inventory) ListDevices(ctx context.Context, skip int, limit int, filters []store.Filter, sort *store.Sort, hasGroup *bool) ([]model.Device, error) {
-	devs, err := i.db.GetDevices(ctx, skip, limit, filters, sort, hasGroup)
+func (i *inventory) ListDevices(ctx context.Context, skip int, limit int, filters []store.Filter, sort *store.Sort, hasGroup *bool, groupName string) ([]model.Device, error) {
+	devs, err := i.db.GetDevices(ctx, skip, limit, filters, sort, hasGroup, groupName)
+
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to fetch devices")
 	}

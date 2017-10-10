@@ -24,12 +24,13 @@ import (
 	u "github.com/mendersoftware/go-lib-micro/rest_utils"
 	"github.com/pkg/errors"
 
+	"regexp"
+
 	inventory "github.com/mendersoftware/inventory/inv"
 	"github.com/mendersoftware/inventory/model"
 	"github.com/mendersoftware/inventory/store"
 	"github.com/mendersoftware/inventory/utils"
 	"github.com/mendersoftware/inventory/utils/identity"
-	"regexp"
 )
 
 const (
@@ -45,6 +46,7 @@ const (
 )
 
 const (
+	queryParamGroup          = "group"
 	queryParamSort           = "sort"
 	queryParamHasGroup       = "has_group"
 	queryParamValueSeparator = ":"
@@ -131,7 +133,7 @@ func parseSortParam(r *rest.Request) (*store.Sort, error) {
 //
 // eg. `attr_name1=value1` or `attr_name1=eq:value1`
 func parseFilterParams(r *rest.Request) ([]store.Filter, error) {
-	knownParams := []string{utils.PageName, utils.PerPageName, queryParamSort, queryParamHasGroup}
+	knownParams := []string{utils.PageName, utils.PerPageName, queryParamSort, queryParamHasGroup, queryParamGroup}
 	filters := make([]store.Filter, 0)
 	var filter store.Filter
 	for name := range r.URL.Query() {
@@ -184,6 +186,12 @@ func (i *inventoryHandlers) GetDevicesHandler(w rest.ResponseWriter, r *rest.Req
 		return
 	}
 
+	groupName, err := utils.ParseQueryParmStr(r, "group", false, nil)
+	if err != nil {
+		u.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
+		return
+	}
+
 	sort, err := parseSortParam(r)
 	if err != nil {
 		u.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
@@ -197,7 +205,7 @@ func (i *inventoryHandlers) GetDevicesHandler(w rest.ResponseWriter, r *rest.Req
 	}
 
 	//get one extra device to see if there's a 'next' page
-	devs, err := i.inventory.ListDevices(ctx, int((page-1)*perPage), int(perPage+1), filters, sort, hasGroup)
+	devs, err := i.inventory.ListDevices(ctx, int((page-1)*perPage), int(perPage+1), filters, sort, hasGroup, groupName)
 	if err != nil {
 		u.RestErrWithLogInternal(w, r, l, err)
 		return

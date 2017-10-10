@@ -97,13 +97,13 @@ func (_m *DataStore) GetDeviceGroup(ctx context.Context, id model.DeviceID) (mod
 	return r0, r1
 }
 
-// GetDevices provides a mock function with given fields: ctx, skip, limit, filters, sort, hasGroup
-func (_m *DataStore) GetDevices(ctx context.Context, skip int, limit int, filters []store.Filter, sort *store.Sort, hasGroup *bool) ([]model.Device, error) {
-	ret := _m.Called(ctx, skip, limit, filters, sort, hasGroup)
+// GetDevices provides a mock function with given fields: ctx, skip, limit, filters, sort, hasGroup, groupName
+func (_m *DataStore) GetDevices(ctx context.Context, skip int, limit int, filters []store.Filter, sort *store.Sort, hasGroup *bool, groupName string) ([]model.Device, error) {
+	ret := _m.Called(ctx, skip, limit, filters, sort, hasGroup, groupName)
 
 	var r0 []model.Device
-	if rf, ok := ret.Get(0).(func(context.Context, int, int, []store.Filter, *store.Sort, *bool) []model.Device); ok {
-		r0 = rf(ctx, skip, limit, filters, sort, hasGroup)
+	if rf, ok := ret.Get(0).(func(context.Context, int, int, []store.Filter, *store.Sort, *bool, string) []model.Device); ok {
+		r0 = rf(ctx, skip, limit, filters, sort, hasGroup, groupName)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]model.Device)
@@ -111,8 +111,8 @@ func (_m *DataStore) GetDevices(ctx context.Context, skip int, limit int, filter
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, int, int, []store.Filter, *store.Sort, *bool) error); ok {
-		r1 = rf(ctx, skip, limit, filters, sort, hasGroup)
+	if rf, ok := ret.Get(1).(func(context.Context, int, int, []store.Filter, *store.Sort, *bool, string) error); ok {
+		r1 = rf(ctx, skip, limit, filters, sort, hasGroup, groupName)
 	} else {
 		r1 = ret.Error(1)
 	}

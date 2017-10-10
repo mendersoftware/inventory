@@ -41,6 +41,7 @@ func TestInventoryListDevices(t *testing.T) {
 
 	group := model.GroupName("asd")
 	testCases := map[string]struct {
+		group           string
 		inHasGroup      *bool
 		datastoreFilter []store.Filter
 		datastoreError  error
@@ -75,6 +76,13 @@ func TestInventoryListDevices(t *testing.T) {
 			outError:        errors.New("failed to fetch devices: db connection failed"),
 			outDevices:      nil,
 		},
+		"get devices from group": {
+			group: "asd",
+			outDevices: []model.Device{
+				{ID: model.DeviceID("1"), Group: group},
+				{ID: model.DeviceID("2"), Group: group},
+			},
+		},
 	}
 
 	for name, tc := range testCases {
@@ -90,10 +98,11 @@ func TestInventoryListDevices(t *testing.T) {
 			tc.datastoreFilter,
 			mock.AnythingOfType("*store.Sort"),
 			mock.AnythingOfType("*bool"),
+			mock.AnythingOfType("string"),
 		).Return(tc.outDevices, tc.datastoreError)
 		i := invForTest(db)
 
-		devs, err := i.ListDevices(ctx, 1, 10, nil, nil, tc.inHasGroup)
+		devs, err := i.ListDevices(ctx, 1, 10, nil, nil, tc.inHasGroup, tc.group)
 
 		if tc.outError != nil {
 			if assert.Error(t, err) {

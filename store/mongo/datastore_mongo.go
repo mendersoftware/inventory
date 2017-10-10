@@ -136,7 +136,7 @@ func NewDataStoreMongo(config DataStoreMongoConfig) (*DataStoreMongo, error) {
 	return db, nil
 }
 
-func (db *DataStoreMongo) GetDevices(ctx context.Context, skip int, limit int, filters []store.Filter, sort *store.Sort, hasGroup *bool) ([]model.Device, error) {
+func (db *DataStoreMongo) GetDevices(ctx context.Context, skip int, limit int, filters []store.Filter, sort *store.Sort, hasGroup *bool, groupName string) ([]model.Device, error) {
 	s := db.session.Copy()
 	defer s.Close()
 	c := s.DB(mstore.DbFromContext(ctx, DbName)).C(DbDevicesColl)
@@ -165,6 +165,10 @@ func (db *DataStoreMongo) GetDevices(ctx context.Context, skip int, limit int, f
 		} else {
 			queryFilters = append(queryFilters, bson.M{DbDevGroup: bson.M{"$exists": false}})
 		}
+	}
+
+	if groupName != "" {
+		queryFilters = append(queryFilters, bson.M{DbDevGroup: groupName}) // TODO - is this the right db-call?
 	}
 
 	findQuery := bson.M{}

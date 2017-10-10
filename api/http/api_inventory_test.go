@@ -127,6 +127,21 @@ func TestApiInventoryGetDevices(t *testing.T) {
 		inReq          *http.Request
 		resp           utils.JSONResponseParams
 	}{
+		"get all devices in group": {
+			listDevicesNum: 3,
+			listDevicesErr: nil,
+			inReq:          test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=4&per_page=5&group=foo", nil),
+			resp: utils.JSONResponseParams{
+				OutputStatus:     200,
+				OutputBodyObject: mockListDevices(3),
+				OutputHeaders: map[string][]string{
+					"Link": {
+						fmt.Sprintf(utils.LinkTmpl, "devices", "group=foo&page=3&per_page=5", "prev"),
+						fmt.Sprintf(utils.LinkTmpl, "devices", "group=foo&page=1&per_page=5", "first"),
+					},
+				},
+			},
+		},
 		"valid pagination, no next page": {
 			listDevicesNum: 5,
 			listDevicesErr: nil,
@@ -284,6 +299,7 @@ func TestApiInventoryGetDevices(t *testing.T) {
 			mock.AnythingOfType("[]store.Filter"),
 			mock.AnythingOfType("*store.Sort"),
 			mock.AnythingOfType("*bool"),
+			mock.AnythingOfType("string"),
 		).Return(mockListDevices(testCase.listDevicesNum), testCase.listDevicesErr)
 
 		apih := makeMockApiHandler(t, &inv)

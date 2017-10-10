@@ -30,7 +30,7 @@ var (
 )
 
 type DataStore interface {
-	GetDevices(ctx context.Context, skip int, limit int, filters []Filter, sort *Sort, hasGroup *bool) ([]model.Device, error)
+	GetDevices(ctx context.Context, skip int, limit int, filters []Filter, sort *Sort, hasGroup *bool, groupName string) ([]model.Device, error)
 
 	// find a device with given `id`, returns the device or nil,
 	// if device was not found, error and returned device are nil
