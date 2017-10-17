@@ -26,6 +26,7 @@ import (
 	"github.com/ant0ine/go-json-rest/rest/test"
 	"github.com/mendersoftware/go-lib-micro/requestid"
 	"github.com/mendersoftware/go-lib-micro/requestlog"
+	mt "github.com/mendersoftware/go-lib-micro/testing"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -1179,4 +1180,103 @@ func TestApiDeleteDevice(t *testing.T) {
 			runTestRequest(t, apih, tc.inReq, tc.JSONResponseParams)
 		})
 	}
+}
+
+func TestUserAdmApiCreateTenant(t *testing.T) {
+	t.Parallel()
+
+	testCases := map[string]struct {
+		uaError error
+		body    interface{}
+		tenant  model.NewTenant
+
+		checker mt.ResponseChecker
+	}{
+		"ok": {
+			uaError: nil,
+			body: map[string]interface{}{
+				"tenant_id": "foobar",
+			},
+			tenant: model.NewTenant{ID: "foobar"},
+
+			checker: mt.NewJSONResponse(
+				http.StatusCreated,
+				nil,
+				nil,
+			),
+		},
+		"error: useradm internal": {
+			body: map[string]interface{}{
+				"tenant_id": "failing-tenant",
+			},
+			uaError: errors.New("some internal error"),
+			tenant:  model.NewTenant{ID: "failing-tenant"},
+
+			checker: mt.NewJSONResponse(
+				http.StatusInternalServerError,
+				nil,
+				restError("internal error"),
+			),
+		},
+		"error: no tenant id": {
+			body: map[string]interface{}{
+				"tenant_id": "",
+			},
+			tenant: model.NewTenant{},
+
+			checker: mt.NewJSONResponse(
+				http.StatusBadRequest,
+				nil,
+				restError("TenantID: non zero value required;"),
+			),
+		},
+		"error: empty json": {
+			tenant: model.NewTenant{},
+
+			checker: mt.NewJSONResponse(
+				http.StatusBadRequest,
+				nil,
+				restError("JSON payload is empty"),
+			),
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(fmt.Sprintf("tc %s", name), func(t *testing.T) {
+
+			ctx := contextMatcher()
+
+			//make mock inventory
+			inv := &minventory.InventoryApp{}
+			inv.On("CreateTenant", ctx, tc.tenant).Return(tc.uaError)
+
+			//make handler
+			api := makeMockApiHandler(t, inv)
+
+			//make request
+			req := makeReq(http.MethodPost,
+				"http://1.2.3.4/api/internal/v1/inventory/tenants",
+				"",
+				tc.body)
+
+			//test
+			recorded := test.RunRequest(t, api, req)
+			mt.CheckResponse(t, tc.checker, recorded)
+		})
+	}
+}
+
+func makeReq(method, url, auth string, body interface{}) *http.Request {
+	req := test.MakeSimpleRequest(method, url, body)
+
+	if auth != "" {
+		req.Header.Set("Authorization", auth)
+	}
+	req.Header.Add(requestid.RequestIdHeader, "test")
+
+	return req
+}
+
+func restError(status string) map[string]interface{} {
+	return map[string]interface{}{"error": status, "request_id": "test"}
 }
