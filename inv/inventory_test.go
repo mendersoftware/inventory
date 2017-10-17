@@ -579,7 +579,48 @@ func TestInventoryDeleteDevice(t *testing.T) {
 func TestNewInventory(t *testing.T) {
 	t.Parallel()
 
-	i := NewInventory(&mstore.DataStore{})
+	i := NewInventory(&mstore.DataStore{}, nil)
 
 	assert.NotNil(t, i)
+}
+
+func TestUserAdmCreateTenant(t *testing.T) {
+	t.Parallel()
+
+	testCases := map[string]struct {
+		tenant    string
+		tenantErr error
+		err       error
+	}{
+		"ok": {
+			tenant: "foobar",
+		},
+		"error": {
+			tenant:    "1234",
+			tenantErr: errors.New("migration failed"),
+			err:       errors.New("failed to apply migrations for tenant 1234: migration failed"),
+		},
+	}
+
+	for name := range testCases {
+		tc := testCases[name]
+		t.Run(fmt.Sprintf("tc %s", name), func(t *testing.T) {
+
+			t.Logf("test case: %s", name)
+
+			ctx := context.Background()
+
+			tenantDb := &mstore.TenantDataKeeper{}
+			tenantDb.On("MigrateTenant", ctx, tc.tenant).Return(tc.tenantErr)
+
+			useradm := NewInventory(nil, tenantDb)
+
+			err := useradm.CreateTenant(ctx, model.NewTenant{ID: tc.tenant})
+			if tc.err != nil {
+				assert.EqualError(t, err, tc.err.Error())
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
 }

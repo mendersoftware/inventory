@@ -35,14 +35,17 @@ type InventoryApp interface {
 	ListDevicesByGroup(ctx context.Context, group model.GroupName, skip int, limit int) ([]model.DeviceID, error)
 	GetDeviceGroup(ctx context.Context, id model.DeviceID) (model.GroupName, error)
 	DeleteDevice(ctx context.Context, id model.DeviceID) error
+	CreateTenant(ctx context.Context, tenant model.NewTenant) error
 }
 
 type Inventory struct {
-	db store.DataStore
+	db           store.DataStore
+	tenantKeeper store.TenantDataKeeper
 }
 
-func NewInventory(d store.DataStore) *Inventory {
-	return &Inventory{db: d}
+func NewInventory(d store.DataStore, tenantKeeper store.TenantDataKeeper,
+) *Inventory {
+	return &Inventory{db: d, tenantKeeper: tenantKeeper}
 }
 
 func (i *Inventory) ListDevices(ctx context.Context, skip int, limit int, filters []store.Filter, sort *store.Sort, hasGroup *bool) ([]model.Device, error) {
@@ -151,4 +154,11 @@ func (i *Inventory) GetDeviceGroup(ctx context.Context, id model.DeviceID) (mode
 	}
 
 	return group, nil
+}
+
+func (i *Inventory) CreateTenant(ctx context.Context, tenant model.NewTenant) error {
+	if err := i.tenantKeeper.MigrateTenant(ctx, tenant.ID); err != nil {
+		return errors.Wrapf(err, "failed to apply migrations for tenant %v", tenant.ID)
+	}
+	return nil
 }
