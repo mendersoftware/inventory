@@ -29,7 +29,7 @@ import (
 )
 
 func invForTest(d store.DataStore) InventoryApp {
-	return &Inventory{db: d}
+	return &inventory{db: d}
 }
 
 func boolPtr(value bool) *bool {
