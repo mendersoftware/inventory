@@ -24,7 +24,7 @@ type TenantStoreMongo struct {
 
 func NewTenantStoreMongo(db *DataStoreMongo) *TenantStoreMongo {
 	return &TenantStoreMongo{
-		db: db,
+		db: db.WithAutomigrate(),
 	}
 }
 
