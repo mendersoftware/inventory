@@ -21,6 +21,7 @@ def pytest_addoption(parser):
     parser.addoption("--devices", action="store", default="1001", help="# of devices to test with")
     parser.addoption("--management-spec", action="store",
                      default="management_api.yml.", help="management API spec")
+    parser.addoption("--internal-spec", default="../docs/internal_api.yml")
     parser.addoption("--inventory-items", action="store",
                      default="inventory_items", help="file with inventory items")
 
