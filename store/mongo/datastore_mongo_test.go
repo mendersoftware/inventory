@@ -30,6 +30,7 @@ import (
 	"github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
 	mstore "github.com/mendersoftware/go-lib-micro/store"
+	"unsafe"
 )
 
 // test funcs
@@ -1647,7 +1648,7 @@ func TestMigrate(t *testing.T) {
 		store := NewDataStoreMongoWithSession(session)
 
 		if tc.automigrate {
-			store.WithAutomigrate()
+			store = store.WithAutomigrate()
 		}
 
 		err := store.Migrate(context.Background(), tc.version)
@@ -1741,4 +1742,17 @@ func TestMongoDeleteDevice(t *testing.T) {
 		// Need to close all sessions to be able to call wipe at next test case
 		session.Close()
 	}
+}
+
+func TestWithAutomigrate(t *testing.T) {
+	db.Wipe()
+
+	session := db.Session()
+	defer session.Close()
+
+	store := NewDataStoreMongoWithSession(session)
+
+	newStore := store.WithAutomigrate()
+
+	assert.NotEqual(t, unsafe.Pointer(store), unsafe.Pointer(newStore))
 }

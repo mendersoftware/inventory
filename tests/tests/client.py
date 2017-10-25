@@ -117,3 +117,58 @@ class CliClient:
             args += ['--tenant', tenant_id]
 
         subprocess.run(args, check=True)
+
+class ApiClient:
+    config = {
+        'also_return_response': True,
+        'validate_responses': True,
+        'validate_requests': False,
+        'validate_swagger_spec': False,
+        'use_models': True,
+    }
+
+    log = logging.getLogger('client.ApiClient')
+    # override spec_option for internal vs management clients
+    spec_option = 'internal-spec'
+    api_url = "http://%s/api/0.1.0/" % \
+              pytest.config.getoption("host")
+
+    def make_api_url(self, path):
+        return os.path.join(self.api_url,
+                            path if not path.startswith("/") else path[1:])
+
+    def setup_swagger(self):
+        self.http_client = RequestsClient()
+        self.http_client.session.verify = False
+
+        spec = pytest.config.getoption(self.spec_option)
+        self.client = SwaggerClient.from_spec(load_file(spec),
+                                              config=self.config,
+                                              http_client=self.http_client)
+        self.client.swagger_spec.api_url = self.api_url
+
+    def __init__(self):
+        self.setup_swagger()
+
+class InternalApiClient(ApiClient):
+    log = logging.getLogger('client.InternalClient')
+    spec_option = 'internal_spec'
+    api_url = "http://%s/api/internal/v1/inventory/" % \
+              pytest.config.getoption("host")
+
+    def __init__(self):
+        super().__init__()
+
+    def verify(self, token, uri='/api/management/1.0/auth/verify', method='POST'):
+        if not token.startswith('Bearer '):
+            token = "Bearer " + token
+        return self.client.auth.post_auth_verify(**{
+            'Authorization': token,
+            'X-Original-URI': uri,
+            'X-Original-Method' :method,
+        }).result()
+
+    def create_tenant(self, tenant_id):
+        return self.client.tenants.post_tenants(tenant={
+            "tenant_id": tenant_id,
+        }).result()

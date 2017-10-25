@@ -1,0 +1,56 @@
+swagger: '2.0'
+info:
+  version: '1'
+  title: Device inventory
+  description: |
+    An API for device attribute management and device grouping.
+    Not exposed via the API Gateway - intended for internal use only.
+
+basePath: '/api/internal/v1/inventory'
+host: 'mender-inventory:8080'
+schemes:
+  - http
+
+paths:
+  /tenants:
+    post:
+      summary: Create tenant
+      description: |
+        Create a tenant with provided configuration.
+      parameters:
+        - name: tenant
+          in: body
+          required: true
+          schema:
+            $ref: "#/definitions/TenantNew"
+      responses:
+        201:
+          description: The tenant was created successfully.
+        400:
+          description: Missing or malformed request parameters.
+        500:
+          description: Unexpected error.
+          schema:
+            $ref: '#/definitions/Error'
+
+definitions:
+  Error:
+    description: Error descriptor.
+    type: object
+    properties:
+      error:
+        description: Description of the error.
+        type: string
+    example:
+      application/json:
+        error: "missing Authorization header"
+  TenantNew:
+    description: Tenant configuration.
+    type: object
+    properties:
+      tenant_id:
+        description: ID of given tenant.
+        type: string
+    example:
+      application/json:
+        tenant_id: "1234"

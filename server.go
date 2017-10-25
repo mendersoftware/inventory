@@ -45,20 +45,12 @@ func RunServer(c config.Reader) error {
 
 	l := log.New(log.Ctx{})
 
-	db, err := mongo.NewDataStoreMongo(
-		mongo.DataStoreMongoConfig{
-			ConnectionString: c.GetString(SettingDb),
-			SSL:              c.GetBool(SettingDbSSL),
-			SSLSkipVerify:    c.GetBool(SettingDbSSLSkipVerify),
-
-			Username: c.GetString(SettingDbUsername),
-			Password: c.GetString(SettingDbPassword),
-		})
+	db, err := mongo.NewDataStoreMongo(makeDataStoreConfig())
 	if err != nil {
 		return errors.Wrap(err, "database connection failed")
 	}
 
-	inv := inventory.NewInventory(db)
+	inv := inventory.NewInventory(db, mongo.NewTenantStoreMongo(db))
 
 	invapi := api_http.NewInventoryApiHandlers(inv)
 

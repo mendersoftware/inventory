@@ -18,7 +18,7 @@ import pytest
 
 from pymongo import MongoClient
 
-from client import CliClient, ManagementClient
+from client import CliClient, ManagementClient, InternalApiClient
 
 
 @pytest.fixture(scope="session")
@@ -36,7 +36,7 @@ def mongo_cleanup(mongo):
 @pytest.yield_fixture(scope='function')
 def clean_db(mongo):
     mongo_cleanup(mongo)
-    yield
+    yield mongo
     mongo_cleanup(mongo)
 
 
@@ -48,6 +48,10 @@ def cli():
 @pytest.fixture(scope="session")
 def management_client():
     return ManagementClient()
+
+@pytest.fixture(scope="session")
+def internal_client():
+    return InternalApiClient()
 
 
 @pytest.fixture(scope="session")

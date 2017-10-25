@@ -178,6 +178,12 @@
 			"revisionTime": "2017-09-29T08:22:05Z"
 		},
 		{
+			"checksumSHA1": "8CsIiNVHuIx/5EmrJHYrXGGpqVM=",
+			"path": "github.com/mendersoftware/go-lib-micro/testing",
+			"revision": "e9c77ab5fa6cc4f066f5112b158c2623450ae5d4",
+			"revisionTime": "2017-10-12T11:12:27Z"
+		},
+		{
 			"checksumSHA1": "FLmqfKOP+8V5+LJm1568MwJf4gk=",
 			"path": "github.com/mendersoftware/mendertesting",
 			"revision": "731be57371e8c3dde8fff60dd0d7d8171ad7f472",

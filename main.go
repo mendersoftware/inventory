@@ -178,7 +178,7 @@ func cmdMigrate(args *cli.Context) error {
 	}
 
 	// we want to apply migrations
-	db.WithAutomigrate()
+	db = db.WithAutomigrate()
 
 	ctx := context.Background()
 

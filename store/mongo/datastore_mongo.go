@@ -449,7 +449,11 @@ func (db *DataStoreMongo) Migrate(ctx context.Context, version string) error {
 	return nil
 }
 
+// WithAutomigrate enables automatic migration and returns a new datastore based
+// on current one
 func (db *DataStoreMongo) WithAutomigrate() *DataStoreMongo {
-	db.automigrate = true
-	return db
+	return &DataStoreMongo{
+		session:     db.session,
+		automigrate: true,
+	}
 }

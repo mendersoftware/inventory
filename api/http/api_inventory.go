@@ -40,6 +40,8 @@ const (
 	uriAttributes    = "/api/0.1.0/attributes"
 	uriGroups        = "/api/0.1.0/groups"
 	uriGroupsDevices = "/api/0.1.0/groups/:name/devices"
+
+	uriInternalTenants = "/api/internal/v1/inventory/tenants"
 )
 
 const (
@@ -58,18 +60,18 @@ type InventoryApiGroup struct {
 	Group string `json:"group" valid:"required"`
 }
 
-type InventoryHandlers struct {
+type inventoryHandlers struct {
 	inventory inventory.InventoryApp
 }
 
 // return an ApiHandler for device admission app
 func NewInventoryApiHandlers(i inventory.InventoryApp) ApiHandler {
-	return &InventoryHandlers{
+	return &inventoryHandlers{
 		inventory: i,
 	}
 }
 
-func (i *InventoryHandlers) GetApp() (rest.App, error) {
+func (i *inventoryHandlers) GetApp() (rest.App, error) {
 	routes := []*rest.Route{
 		rest.Get(uriDevices, i.GetDevicesHandler),
 		rest.Post(uriDevices, i.AddDeviceHandler),
@@ -81,6 +83,8 @@ func (i *InventoryHandlers) GetApp() (rest.App, error) {
 		rest.Get(uriDeviceGroups, i.GetDeviceGroupHandler),
 		rest.Get(uriGroups, i.GetGroupsHandler),
 		rest.Get(uriGroupsDevices, i.GetDevicesByGroup),
+
+		rest.Post(uriInternalTenants, i.CreateTenantHandler),
 	}
 
 	routes = append(routes)
@@ -163,7 +167,7 @@ func parseFilterParams(r *rest.Request) ([]store.Filter, error) {
 	return filters, nil
 }
 
-func (i *InventoryHandlers) GetDevicesHandler(w rest.ResponseWriter, r *rest.Request) {
+func (i *inventoryHandlers) GetDevicesHandler(w rest.ResponseWriter, r *rest.Request) {
 	ctx := r.Context()
 
 	l := log.FromContext(ctx)
@@ -214,7 +218,7 @@ func (i *InventoryHandlers) GetDevicesHandler(w rest.ResponseWriter, r *rest.Req
 	w.WriteJson(devs[:len])
 }
 
-func (i *InventoryHandlers) GetDeviceHandler(w rest.ResponseWriter, r *rest.Request) {
+func (i *inventoryHandlers) GetDeviceHandler(w rest.ResponseWriter, r *rest.Request) {
 	ctx := r.Context()
 
 	l := log.FromContext(ctx)
@@ -234,7 +238,7 @@ func (i *InventoryHandlers) GetDeviceHandler(w rest.ResponseWriter, r *rest.Requ
 	w.WriteJson(dev)
 }
 
-func (i *InventoryHandlers) DeleteDeviceHandler(w rest.ResponseWriter, r *rest.Request) {
+func (i *inventoryHandlers) DeleteDeviceHandler(w rest.ResponseWriter, r *rest.Request) {
 	ctx := r.Context()
 
 	l := log.FromContext(ctx)
@@ -250,7 +254,7 @@ func (i *InventoryHandlers) DeleteDeviceHandler(w rest.ResponseWriter, r *rest.R
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (i *InventoryHandlers) AddDeviceHandler(w rest.ResponseWriter, r *rest.Request) {
+func (i *inventoryHandlers) AddDeviceHandler(w rest.ResponseWriter, r *rest.Request) {
 	ctx := r.Context()
 
 	l := log.FromContext(ctx)
@@ -275,7 +279,7 @@ func (i *InventoryHandlers) AddDeviceHandler(w rest.ResponseWriter, r *rest.Requ
 	w.WriteHeader(http.StatusCreated)
 }
 
-func (i *InventoryHandlers) PatchDeviceAttributesHandler(w rest.ResponseWriter, r *rest.Request) {
+func (i *inventoryHandlers) PatchDeviceAttributesHandler(w rest.ResponseWriter, r *rest.Request) {
 	ctx := r.Context()
 
 	l := log.FromContext(ctx)
@@ -304,7 +308,7 @@ func (i *InventoryHandlers) PatchDeviceAttributesHandler(w rest.ResponseWriter, 
 	w.WriteHeader(http.StatusOK)
 }
 
-func (i *InventoryHandlers) DeleteDeviceGroupHandler(w rest.ResponseWriter, r *rest.Request) {
+func (i *inventoryHandlers) DeleteDeviceGroupHandler(w rest.ResponseWriter, r *rest.Request) {
 	ctx := r.Context()
 
 	l := log.FromContext(ctx)
@@ -328,7 +332,7 @@ func (i *InventoryHandlers) DeleteDeviceGroupHandler(w rest.ResponseWriter, r *r
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (i *InventoryHandlers) AddDeviceToGroupHandler(w rest.ResponseWriter, r *rest.Request) {
+func (i *inventoryHandlers) AddDeviceToGroupHandler(w rest.ResponseWriter, r *rest.Request) {
 	ctx := r.Context()
 
 	l := log.FromContext(ctx)
@@ -365,7 +369,7 @@ func (i *InventoryHandlers) AddDeviceToGroupHandler(w rest.ResponseWriter, r *re
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (i *InventoryHandlers) GetDevicesByGroup(w rest.ResponseWriter, r *rest.Request) {
+func (i *inventoryHandlers) GetDevicesByGroup(w rest.ResponseWriter, r *rest.Request) {
 	ctx := r.Context()
 
 	l := log.FromContext(ctx)
@@ -437,7 +441,7 @@ func parseAttributes(r *rest.Request) (model.DeviceAttributes, error) {
 	return attrs, nil
 }
 
-func (i *InventoryHandlers) GetGroupsHandler(w rest.ResponseWriter, r *rest.Request) {
+func (i *inventoryHandlers) GetGroupsHandler(w rest.ResponseWriter, r *rest.Request) {
 	ctx := r.Context()
 
 	l := log.FromContext(ctx)
@@ -455,7 +459,7 @@ func (i *InventoryHandlers) GetGroupsHandler(w rest.ResponseWriter, r *rest.Requ
 	w.WriteJson(groups)
 }
 
-func (i *InventoryHandlers) GetDeviceGroupHandler(w rest.ResponseWriter, r *rest.Request) {
+func (i *inventoryHandlers) GetDeviceGroupHandler(w rest.ResponseWriter, r *rest.Request) {
 	ctx := r.Context()
 
 	l := log.FromContext(ctx)
@@ -479,4 +483,36 @@ func (i *InventoryHandlers) GetDeviceGroupHandler(w rest.ResponseWriter, r *rest
 	}
 
 	w.WriteJson(ret)
+}
+
+type newTenantRequest struct {
+	TenantID string `json:"tenant_id" valid:"required"`
+}
+
+func (i *inventoryHandlers) CreateTenantHandler(w rest.ResponseWriter, r *rest.Request) {
+	ctx := r.Context()
+
+	l := log.FromContext(ctx)
+
+	var newTenant newTenantRequest
+
+	if err := r.DecodeJsonPayload(&newTenant); err != nil {
+		u.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
+		return
+	}
+
+	if _, err := govalidator.ValidateStruct(newTenant); err != nil {
+		u.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
+		return
+	}
+
+	err := i.inventory.CreateTenant(ctx, model.NewTenant{
+		ID: newTenant.TenantID,
+	})
+	if err != nil {
+		u.RestErrWithLogInternal(w, r, l, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusCreated)
 }
