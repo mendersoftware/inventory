@@ -15,6 +15,7 @@ package http
 
 import (
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -23,8 +24,6 @@ import (
 	"github.com/mendersoftware/go-lib-micro/log"
 	u "github.com/mendersoftware/go-lib-micro/rest_utils"
 	"github.com/pkg/errors"
-
-	"regexp"
 
 	inventory "github.com/mendersoftware/inventory/inv"
 	"github.com/mendersoftware/inventory/model"
@@ -205,7 +204,15 @@ func (i *inventoryHandlers) GetDevicesHandler(w rest.ResponseWriter, r *rest.Req
 	}
 
 	//get one extra device to see if there's a 'next' page
-	devs, err := i.inventory.ListDevices(ctx, int((page-1)*perPage), int(perPage+1), filters, sort, hasGroup, groupName)
+	ld := store.ListQuery{int((page - 1) * perPage),
+		int(perPage + 1),
+		filters,
+		sort,
+		hasGroup,
+		groupName}
+
+	devs, err := i.inventory.ListDevices(ctx, ld)
+
 	if err != nil {
 		u.RestErrWithLogInternal(w, r, l, err)
 		return

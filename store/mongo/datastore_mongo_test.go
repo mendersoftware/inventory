@@ -229,10 +229,10 @@ func TestMongoGetDevices(t *testing.T) {
 			assert.NoError(t, err, "failed to setup input data")
 		}
 
-		store := NewDataStoreMongoWithSession(session)
+		mongoStore := NewDataStoreMongoWithSession(session)
 
 		//test
-		devs, err := store.GetDevices(ctx, tc.skip, tc.limit, tc.filters, tc.sort, tc.hasGroup, tc.groupName)
+		devs, err := mongoStore.GetDevices(ctx, store.ListQuery{tc.skip, tc.limit, tc.filters, tc.sort, tc.hasGroup, tc.groupName})
 		assert.NoError(t, err, "failed to get devices")
 
 		assert.Equal(t, len(tc.expected), len(devs))

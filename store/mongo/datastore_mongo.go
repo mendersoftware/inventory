@@ -136,14 +136,14 @@ func NewDataStoreMongo(config DataStoreMongoConfig) (*DataStoreMongo, error) {
 	return db, nil
 }
 
-func (db *DataStoreMongo) GetDevices(ctx context.Context, skip int, limit int, filters []store.Filter, sort *store.Sort, hasGroup *bool, groupName string) ([]model.Device, error) {
+func (db *DataStoreMongo) GetDevices(ctx context.Context, q store.ListQuery) ([]model.Device, error) {
 	s := db.session.Copy()
 	defer s.Close()
 	c := s.DB(mstore.DbFromContext(ctx, DbName)).C(DbDevicesColl)
 	res := []model.Device{}
 
 	queryFilters := make([]bson.M, 0)
-	for _, filter := range filters {
+	for _, filter := range q.Filters {
 		op := mongoOperator(filter.Operator)
 		field := fmt.Sprintf("%s.%s.%s", DbDevAttributes, filter.AttrName, DbDevAttributesValue)
 		switch filter.Operator {
@@ -159,16 +159,16 @@ func (db *DataStoreMongo) GetDevices(ctx context.Context, skip int, limit int, f
 		}
 	}
 
-	if hasGroup != nil {
-		if *hasGroup {
+	if q.HasGroup != nil {
+		if *q.HasGroup {
 			queryFilters = append(queryFilters, bson.M{DbDevGroup: bson.M{"$exists": true}})
 		} else {
 			queryFilters = append(queryFilters, bson.M{DbDevGroup: bson.M{"$exists": false}})
 		}
 	}
 
-	if groupName != "" {
-		queryFilters = append(queryFilters, bson.M{DbDevGroup: groupName}) // TODO - is this the right db-call?
+	if q.GroupName != "" {
+		queryFilters = append(queryFilters, bson.M{DbDevGroup: q.GroupName})
 	}
 
 	findQuery := bson.M{}
@@ -176,10 +176,10 @@ func (db *DataStoreMongo) GetDevices(ctx context.Context, skip int, limit int, f
 		findQuery["$and"] = queryFilters
 	}
 
-	query := c.Find(findQuery).Skip(skip).Limit(limit)
-	if sort != nil {
-		sortField := fmt.Sprintf("%s.%s.%s", DbDevAttributes, sort.AttrName, DbDevAttributesValue)
-		if sort.Ascending {
+	query := c.Find(findQuery).Skip(q.Skip).Limit(q.Limit)
+	if q.Sort != nil {
+		sortField := fmt.Sprintf("%s.%s.%s", DbDevAttributes, q.Sort.AttrName, DbDevAttributesValue)
+		if q.Sort.Ascending {
 			query.Sort(sortField)
 		} else {
 			query.Sort("-" + sortField)

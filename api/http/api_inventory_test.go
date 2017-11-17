@@ -294,12 +294,7 @@ func TestApiInventoryGetDevices(t *testing.T) {
 
 		inv.On("ListDevices",
 			ctx,
-			mock.AnythingOfType("int"),
-			mock.AnythingOfType("int"),
-			mock.AnythingOfType("[]store.Filter"),
-			mock.AnythingOfType("*store.Sort"),
-			mock.AnythingOfType("*bool"),
-			mock.AnythingOfType("string"),
+			mock.AnythingOfType("store.ListQuery"),
 		).Return(mockListDevices(testCase.listDevicesNum), testCase.listDevicesErr)
 
 		apih := makeMockApiHandler(t, &inv)

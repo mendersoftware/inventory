@@ -93,16 +93,11 @@ func TestInventoryListDevices(t *testing.T) {
 		db := &mstore.DataStore{}
 		db.On("GetDevices",
 			ctx,
-			mock.AnythingOfType("int"),
-			mock.AnythingOfType("int"),
-			tc.datastoreFilter,
-			mock.AnythingOfType("*store.Sort"),
-			mock.AnythingOfType("*bool"),
-			mock.AnythingOfType("string"),
+			mock.AnythingOfType("store.ListQuery"),
 		).Return(tc.outDevices, tc.datastoreError)
 		i := invForTest(db)
 
-		devs, err := i.ListDevices(ctx, 1, 10, nil, nil, tc.inHasGroup, tc.group)
+		devs, err := i.ListDevices(ctx, store.ListQuery{1, 10, nil, nil, tc.inHasGroup, tc.group})
 
 		if tc.outError != nil {
 			if assert.Error(t, err) {
