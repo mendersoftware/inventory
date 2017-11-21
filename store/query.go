@@ -30,3 +30,12 @@ type Sort struct {
 	AttrName  string
 	Ascending bool
 }
+
+type ListQuery struct {
+	Skip      int
+	Limit     int
+	Filters   []Filter
+	Sort      *Sort
+	HasGroup  *bool
+	GroupName string
+}

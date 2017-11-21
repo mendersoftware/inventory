@@ -110,13 +110,13 @@ func (_m *InventoryApp) GetDeviceGroup(ctx context.Context, id model.DeviceID) (
 	return r0, r1
 }
 
-// ListDevices provides a mock function with given fields: ctx, skip, limit, filters, sort, hasGroup
-func (_m *InventoryApp) ListDevices(ctx context.Context, skip int, limit int, filters []store.Filter, sort *store.Sort, hasGroup *bool) ([]model.Device, error) {
-	ret := _m.Called(ctx, skip, limit, filters, sort, hasGroup)
+// ListDevices provides a mock function with given fields: ctx, q
+func (_m *InventoryApp) ListDevices(ctx context.Context, q store.ListQuery) ([]model.Device, error) {
+	ret := _m.Called(ctx, q)
 
 	var r0 []model.Device
-	if rf, ok := ret.Get(0).(func(context.Context, int, int, []store.Filter, *store.Sort, *bool) []model.Device); ok {
-		r0 = rf(ctx, skip, limit, filters, sort, hasGroup)
+	if rf, ok := ret.Get(0).(func(context.Context, store.ListQuery) []model.Device); ok {
+		r0 = rf(ctx, q)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]model.Device)
@@ -124,8 +124,8 @@ func (_m *InventoryApp) ListDevices(ctx context.Context, skip int, limit int, fi
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, int, int, []store.Filter, *store.Sort, *bool) error); ok {
-		r1 = rf(ctx, skip, limit, filters, sort, hasGroup)
+	if rf, ok := ret.Get(1).(func(context.Context, store.ListQuery) error); ok {
+		r1 = rf(ctx, q)
 	} else {
 		r1 = ret.Error(1)
 	}

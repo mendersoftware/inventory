@@ -84,14 +84,22 @@ func TestMongoGetDevices(t *testing.T) {
 	floatVal5 := 5.0
 
 	testCases := map[string]struct {
-		expected []model.Device
-		skip     int
-		limit    int
-		filters  []store.Filter
-		sort     *store.Sort
-		hasGroup *bool
-		tenant   string
+		expected  []model.Device
+		skip      int
+		limit     int
+		filters   []store.Filter
+		sort      *store.Sort
+		hasGroup  *bool
+		groupName string
+		tenant    string
 	}{
+		"get device from group 1": {
+			expected:  []model.Device{inputDevs[1]},
+			skip:      0,
+			filters:   nil,
+			sort:      nil,
+			groupName: "1",
+		},
 		"all devs, no skip, no limit": {
 			expected: inputDevs,
 			skip:     0,
@@ -221,10 +229,10 @@ func TestMongoGetDevices(t *testing.T) {
 			assert.NoError(t, err, "failed to setup input data")
 		}
 
-		store := NewDataStoreMongoWithSession(session)
+		mongoStore := NewDataStoreMongoWithSession(session)
 
 		//test
-		devs, err := store.GetDevices(ctx, tc.skip, tc.limit, tc.filters, tc.sort, tc.hasGroup)
+		devs, err := mongoStore.GetDevices(ctx, store.ListQuery{tc.skip, tc.limit, tc.filters, tc.sort, tc.hasGroup, tc.groupName})
 		assert.NoError(t, err, "failed to get devices")
 
 		assert.Equal(t, len(tc.expected), len(devs))
