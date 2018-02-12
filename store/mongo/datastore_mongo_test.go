@@ -15,7 +15,6 @@ package mongo_test
 
 import (
 	"context"
-	"errors"
 	"reflect"
 	"testing"
 	"time"
@@ -336,16 +335,17 @@ func TestMongoAddDevice(t *testing.T) {
 	testCases := map[string]struct {
 		InputDevice *model.Device
 		tenant      string
+		IsError     bool
 		OutputError error
 	}{
 		"no device given": {
 			InputDevice: nil,
-			OutputError: errors.New("failed to store device: error parsing element 0 of field documents :: caused by :: wrong type for '0' field, expected object, found 0: null"),
+			IsError:     true,
 		},
 		"no device given; with tenant": {
 			InputDevice: nil,
 			tenant:      "foo",
-			OutputError: errors.New("failed to store device: error parsing element 0 of field documents :: caused by :: wrong type for '0' field, expected object, found 0: null"),
+			IsError:     true,
 		},
 		"valid device with one attribute, no error": {
 			InputDevice: &model.Device{
@@ -423,8 +423,10 @@ func TestMongoAddDevice(t *testing.T) {
 
 		err := store.AddDevice(ctx, testCase.InputDevice)
 
-		if testCase.OutputError != nil {
-			assert.EqualError(t, err, testCase.OutputError.Error())
+		if testCase.IsError {
+			if testCase.OutputError != nil {
+				assert.EqualError(t, err, testCase.OutputError.Error())
+			}
 		} else {
 			assert.NoError(t, err, "expected no error inserting to data store")
 
