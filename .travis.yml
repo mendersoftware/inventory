@@ -124,7 +124,7 @@ script:
         cp integration_new/extra/travis-testing/* tests/ ;
 
         CGO_ENABLED=0 go test -c -o inventory-test -coverpkg $(go list ./... | grep -v vendor | grep -v mock | grep -v test | tr  '\n' ,);
-        
+
         sudo docker build -f Dockerfile.acceptance-testing -t mendersoftware/inventory:prtest .;
         ( ./tests/build-acceptance ./tests ./docs/management_api.yml ./docs/devices_api.yml ./docs/internal_api.yml ./inventory &&
           TESTS_DIR=$PWD/tests ./tests/run-test-environment acceptance $PWD/integration_new ./tests/docker-compose.yml );
@@ -148,12 +148,12 @@ before_deploy:
     # Upload image to docker registry only on PUSH
     - if [ "$JOB_TYPE" = compile_and_basic_tests ]; then
         if [ ! -z "$TRAVIS_TAG" ]; then export IMAGE_TAG=$TRAVIS_TAG; else export IMAGE_TAG=$TRAVIS_BRANCH; fi
-    
+
         docker tag $DOCKER_REPOSITORY:pr $DOCKER_REPOSITORY:$IMAGE_TAG;
-        docker login --email=$DOCKER_HUB_EMAIL --username=$DOCKER_HUB_USERNAME --password=$DOCKER_HUB_PASSWORD;
+        docker login --username=$DOCKER_HUB_USERNAME --password=$DOCKER_HUB_PASSWORD;
         docker push $DOCKER_REPOSITORY:$IMAGE_TAG;
 
-        if [ "$TRAVIS_BRANCH" = master ]; then 
+        if [ "$TRAVIS_BRANCH" = master ]; then
             export COMMIT_TAG="$TRAVIS_BRANCH"_"$TRAVIS_COMMIT";
             docker tag $DOCKER_REPOSITORY:pr $DOCKER_REPOSITORY:$COMMIT_TAG;
             docker push $DOCKER_REPOSITORY:$COMMIT_TAG;
