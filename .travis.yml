@@ -5,6 +5,14 @@ sudo: required
 
 services:
     - docker
+    - mongodb
+
+addons:
+    apt:
+        sources:
+        - mongodb-3.4-precise
+        packages:
+        - mongodb-org-server
 
 # Golang version matrix
 go:
@@ -50,15 +58,13 @@ before_install:
     # Install cyclomatic dependency analysis tool
     - go get -u github.com/fzipp/gocyclo
 
-    # Install mongo 3.4
-    - sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv 0C49F3730359A14518585931BC711F9BA15703C6
-    - echo "deb [ arch=amd64 ] http://repo.mongodb.org/apt/ubuntu trusty/mongodb-org/3.4 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-3.4.list
-    - sudo apt-get -qq update
-    - sudo apt-get install -y nodejs mongodb-org
 
-    - pip2.7 install -U --user paramiko fabric PyYAML pytest requests bravado pytest-xdist
-    - npm install -g npm
+    # Install swagger-cli
+    - sudo apt-get -qq update && sudo apt-get -qq install -y e2tools
     - npm install -g swagger-cli
+
+
+    - pip2.7 install -U --user paramiko fabric PyYAML pytest requests filelock
 
     # Get our own Swagger verifier
     - wget https://raw.githubusercontent.com/mendersoftware/autodocs/master/verify_docs.py
