@@ -40,18 +40,17 @@ paths:
             items:
               $ref: '#/definitions/Attribute'
             example:
-              application/json:
-                - name: "ip_addr"
-                  value: "1.2.3.4"
-                  description: "IP address"
-                - name: "mac_addr"
-                  value: "00.01:02:03:04:05"
-                  description: "MAC address"
-                - name: "ports"
-                  value:
-                    - "8080"
-                    - "8081"
-                  description: "Open ports"
+              - name: "ip_addr"
+                value: "1.2.3.4"
+                description: "IP address"
+              - name: "mac_addr"
+                value: "00.01:02:03:04:05"
+                description: "MAC address"
+              - name: "ports"
+                value:
+                  - "8080"
+                  - "8081"
+                description: "Open ports"
       responses:
         200:
           description: Attributes were uploaded successfully.
@@ -90,10 +89,9 @@ definitions:
 
             Supported types: number, string, array of numbers, array of strings. Mixed arrays are not allowed.
     example:
-      application/json:
-        name: "cpu_load"
-        description: "The current CPU load."
-        value: 42
+      name: "cpu_load"
+      description: "The current CPU load."
+      value: 42
 
   Error:
     description: Error descriptor.
@@ -106,6 +104,5 @@ definitions:
         description: Request ID (same as in X-MEN-RequestID header).
         type: string
     example:
-      application/json:
-          error: "failed to decode device group data: JSON payload is empty"
-          request_id: "f7881e82-0492-49fb-b459-795654e7188a"
+      error: "failed to decode device group data: JSON payload is empty"
+      request_id: "f7881e82-0492-49fb-b459-795654e7188a"
