@@ -123,27 +123,26 @@ paths:
             items:
               $ref: '#/definitions/Device'
           examples:
-            application/json:
-              - id: "291ae0e5956c69c2267489213df4459d19ed48a806603def19d417d004a4b67e"
-                attributes:
-                  - name: "ip_addr"
-                    value: "1.2.3.4"
-                    description: "IP address"
-                  - name: "mac_addr"
-                    value: "00.01:02:03:04:05"
-                    description: "MAC address"
-                  - name: "ports"
-                    value:
-                      - "8080"
-                      - "8081"
-                    description: "Open ports"
-                updated_ts: "2016-10-03T16:58:51.639Z"
-              - id: "76f40e5956c699e327489213df4459d1923e1a806603def19d417d004a4a3ef"
-                attributes:
-                  - name: "mac"
-                    value: "00:01:02:03:04:05"
-                    description: "MAC address"
-                updated_ts: "2016-10-04T18:24:21.432Z"
+            - id: "291ae0e5956c69c2267489213df4459d19ed48a806603def19d417d004a4b67e"
+              attributes:
+                - name: "ip_addr"
+                  value: "1.2.3.4"
+                  description: "IP address"
+                - name: "mac_addr"
+                  value: "00.01:02:03:04:05"
+                  description: "MAC address"
+                - name: "ports"
+                  value:
+                    - "8080"
+                    - "8081"
+                  description: "Open ports"
+              updated_ts: "2016-10-03T16:58:51.639Z"
+            - id: "76f40e5956c699e327489213df4459d1923e1a806603def19d417d004a4a3ef"
+              attributes:
+                - name: "mac"
+                  value: "00:01:02:03:04:05"
+                  description: "MAC address"
+              updated_ts: "2016-10-04T18:24:21.432Z"
         400:
           description: Missing or malformed request parameters. See error for details.
           schema:
@@ -174,21 +173,20 @@ paths:
           schema:
             $ref: "#/definitions/Device"
           examples:
-            application/json:
-              id: "291ae0e5956c69c2267489213df4459d19ed48a806603def19d417d004a4b67e"
-              attributes:
-                - name: "ip_addr"
-                  value: "1.2.3.4"
-                  description: "IP address"
-                - name: "mac_addr"
-                  value: "00.01:02:03:04:05"
-                  description: "MAC address"
-                - name: "ports"
-                  value:
-                    - "8080"
-                    - "8081"
-                  description: "Open ports"
-              updated_ts: "2016-10-03T16:58:51.639Z"
+            id: "291ae0e5956c69c2267489213df4459d19ed48a806603def19d417d004a4b67e"
+            attributes:
+              - name: "ip_addr"
+                value: "1.2.3.4"
+                description: "IP address"
+              - name: "mac_addr"
+                value: "00.01:02:03:04:05"
+                description: "MAC address"
+              - name: "ports"
+                value:
+                  - "8080"
+                  - "8081"
+                description: "Open ports"
+            updated_ts: "2016-10-03T16:58:51.639Z"
         404:
           description: The device was not found.
           schema:
@@ -244,8 +242,7 @@ paths:
           schema:
             $ref: "#/definitions/Group"
           examples:
-            application/json:
-              group: "testing"
+            group: "testing"
         400:
           description: Missing or malformed request params or body. See the error message for details.
         404:
@@ -342,10 +339,9 @@ paths:
               description: Group name
               type: string
           examples:
-            application/json:
-              - "staging"
-              - "testing"
-              - "production"
+            - "staging"
+            - "testing"
+            - "production"
         500:
           description: Internal server error.
           schema:
@@ -431,10 +427,9 @@ definitions:
 
             Supported types: number, string, array of numbers, array of strings. Mixed arrays are not allowed.
     example:
-      application/json:
-        name: "cpu_load"
-        description: "The current CPU load."
-        value: 42
+      name: "cpu_load"
+      description: "The current CPU load."
+      value: 42
   DeviceNew:
     type: object
     required:
@@ -452,20 +447,19 @@ definitions:
           $ref: '#/definitions/Attribute'
         description: A list of attribute descriptors.
     example:
-      application/json:
-        id: "291ae0e5956c69c2267489213df4459d19ed48a806603def19d417d004a4b67e"
-        attributes:
-          - name: "ip_addr"
-            value: "1.2.3.4"
-            description: "IP address"
-          - name: "mac_addr"
-            value: "00.01:02:03:04:05"
-            description: "MAC address"
-          - name: "ports"
-            value:
-              - "8080"
-              - "8081"
-            description: "Open ports"
+      id: "291ae0e5956c69c2267489213df4459d19ed48a806603def19d417d004a4b67e"
+      attributes:
+        - name: "ip_addr"
+          value: "1.2.3.4"
+          description: "IP address"
+        - name: "mac_addr"
+          value: "00.01:02:03:04:05"
+          description: "MAC address"
+        - name: "ports"
+          value:
+            - "8080"
+            - "8081"
+          description: "Open ports"
   Device:
     type: object
     properties:
@@ -481,21 +475,20 @@ definitions:
           $ref: '#/definitions/Attribute'
         description: A list of attribute descriptors.
     example:
-      application/json:
-        id: "291ae0e5956c69c2267489213df4459d19ed48a806603def19d417d004a4b67e"
-        attributes:
-          - name: "ip_addr"
-            value: "1.2.3.4"
-            description: "IP address"
-          - name: "mac_addr"
-            value: "00.01:02:03:04:05"
-            description: "MAC address"
-          - name: "ports"
-            value:
-              - "8080"
-              - "8081"
-            description: "Open ports"
-        updated_ts: "2016-10-03T16:58:51.639Z"
+      id: "291ae0e5956c69c2267489213df4459d19ed48a806603def19d417d004a4b67e"
+      attributes:
+        - name: "ip_addr"
+          value: "1.2.3.4"
+          description: "IP address"
+        - name: "mac_addr"
+          value: "00.01:02:03:04:05"
+          description: "MAC address"
+        - name: "ports"
+          value:
+            - "8080"
+            - "8081"
+          description: "Open ports"
+      updated_ts: "2016-10-03T16:58:51.639Z"
   Group:
     description: Device group.
     type: object
@@ -505,8 +498,7 @@ definitions:
     required:
       - group
     example:
-      application/json:
-        group: "staging"
+      group: "staging"
   Error:
     description: Error descriptor.
     type: object
@@ -518,6 +510,5 @@ definitions:
         description: Request ID (same as in X-MEN-RequestID header).
         type: string
     example:
-      application/json:
-          error: "failed to decode device group data: JSON payload is empty"
-          request_id: "f7881e82-0492-49fb-b459-795654e7188a"
+      error: "failed to decode device group data: JSON payload is empty"
+      request_id: "f7881e82-0492-49fb-b459-795654e7188a"
