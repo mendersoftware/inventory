@@ -59,10 +59,6 @@ paths:
           description: Malformed request body. See error for details.
           schema:
             $ref: '#/definitions/Error'
-        409:
-          description: Conflict - the device already exists.
-          schema:
-            $ref: '#/definitions/Error'
         500:
           description: Internal server error.
           schema:
