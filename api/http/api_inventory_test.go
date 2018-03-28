@@ -316,7 +316,7 @@ func TestApiInventoryAddDevice(t *testing.T) {
 	}{
 		"empty body": {
 			inReq: test.MakeSimpleRequest("POST",
-				"http://1.2.3.4/api/0.1.0/devices",
+				"http://1.2.3.4/api/internal/v1/inventory/devices",
 				nil),
 			inventoryErr: nil,
 			JSONResponseParams: utils.JSONResponseParams{
@@ -326,7 +326,7 @@ func TestApiInventoryAddDevice(t *testing.T) {
 		},
 		"garbled body": {
 			inReq: test.MakeSimpleRequest("POST",
-				"http://1.2.3.4/api/0.1.0/devices",
+				"http://1.2.3.4/api/internal/v1/inventory/devices",
 				"foo bar"),
 			inventoryErr: nil,
 			JSONResponseParams: utils.JSONResponseParams{
@@ -336,7 +336,7 @@ func TestApiInventoryAddDevice(t *testing.T) {
 		},
 		"body formatted ok, all fields present": {
 			inReq: test.MakeSimpleRequest("POST",
-				"http://1.2.3.4/api/0.1.0/devices",
+				"http://1.2.3.4/api/internal/v1/inventory/devices",
 				map[string]interface{}{
 					"id": "id-0001",
 					"attributes": []map[string]interface{}{
@@ -355,7 +355,7 @@ func TestApiInventoryAddDevice(t *testing.T) {
 		},
 		"body formatted ok, wrong attributes type": {
 			inReq: test.MakeSimpleRequest("POST",
-				"http://1.2.3.4/api/0.1.0/devices",
+				"http://1.2.3.4/api/internal/v1/inventory/devices",
 				map[string]interface{}{
 					"id":         "id-0001",
 					"attributes": 123,
@@ -369,7 +369,7 @@ func TestApiInventoryAddDevice(t *testing.T) {
 		},
 		"body formatted ok, 'id' missing": {
 			inReq: test.MakeSimpleRequest("POST",
-				"http://1.2.3.4/api/0.1.0/devices",
+				"http://1.2.3.4/api/internal/v1/inventory/devices",
 				map[string]interface{}{},
 			),
 			inventoryErr: nil,
@@ -380,7 +380,7 @@ func TestApiInventoryAddDevice(t *testing.T) {
 		},
 		"body formatted ok, incorrect attribute value": {
 			inReq: test.MakeSimpleRequest("POST",
-				"http://1.2.3.4/api/0.1.0/devices",
+				"http://1.2.3.4/api/internal/v1/inventory/devices",
 				map[string]interface{}{
 					"id": "id-0001",
 					"attributes": []map[string]interface{}{
@@ -397,7 +397,7 @@ func TestApiInventoryAddDevice(t *testing.T) {
 		},
 		"body formatted ok, attribute name missing": {
 			inReq: test.MakeSimpleRequest("POST",
-				"http://1.2.3.4/api/0.1.0/devices",
+				"http://1.2.3.4/api/internal/v1/inventory/devices",
 				map[string]interface{}{
 					"id": "id-0001",
 					"attributes": []map[string]interface{}{
@@ -413,7 +413,7 @@ func TestApiInventoryAddDevice(t *testing.T) {
 		},
 		"body formatted ok, inv error": {
 			inReq: test.MakeSimpleRequest("POST",
-				"http://1.2.3.4/api/0.1.0/devices",
+				"http://1.2.3.4/api/internal/v1/inventory/devices",
 				map[string]interface{}{
 					"id": "id-0001",
 					"attributes": []map[string]interface{}{
@@ -428,19 +428,6 @@ func TestApiInventoryAddDevice(t *testing.T) {
 			JSONResponseParams: utils.JSONResponseParams{
 				OutputStatus:     http.StatusInternalServerError,
 				OutputBodyObject: RestError("internal error"),
-			},
-		},
-		"device ID already exists error": {
-			inReq: test.MakeSimpleRequest("POST",
-				"http://1.2.3.4/api/0.1.0/devices",
-				map[string]interface{}{
-					"id": "id-0001",
-				},
-			),
-			inventoryErr: errors.Wrap(store.ErrDuplicatedDeviceId, "failed to add device"),
-			JSONResponseParams: utils.JSONResponseParams{
-				OutputStatus:     http.StatusConflict,
-				OutputBodyObject: RestError("device with specified ID already exists"),
 			},
 		},
 	}

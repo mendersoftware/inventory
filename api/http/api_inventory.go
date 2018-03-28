@@ -42,6 +42,7 @@ const (
 	uriGroupsDevices = "/api/0.1.0/groups/:name/devices"
 
 	uriInternalTenants = "/api/internal/v1/inventory/tenants"
+	uriInternalDevices = "/api/internal/v1/inventory/devices"
 )
 
 const (
@@ -75,7 +76,6 @@ func NewInventoryApiHandlers(i inventory.InventoryApp) ApiHandler {
 func (i *inventoryHandlers) GetApp() (rest.App, error) {
 	routes := []*rest.Route{
 		rest.Get(uriDevices, i.GetDevicesHandler),
-		rest.Post(uriDevices, i.AddDeviceHandler),
 		rest.Get(uriDevice, i.GetDeviceHandler),
 		rest.Delete(uriDevice, i.DeleteDeviceHandler),
 		rest.Delete(uriDeviceGroup, i.DeleteDeviceGroupHandler),
@@ -86,6 +86,7 @@ func (i *inventoryHandlers) GetApp() (rest.App, error) {
 		rest.Get(uriGroupsDevices, i.GetDevicesByGroup),
 
 		rest.Post(uriInternalTenants, i.CreateTenantHandler),
+		rest.Post(uriInternalDevices, i.AddDeviceHandler),
 	}
 
 	routes = append(routes)
@@ -282,10 +283,6 @@ func (i *inventoryHandlers) AddDeviceHandler(w rest.ResponseWriter, r *rest.Requ
 
 	err = i.inventory.AddDevice(ctx, dev)
 	if err != nil {
-		if cause := errors.Cause(err); cause != nil && cause == store.ErrDuplicatedDeviceId {
-			u.RestErrWithLogMsg(w, r, l, err, http.StatusConflict, "device with specified ID already exists")
-			return
-		}
 		u.RestErrWithLogInternal(w, r, l, err)
 		return
 	}
