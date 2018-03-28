@@ -1,13 +1,14 @@
-from common import inventory_attributes, management_client, clean_db, mongo
+from common import inventory_attributes, management_client, internal_client, clean_db, mongo
 
 import requests
 import pytest
+import os
 
 
 @pytest.mark.usefixtures("clean_db")
 class TestInventorySearching:
 
-    def test_inventory_searching(self, management_client, inventory_attributes):
+    def test_inventory_searching(self, management_client, internal_client, inventory_attributes):
         extra_inventory_items = {
             "users_logged_in": 100,
             "open_connections": 1231,
@@ -18,7 +19,9 @@ class TestInventorySearching:
             it = list(inventory_attributes)
             it.append(management_client.inventoryAttribute(name=i,
                                                            value=extra_inventory_items[i]))
-            management_client.createDevice(attributes=it)
+
+            did = "".join([ format(i, "02x") for i in os.urandom(128)])
+            internal_client.create_device(did, it)
 
         r = requests.get(management_client.client.swagger_spec.api_url + "/devices",
                          params=({"users_logged_in": 100}),
