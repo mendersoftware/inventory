@@ -19,39 +19,6 @@ schemes:
 
 paths:
   /devices:
-    post:
-      summary: Create a device resource with the supplied set of attributes
-      parameters:
-        - name: Authorization
-          in: header
-          required: true
-          type: string
-          format: Bearer [token]
-          description: Contains the JWT token issued by the User Administration and Authentication Service.
-        - name: device
-          in: body
-          required: true
-          schema:
-            $ref: "#/definitions/DeviceNew"
-      responses:
-        201:
-          description: The device was successfully created.
-          headers:
-            Location:
-              type: string
-              description: URI for the newly created 'Device' resource.
-        400:
-          description: Malformed request body. See error for details.
-          schema:
-            $ref: '#/definitions/Error'
-        409:
-          description: Conflict - the device already exists.
-          schema:
-            $ref: '#/definitions/Error'
-        500:
-          description: Internal server error.
-          schema:
-            $ref: '#/definitions/Error'
     get:
       summary: List devices
       description:  |
@@ -435,37 +402,6 @@ definitions:
         name: "cpu_load"
         description: "The current CPU load."
         value: 42
-  DeviceNew:
-    type: object
-    required:
-      - id
-    properties:
-      id:
-        type: string
-        description: Mender-assigned unique ID.
-      updated_ts:
-        type: string
-        description: Timestamp of the most recent attribute update.
-      attributes:
-        type: array
-        items:
-          $ref: '#/definitions/Attribute'
-        description: A list of attribute descriptors.
-    example:
-      application/json:
-        id: "291ae0e5956c69c2267489213df4459d19ed48a806603def19d417d004a4b67e"
-        attributes:
-          - name: "ip_addr"
-            value: "1.2.3.4"
-            description: "IP address"
-          - name: "mac_addr"
-            value: "00.01:02:03:04:05"
-            description: "MAC address"
-          - name: "ports"
-            value:
-              - "8080"
-              - "8081"
-            description: "Open ports"
   Device:
     type: object
     properties:
