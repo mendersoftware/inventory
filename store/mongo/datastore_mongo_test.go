@@ -823,6 +823,118 @@ func TestMongoUpsertAttributes(t *testing.T) {
 				},
 			},
 		},
+		"dev exists, attributes exist, add(merge) new attrs": {
+			devs: []model.Device{
+				{
+					ID: model.DeviceID("0003"),
+					Attributes: map[string]model.DeviceAttribute{
+						"mac": {
+							Name:        "mac",
+							Value:       "0003-mac",
+							Description: strPtr("descr"),
+						},
+						"sn": {
+							Name:        "sn",
+							Value:       "0003-sn",
+							Description: strPtr("descr"),
+						},
+					},
+					CreatedTs: createdTs,
+				},
+			},
+			inDevId: model.DeviceID("0003"),
+			inAttrs: map[string]model.DeviceAttribute{
+				"new-1": {
+					Name:  "new-1",
+					Value: []string{"new-1-0", "new-1-0"},
+				},
+				"new-2": {
+					Name:        "new-2",
+					Value:       "new-2-val",
+					Description: strPtr("foo"),
+				},
+			},
+
+			outAttrs: map[string]model.DeviceAttribute{
+				"mac": {
+					Description: strPtr("descr"),
+					Value:       "0003-mac",
+				},
+				"sn": {
+					Name:        "sn",
+					Value:       "0003-sn",
+					Description: strPtr("descr"),
+				},
+				"new-1": {
+					Name:  "new-1",
+					Value: []string{"new-1-0", "new-1-0"},
+				},
+				"new-2": {
+					Name:        "new-2",
+					Value:       "new-2-val",
+					Description: strPtr("foo"),
+				},
+			},
+		},
+		"dev exists, attributes exist, add(merge) new attrs + modify existing": {
+			devs: []model.Device{
+				{
+					ID: model.DeviceID("0003"),
+					Attributes: map[string]model.DeviceAttribute{
+						"mac": {
+							Name:        "mac",
+							Value:       "0003-mac",
+							Description: strPtr("descr"),
+						},
+						"sn": {
+							Name:        "sn",
+							Value:       "0003-sn",
+							Description: strPtr("descr"),
+						},
+					},
+					CreatedTs: createdTs,
+				},
+			},
+			inDevId: model.DeviceID("0003"),
+			inAttrs: map[string]model.DeviceAttribute{
+				"mac": {
+					Name:        "mac",
+					Value:       "0003-mac-new",
+					Description: strPtr("descr-new"),
+				},
+				"new-1": {
+					Name:  "new-1",
+					Value: []string{"new-1-0", "new-1-0"},
+				},
+				"new-2": {
+					Name:        "new-2",
+					Value:       "new-2-val",
+					Description: strPtr("foo"),
+				},
+			},
+
+			outAttrs: map[string]model.DeviceAttribute{
+				"mac": {
+					Name:        "mac",
+					Value:       "0003-mac-new",
+					Description: strPtr("descr-new"),
+				},
+				"sn": {
+					Name:        "sn",
+					Value:       "0003-sn",
+					Description: strPtr("descr"),
+				},
+				"new-1": {
+					Name:  "new-1",
+					Value: []string{"new-1-0", "new-1-0"},
+				},
+				"new-2": {
+					Name:        "new-2",
+					Value:       "new-2-val",
+					Description: strPtr("foo"),
+				},
+			},
+		},
 		"dev exists, no attributes exist, upsert new attrs (val + descr)": {
 			devs: []model.Device{
 				{
