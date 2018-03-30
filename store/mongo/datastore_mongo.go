@@ -268,6 +268,12 @@ func makeAttrUpsert(attrs model.DeviceAttributes) map[string]interface{} {
 				fmt.Sprintf("%s.%s.%s", DbDevAttributes, name, DbDevAttributesValue)
 			upsert[fieldName] = a.Value
 		}
+
+		if a.Name != "" {
+			fieldName =
+				fmt.Sprintf("%s.%s.%s", DbDevAttributes, name, "name")
+			upsert[fieldName] = a.Name
+		}
 	}
 
 	return upsert
