@@ -219,11 +219,14 @@ func (db *DataStoreMongo) AddDevice(ctx context.Context, dev *model.Device) erro
 	defer s.Close()
 	c := s.DB(mstore.DbFromContext(ctx, DbName)).C(DbDevicesColl)
 
-	err := c.Insert(dev)
+	update := makeAttrUpsert(dev.Attributes)
+	now := time.Now()
+	update["updated_ts"] = now
+	update = bson.M{"$set": update,
+		"$setOnInsert": bson.M{"created_ts": now}}
+
+	_, err := c.UpsertId(dev.ID, update)
 	if err != nil {
-		if mgo.IsDup(err) {
-			return store.ErrDuplicatedDeviceId
-		}
 		return errors.Wrap(err, "failed to store device")
 	}
 	return nil
@@ -264,6 +267,12 @@ func makeAttrUpsert(attrs model.DeviceAttributes) map[string]interface{} {
 			fieldName =
 				fmt.Sprintf("%s.%s.%s", DbDevAttributes, name, DbDevAttributesValue)
 			upsert[fieldName] = a.Value
+		}
+
+		if a.Name != "" {
+			fieldName =
+				fmt.Sprintf("%s.%s.%s", DbDevAttributes, name, "name")
+			upsert[fieldName] = a.Name
 		}
 	}
 

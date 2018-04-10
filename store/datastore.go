@@ -22,7 +22,6 @@ import (
 )
 
 var (
-	ErrDuplicatedDeviceId = errors.New("Duplicated device id")
 	// device not found
 	ErrDevNotFound = errors.New("Device not found")
 

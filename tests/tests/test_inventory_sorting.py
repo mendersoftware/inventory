@@ -1,21 +1,25 @@
-from common import inventory_attributes, management_client, clean_db, mongo
+from common import inventory_attributes, management_client, internal_client, clean_db, mongo
 
 import pytest
+import os
 
 
 @pytest.mark.usefixtures("clean_db")
 class TestInventorySorting:
 
-    def test_inventory_sorting(self, management_client, inventory_attributes):
+    def test_inventory_sorting(self, management_client, internal_client, inventory_attributes):
         numbers = [100, 1000, 1, 999]
 
         for n in range(20):
-            management_client.createDevice(attributes=inventory_attributes)
+            did = "".join([ format(i, "02x") for i in os.urandom(128)])
+            internal_client.create_device(did, inventory_attributes)
 
         for n in numbers:
             it = list(inventory_attributes)
-            it.append(management_client.inventoryAttribute(name="number", value=n))
-            management_client.createDevice(attributes=it)
+            it.append(internal_client.Attribute(name="number", value=n))
+
+            did = "".join([ format(i, "02x") for i in os.urandom(128)])
+            internal_client.create_device(did, it)
 
         t = []
         r = management_client.getAllDevices(sort="number:asc")

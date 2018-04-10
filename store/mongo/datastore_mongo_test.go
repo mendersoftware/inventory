@@ -332,23 +332,30 @@ func TestMongoAddDevice(t *testing.T) {
 		t.Skip("skipping TestMongoAddDevice in short mode.")
 	}
 
+	existing := []interface{}{
+		&model.Device{
+			ID: model.DeviceID("0000"),
+			Attributes: model.DeviceAttributes{
+				"mac": {Name: "mac", Value: "0000-mac"},
+				"sn":  {Name: "sn", Value: "0000-sn"},
+			},
+		},
+	}
+
 	testCases := map[string]struct {
-		InputDevice *model.Device
-		tenant      string
-		IsError     bool
-		OutputError error
+		InputDevice  *model.Device
+		OutputDevice *model.Device
+		tenant       string
+		OutputError  error
 	}{
-		"no device given": {
-			InputDevice: nil,
-			IsError:     true,
-		},
-		"no device given; with tenant": {
-			InputDevice: nil,
-			tenant:      "foo",
-			IsError:     true,
-		},
 		"valid device with one attribute, no error": {
 			InputDevice: &model.Device{
+				ID: model.DeviceID("0002"),
+				Attributes: model.DeviceAttributes{
+					"mac": {Name: "mac", Value: "0002-mac"},
+				},
+			},
+			OutputDevice: &model.Device{
 				ID: model.DeviceID("0002"),
 				Attributes: model.DeviceAttributes{
 					"mac": {Name: "mac", Value: "0002-mac"},
@@ -358,6 +365,12 @@ func TestMongoAddDevice(t *testing.T) {
 		},
 		"valid device with one attribute, no error; with tenant": {
 			InputDevice: &model.Device{
+				ID: model.DeviceID("0002"),
+				Attributes: model.DeviceAttributes{
+					"mac": {Name: "mac", Value: "0002-mac"},
+				},
+			},
+			OutputDevice: &model.Device{
 				ID: model.DeviceID("0002"),
 				Attributes: model.DeviceAttributes{
 					"mac": {Name: "mac", Value: "0002-mac"},
@@ -374,10 +387,23 @@ func TestMongoAddDevice(t *testing.T) {
 					"sn":  {Name: "sn", Value: "0002-sn"},
 				},
 			},
+			OutputDevice: &model.Device{
+				ID: model.DeviceID("0003"),
+				Attributes: model.DeviceAttributes{
+					"mac": {Name: "mac", Value: "0002-mac"},
+					"sn":  {Name: "sn", Value: "0002-sn"},
+				},
+			},
 			OutputError: nil,
 		},
 		"valid device with attribute without value, no error": {
 			InputDevice: &model.Device{
+				ID: model.DeviceID("0004"),
+				Attributes: model.DeviceAttributes{
+					"mac": {Name: "mac"},
+				},
+			},
+			OutputDevice: &model.Device{
 				ID: model.DeviceID("0004"),
 				Attributes: model.DeviceAttributes{
 					"mac": {Name: "mac"},
@@ -392,6 +418,12 @@ func TestMongoAddDevice(t *testing.T) {
 					"mac": {Name: "mac", Value: []interface{}{123, 456}},
 				},
 			},
+			OutputDevice: &model.Device{
+				ID: model.DeviceID("0005"),
+				Attributes: model.DeviceAttributes{
+					"mac": {Name: "mac", Value: []interface{}{123, 456}},
+				},
+			},
 			OutputError: nil,
 		},
 		"valid device without attributes, no error": {
@@ -399,6 +431,81 @@ func TestMongoAddDevice(t *testing.T) {
 				ID: model.DeviceID("0007"),
 				Attributes: model.DeviceAttributes{
 					"mac": {Name: "mac"},
+				},
+			},
+			OutputDevice: &model.Device{
+				ID: model.DeviceID("0007"),
+				Attributes: model.DeviceAttributes{
+					"mac": {Name: "mac"},
+				},
+			},
+			OutputError: nil,
+		},
+		"valid device with upsert, all attrs updated, no error": {
+			InputDevice: &model.Device{
+				ID: model.DeviceID("0000"),
+				Attributes: model.DeviceAttributes{
+					"mac": {Name: "mac", Value: "0000-mac-new"},
+					"sn":  {Name: "sn", Value: "0000-sn-new"},
+				},
+			},
+			OutputDevice: &model.Device{
+				ID: model.DeviceID("0000"),
+				Attributes: model.DeviceAttributes{
+					"mac": {Name: "mac", Value: "0000-mac-new"},
+					"sn":  {Name: "sn", Value: "0000-sn-new"},
+				},
+			},
+			OutputError: nil,
+		},
+		"valid device with upsert, one attr updated, no error": {
+			InputDevice: &model.Device{
+				ID: model.DeviceID("0000"),
+				Attributes: model.DeviceAttributes{
+					"mac": {Name: "mac", Value: "0000-mac-new"},
+				},
+			},
+			OutputDevice: &model.Device{
+				ID: model.DeviceID("0000"),
+				Attributes: model.DeviceAttributes{
+					"mac": {Name: "mac", Value: "0000-mac-new"},
+					"sn":  {Name: "sn", Value: "0000-sn"},
+				},
+			},
+			OutputError: nil,
+		},
+		"valid device with upsert, no attrs updated, new upserted, no error": {
+			InputDevice: &model.Device{
+				ID: model.DeviceID("0000"),
+				Attributes: model.DeviceAttributes{
+					"other-param": {Name: "other-param", Value: "other-param-value"},
+				},
+			},
+			OutputDevice: &model.Device{
+				ID: model.DeviceID("0000"),
+				Attributes: model.DeviceAttributes{
+					"other-param": {Name: "other-param", Value: "other-param-value"},
+					"mac":         {Name: "mac", Value: "0000-mac"},
+					"sn":          {Name: "sn", Value: "0000-sn"},
+				},
+			},
+			OutputError: nil,
+		},
+		"valid device with upsert, no attrs updated, many new upserted, no error": {
+			InputDevice: &model.Device{
+				ID: model.DeviceID("0000"),
+				Attributes: model.DeviceAttributes{
+					"other-param":   {Name: "other-param", Value: "other-param-value"},
+					"other-param-2": {Name: "other-param-2", Value: "other-param-2-value"},
+				},
+			},
+			OutputDevice: &model.Device{
+				ID: model.DeviceID("0000"),
+				Attributes: model.DeviceAttributes{
+					"other-param":   {Name: "other-param", Value: "other-param-value"},
+					"other-param-2": {Name: "other-param-2", Value: "other-param-2-value"},
+					"mac":           {Name: "mac", Value: "0000-mac"},
+					"sn":            {Name: "sn", Value: "0000-sn"},
 				},
 			},
 			OutputError: nil,
@@ -421,29 +528,35 @@ func TestMongoAddDevice(t *testing.T) {
 			})
 		}
 
-		err := store.AddDevice(ctx, testCase.InputDevice)
+		c := session.DB(mstore.DbFromContext(ctx, DbName)).C(DbDevicesColl)
+		err := c.Insert(existing...)
+		assert.NoError(t, err)
 
-		if testCase.IsError {
-			if testCase.OutputError != nil {
-				assert.EqualError(t, err, testCase.OutputError.Error())
-			}
+		err = store.AddDevice(ctx, testCase.InputDevice)
+
+		if testCase.OutputError != nil {
+			assert.EqualError(t, err, testCase.OutputError.Error())
 		} else {
 			assert.NoError(t, err, "expected no error inserting to data store")
 
 			var dbdev *model.Device
 			devsColl := session.DB(mstore.DbFromContext(ctx, DbName)).C(DbDevicesColl)
-			err := devsColl.Find(nil).One(&dbdev)
+			err := devsColl.FindId(testCase.InputDevice.ID).One(&dbdev)
 
 			assert.NoError(t, err, "expected no error")
 
-			assert.NotNil(t, dbdev, "expected to device of ID %s to be found", testCase.InputDevice.ID)
-
-			assert.Equal(t, testCase.InputDevice.ID, dbdev.ID)
+			compareDevsWithoutTimestamps(t, testCase.OutputDevice, dbdev)
 		}
 
 		// Need to close all sessions to be able to call wipe at next test case
 		session.Close()
 	}
+}
+
+func compareDevsWithoutTimestamps(t *testing.T, expected, actual *model.Device) {
+	assert.Equal(t, expected.ID, actual.ID)
+	assert.Equal(t, expected.Attributes, actual.Attributes)
+	assert.Equal(t, expected.Group, actual.Group)
 }
 
 func TestNewDataStoreMongo(t *testing.T) {
@@ -707,6 +820,118 @@ func TestMongoUpsertAttributes(t *testing.T) {
 					Description: strPtr("descr"),
 					//[]interface{} instead of []string - otherwise DeepEquals fails where it really shouldn't
 					Value: []interface{}{"0003-sn-1", "0003-sn-2"},
+				},
+			},
+		},
+		"dev exists, attributes exist, add(merge) new attrs": {
+			devs: []model.Device{
+				{
+					ID: model.DeviceID("0003"),
+					Attributes: map[string]model.DeviceAttribute{
+						"mac": {
+							Name:        "mac",
+							Value:       "0003-mac",
+							Description: strPtr("descr"),
+						},
+						"sn": {
+							Name:        "sn",
+							Value:       "0003-sn",
+							Description: strPtr("descr"),
+						},
+					},
+					CreatedTs: createdTs,
+				},
+			},
+			inDevId: model.DeviceID("0003"),
+			inAttrs: map[string]model.DeviceAttribute{
+				"new-1": {
+					Name:  "new-1",
+					Value: []string{"new-1-0", "new-1-0"},
+				},
+				"new-2": {
+					Name:        "new-2",
+					Value:       "new-2-val",
+					Description: strPtr("foo"),
+				},
+			},
+
+			outAttrs: map[string]model.DeviceAttribute{
+				"mac": {
+					Description: strPtr("descr"),
+					Value:       "0003-mac",
+				},
+				"sn": {
+					Name:        "sn",
+					Value:       "0003-sn",
+					Description: strPtr("descr"),
+				},
+				"new-1": {
+					Name:  "new-1",
+					Value: []string{"new-1-0", "new-1-0"},
+				},
+				"new-2": {
+					Name:        "new-2",
+					Value:       "new-2-val",
+					Description: strPtr("foo"),
+				},
+			},
+		},
+		"dev exists, attributes exist, add(merge) new attrs + modify existing": {
+			devs: []model.Device{
+				{
+					ID: model.DeviceID("0003"),
+					Attributes: map[string]model.DeviceAttribute{
+						"mac": {
+							Name:        "mac",
+							Value:       "0003-mac",
+							Description: strPtr("descr"),
+						},
+						"sn": {
+							Name:        "sn",
+							Value:       "0003-sn",
+							Description: strPtr("descr"),
+						},
+					},
+					CreatedTs: createdTs,
+				},
+			},
+			inDevId: model.DeviceID("0003"),
+			inAttrs: map[string]model.DeviceAttribute{
+				"mac": {
+					Name:        "mac",
+					Value:       "0003-mac-new",
+					Description: strPtr("descr-new"),
+				},
+				"new-1": {
+					Name:  "new-1",
+					Value: []string{"new-1-0", "new-1-0"},
+				},
+				"new-2": {
+					Name:        "new-2",
+					Value:       "new-2-val",
+					Description: strPtr("foo"),
+				},
+			},
+
+			outAttrs: map[string]model.DeviceAttribute{
+				"mac": {
+					Name:        "mac",
+					Value:       "0003-mac-new",
+					Description: strPtr("descr-new"),
+				},
+				"sn": {
+					Name:        "sn",
+					Value:       "0003-sn",
+					Description: strPtr("descr"),
+				},
+				"new-1": {
+					Name:  "new-1",
+					Value: []string{"new-1-0", "new-1-0"},
+				},
+				"new-2": {
+					Name:        "new-2",
+					Value:       "new-2-val",
+					Description: strPtr("foo"),
 				},
 			},
 		},

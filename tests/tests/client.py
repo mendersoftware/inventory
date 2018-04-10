@@ -33,18 +33,9 @@ class ManagementClient:
                                                         pytest.config.getoption("api"))
 
     group = client.get_model("Group")
-    deviceNew = client.get_model("DeviceNew")
     inventoryAttribute = client.get_model("Attribute")
 
     log = logging.getLogger('Client')
-
-    def createDevice(self, attributes, deviceid=None, description="test device"):
-        if not deviceid:
-            deviceid = "".join([format(i, "02x") for i in os.urandom(32)])
-
-        deviceNew = self.deviceNew(id=deviceid, description=description, attributes=attributes)
-        r, h = self.client.devices.post_devices(device=deviceNew, Authorization="foo").result()
-        return deviceid
 
     def deleteAllGroups(self):
         groups = self.client.groups.get_groups().result()[0]
@@ -168,7 +159,18 @@ class InternalApiClient(ApiClient):
             'X-Original-Method' :method,
         }).result()
 
+    def DeviceNew(self, **kwargs):
+        return self.client.get_model("DeviceNew")(**kwargs)
+
+    def Attribute(self, **kwargs):
+        return self.client.get_model("Attribute")(**kwargs)
+
     def create_tenant(self, tenant_id):
         return self.client.tenants.post_tenants(tenant={
             "tenant_id": tenant_id,
         }).result()
+
+    def create_device(self, device_id, attributes, description="test device"):
+        device = self.DeviceNew(id=device_id, description=description, attributes=attributes)
+
+        return self.client.devices.post_devices(device=device, Authorization="foo").result()
