@@ -317,36 +317,6 @@
 			"revision": "875cf421b32f8f1b31bd43776297876d01542279"
 		},
 		{
-			"checksumSHA1": "bDSCvmvwCYcN5mPjePIzpPyqGYM=",
-			"comment": "r2016.02.04-1-gb6e2fa3",
-			"path": "gopkg.in/mgo.v2",
-			"revision": "b6e2fa371e64216a45e61072a96d4e3859f169da"
-		},
-		{
-			"checksumSHA1": "zTjQOFGy4XTv4L33Kd2FhrV+mbM=",
-			"comment": "r2016.02.04-1-gb6e2fa3",
-			"path": "gopkg.in/mgo.v2/bson",
-			"revision": "b6e2fa371e64216a45e61072a96d4e3859f169da"
-		},
-		{
-			"checksumSHA1": "58HoOoQzqGWh5E+SJfQw7/sPaZs=",
-			"comment": "r2016.02.04-1-gb6e2fa3",
-			"path": "gopkg.in/mgo.v2/dbtest",
-			"revision": "b6e2fa371e64216a45e61072a96d4e3859f169da"
-		},
-		{
-			"checksumSHA1": "CkCDTsyN2Lbj1cL8+oaYKoPpI9w=",
-			"comment": "r2016.02.04-1-gb6e2fa3",
-			"path": "gopkg.in/mgo.v2/internal/sasl",
-			"revision": "b6e2fa371e64216a45e61072a96d4e3859f169da"
-		},
-		{
-			"checksumSHA1": "+1WDRPaOphSCmRMxVPIPBV4aubc=",
-			"comment": "r2016.02.04-1-gb6e2fa3",
-			"path": "gopkg.in/mgo.v2/internal/scram",
-			"revision": "b6e2fa371e64216a45e61072a96d4e3859f169da"
-		},
-		{
 			"checksumSHA1": "t95/FNK2nGCx3e6IARbO7OrcCuY=",
 			"path": "gopkg.in/tomb.v2",
 			"revision": "d5d1b5820637886def9eef33e03a27a9f166942c",
