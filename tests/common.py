@@ -23,7 +23,7 @@ from client import CliClient, ManagementClient, InternalApiClient
 
 @pytest.fixture(scope="session")
 def mongo():
-    return MongoClient('mender-mongo-inventory:27017')
+    return MongoClient('mender-mongo:27017')
 
 
 def mongo_cleanup(mongo):
