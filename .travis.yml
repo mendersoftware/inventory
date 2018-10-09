@@ -130,7 +130,7 @@ jobs:
         - sudo docker build -t mendersoftware/useradm:pr .;
 
         - ./integration/extra/release_tool.py --set-version-of mender-useradm --version pr;
-        - ./integration/backend-tests/run;
+        - PYTEST_ARGS="-k 'not Multitenant'" ./integration/backend-tests/run;
 
     - stage: Trigger integration
       script:
