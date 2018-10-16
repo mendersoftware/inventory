@@ -117,6 +117,46 @@ func mockListDeviceIDs(num int) []model.DeviceID {
 	return devs
 }
 
+func TestApiParseFilterParams(t *testing.T) {
+	t.Parallel()
+
+	testCases := map[string]struct {
+		inReq  *http.Request
+		filter string
+	}{
+		"valid filter with multiple colons": {
+			inReq:  test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&attr_name1=qe:123:123:123", nil),
+			filter: "qe:123:123:123",
+		},
+		"valid filter with multiple colons and ignore known operator": {
+			inReq:  test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&attr_name1=eq:qe:123:123:123", nil),
+			filter: "eq:qe:123:123:123",
+		},
+		"invalid filter with colon": {
+			inReq: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&attr_name1=qe:123", nil),
+		},
+		"valid filter with colon": {
+			inReq:  test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&attr_name1=eq:123", nil),
+			filter: "123",
+		},
+	}
+
+	for name, testCase := range testCases {
+		t.Run(fmt.Sprintf("tc %s", name), func(t *testing.T) {
+			req := rest.Request{Request: testCase.inReq}
+			filters, err := parseFilterParams(&req)
+			if testCase.filter == "" {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.NotNil(t, filters)
+				assert.NotEmpty(t, filters)
+				assert.Equal(t, testCase.filter, filters[0].Value)
+			}
+		})
+	}
+}
+
 func TestApiInventoryGetDevices(t *testing.T) {
 	t.Parallel()
 	rest.ErrorFieldName = "error"
