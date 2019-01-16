@@ -147,19 +147,18 @@ func parseFilterParams(r *rest.Request) ([]store.Filter, error) {
 		}
 		valueStrArray := strings.Split(valueStr, queryParamValueSeparator)
 		filter = store.Filter{AttrName: name}
-		valueIdx := 0
 		if len(valueStrArray) == 2 {
-			valueIdx = 1
 			switch valueStrArray[filterEqOperatorIdx] {
 			case "eq":
 				filter.Operator = store.Eq
 			default:
 				return nil, errors.New("invalid filter operator")
 			}
+			filter.Value = valueStrArray[filterEqOperatorIdx+1]
 		} else {
 			filter.Operator = store.Eq
+			filter.Value = valueStr
 		}
-		filter.Value = valueStrArray[valueIdx]
 		floatValue, err := strconv.ParseFloat(filter.Value, 64)
 		if err == nil {
 			filter.ValueFloat = &floatValue
