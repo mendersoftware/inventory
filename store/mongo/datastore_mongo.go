@@ -373,6 +373,37 @@ func (db *DataStoreMongo) GetDevicesByGroup(ctx context.Context, group model.Gro
 	return resIds, nil
 }
 
+func (db *DataStoreMongo) GetDeviceCountByGroup(ctx context.Context, group model.GroupName) (int, error) {
+	s := db.session.Copy()
+	defer s.Close()
+
+	// compose aggregation pipeline
+	c := s.DB(mstore.DbFromContext(ctx, DbName)).C(DbDevicesColl)
+
+	filt := bson.M{"$match": bson.M{ "group": group }}
+	// the sortByCount might also be useful to return counts for all groups in one call, here it is
+	// used as a convenient way to get counts and structure, while still being one simple call in the
+	// pipeline
+	grp := bson.M{ "$sortByCount": "$group" }
+	
+	var resp bson.M
+
+	// first filter for devices out of current group, get count afterwards
+	pipe := c.Pipe([]bson.M{ filt, grp })
+	err := pipe.One(&resp)
+
+	switch err {
+	case nil:
+		break
+	case mgo.ErrNotFound:
+		return 0, store.ErrGroupNotFound
+	default:
+		return 0, err
+	}
+
+	return resp["count"].(int), err
+}
+
 func (db *DataStoreMongo) GetDeviceGroup(ctx context.Context, id model.DeviceID) (model.GroupName, error) {
 	s := db.session.Copy()
 	defer s.Close()

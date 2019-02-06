@@ -33,6 +33,7 @@ type InventoryApp interface {
 	UpdateDeviceGroup(ctx context.Context, id model.DeviceID, group model.GroupName) error
 	ListGroups(ctx context.Context) ([]model.GroupName, error)
 	ListDevicesByGroup(ctx context.Context, group model.GroupName, skip int, limit int) ([]model.DeviceID, error)
+	GetDeviceCountByGroup(ctx context.Context, group model.GroupName) (int, error)
 	GetDeviceGroup(ctx context.Context, id model.DeviceID) (model.GroupName, error)
 	DeleteDevice(ctx context.Context, id model.DeviceID) error
 	CreateTenant(ctx context.Context, tenant model.NewTenant) error
@@ -142,6 +143,19 @@ func (i *inventory) ListDevicesByGroup(ctx context.Context, group model.GroupNam
 	}
 
 	return ids, nil
+}
+
+func (i *inventory) GetDeviceCountByGroup(ctx context.Context, group model.GroupName) (int, error) {
+	count, err := i.db.GetDeviceCountByGroup(ctx, group)
+	if err != nil {
+		if err == store.ErrGroupNotFound {
+			return 0, err
+		} else {
+			return 0, errors.Wrap(err, "failed to get number of devices in group")
+		}
+	}
+
+	return count, nil
 }
 
 func (i *inventory) GetDeviceGroup(ctx context.Context, id model.DeviceID) (model.GroupName, error) {

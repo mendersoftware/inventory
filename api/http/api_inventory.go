@@ -416,6 +416,8 @@ func (i *inventoryHandlers) GetDevicesByGroup(w rest.ResponseWriter, r *rest.Req
 	for _, l := range links {
 		w.Header().Add("Link", l)
 	}
+	count, err := i.inventory.GetDeviceCountByGroup(ctx, model.GroupName(group))
+	w.Header().Add("GroupCount", strconv.Itoa(count))
 	w.WriteJson(ids[:len])
 
 }

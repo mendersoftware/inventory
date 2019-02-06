@@ -62,6 +62,9 @@ type DataStore interface {
 	// Lists devices belonging to a group
 	GetDevicesByGroup(ctx context.Context, group model.GroupName, skip, limit int) ([]model.DeviceID, error)
 
+	// Get number of devices belonging to a group
+	GetDeviceCountByGroup(ctx context.Context, group model.GroupName) (int, error)
+
 	// Get device's group
 	GetDeviceGroup(ctx context.Context, id model.DeviceID) (model.GroupName, error)
 }
