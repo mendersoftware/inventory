@@ -1,4 +1,4 @@
-// Copyright 2017 Northern.tech AS
+// Copyright 2019 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -134,6 +134,29 @@ func (_m *DataStore) GetDevicesByGroup(ctx context.Context, group model.GroupNam
 	var r1 error
 	if rf, ok := ret.Get(1).(func(context.Context, model.GroupName, int, int) error); ok {
 		r1 = rf(ctx, group, skip, limit)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// ListGroups provides a mock function with given fields: ctx, group
+func (_m *DataStore) GetDeviceCountByGroup(ctx context.Context, group model.GroupName) (int, error) {
+	ret := _m.Called(ctx, group)
+
+	var r0 int
+	if rf, ok := ret.Get(0).(func(context.Context, model.GroupName) int); ok {
+		r0 = rf(ctx, group)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(int)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, model.GroupName) error); ok {
+		r1 = rf(ctx, group)
 	} else {
 		r1 = ret.Error(1)
 	}

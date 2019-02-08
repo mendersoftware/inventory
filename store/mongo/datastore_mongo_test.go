@@ -1,4 +1,4 @@
-// Copyright 2018 Northern.tech AS
+// Copyright 2019 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -1706,6 +1706,111 @@ func TestGetDevicesByGroupWithTenant(t *testing.T) {
 			assert.NoError(t, err, "expected no error")
 			if !reflect.DeepEqual(tc.OutputDevices, devs) {
 				assert.Fail(t, "expected: %v\nhave: %v", tc.OutputDevices, devs)
+			}
+		}
+	}
+
+	session.Close()
+}
+
+func TestGetDeviceCountByGroup(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping TestGetDeviceCountByGroup in short mode.")
+	}
+
+	devDevices := []model.Device{
+		{
+			ID:    model.DeviceID("1"),
+			Group: model.GroupName("dev"),
+		},
+		{
+			ID:    model.DeviceID("6"),
+			Group: model.GroupName("dev"),
+		},
+		{
+			ID:    model.DeviceID("8"),
+			Group: model.GroupName("dev"),
+		},
+	}
+	prodDevices := []model.Device{
+		{
+			ID:    model.DeviceID("2"),
+			Group: model.GroupName("prod"),
+		},
+		{
+			ID:    model.DeviceID("4"),
+			Group: model.GroupName("prod"),
+		},
+		{
+			ID:    model.DeviceID("5"),
+			Group: model.GroupName("prod"),
+		},
+	}
+	testDevices := []model.Device{
+		{
+			ID:    model.DeviceID("3"),
+			Group: model.GroupName("test"),
+		},
+		{
+			ID:    model.DeviceID("7"),
+			Group: model.GroupName("test"),
+		},
+	}
+
+	inputDevices := make([]model.Device, 0, len(devDevices) + len(prodDevices) + len(testDevices))
+	inputDevices = append(inputDevices, devDevices...)
+	inputDevices = append(inputDevices, prodDevices...)
+	inputDevices = append(inputDevices, testDevices...)
+
+	testCases := map[string]struct {
+		InputGroupName model.GroupName
+		OutputDeviceCount  int
+		OutputError    error
+	}{
+		"dev group": {
+			InputGroupName: "dev",
+			OutputDeviceCount: len(devDevices),
+			OutputError: nil,
+		},
+		"prod group": {
+			InputGroupName: "prod",
+			OutputDeviceCount: len(prodDevices),
+			OutputError: nil,
+		},
+		"test group": {
+			InputGroupName: "test",
+			OutputDeviceCount: len(testDevices),
+			OutputError: nil,
+		},
+		"group doesn't exist": {
+			InputGroupName: "unknown",
+			OutputDeviceCount: 0,
+			OutputError: store.ErrGroupNotFound,
+		},
+	}
+
+	db.Wipe()
+	session := db.Session()
+
+	for _, d := range inputDevices {
+		err := session.DB(DbName).C(DbDevicesColl).Insert(d)
+		assert.NoError(t, err, "failed to setup input data")
+	}
+
+	for name, tc := range testCases {
+		t.Logf("test case: %s", name)
+
+		store := NewDataStoreMongoWithSession(session)
+
+		ctx := context.Background()
+		devCount, err := store.GetDeviceCountByGroup(ctx, tc.InputGroupName)
+
+		if tc.OutputError != nil {
+			assert.EqualError(t, err, tc.OutputError.Error())
+		} else {
+			assert.NoError(t, err, "expected no error")
+			if !reflect.DeepEqual(tc.OutputDeviceCount, devCount) {
+				assert.Fail(t, "expected: %v\nhave: %v", tc.OutputDeviceCount, devCount)
 			}
 		}
 	}

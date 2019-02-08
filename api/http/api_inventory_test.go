@@ -1,4 +1,4 @@
-// Copyright 2018 Northern.tech AS
+// Copyright 2019 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -1080,6 +1080,11 @@ func TestApiInventoryGetDevicesByGroup(t *testing.T) {
 			mock.AnythingOfType("int"),
 			mock.AnythingOfType("int"),
 		).Return(mockListDeviceIDs(testCase.listDevicesNum), testCase.listDevicesErr)
+
+		inv.On("GetDeviceCountByGroup",
+			ctx,
+			mock.AnythingOfType("model.GroupName"),
+		).Return(testCase.listDevicesNum, testCase.listDevicesErr)
 
 		apih := makeMockApiHandler(t, &inv)
 
