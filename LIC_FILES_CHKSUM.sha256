@@ -1,7 +1,7 @@
 
 # These are identical to Apache-2.0 license.
 c773be5f6ca136ca7791e117829ff9a60b4a1436cc2bfa9214895f4ed9b3f2a9  COPYING
-98ed35b5a138f58164b5c0dbccd9d7f01ef4d84b9dba01e896f0a3241c50c0f7  LICENSE
+beb140be4cd64599bedc691a55b2729c9cc611a4b9d6ec44e01270105daf18a2  LICENSE
 98ed35b5a138f58164b5c0dbccd9d7f01ef4d84b9dba01e896f0a3241c50c0f7  vendor/github.com/mendersoftware/mendertesting/LICENSE
 9e015a4328bd336835c9969e38b1fc338a40bdea18d4d1f33b2cd12808238dd7  vendor/github.com/mendersoftware/go-lib-micro/LICENSE
 5e3400b93bbb099e83e52bab885e7441750673c21f97988ca3f1240639b63283  vendor/github.com/spf13/afero/LICENSE.txt
