@@ -84,6 +84,9 @@ paths:
                 Standard header, used for page navigation.
 
                 Supported relation types are 'first', 'next' and 'prev'.
+            X-Total-Count:
+              type: string
+              description: Custom header indicating the total number of devices for the given query parameters
           schema:
             title: ListOfDevices
             type: array
@@ -356,6 +359,9 @@ paths:
             Link:
               type: string
               description: Standard header, we support 'first', 'next', and 'prev'.
+            X-Total-Count:
+              type: string
+              description: Custom header indicating the total number of devices in the given group
           schema:
             title: ListOfIDs
             type: array
