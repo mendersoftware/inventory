@@ -124,7 +124,7 @@ func (_m *InventoryApp) ListDevices(ctx context.Context, q store.ListQuery) ([]m
 	}
 
 	var r1 int
-	if rf, ok := ret.Get(1).(func(context.Context, model.GroupName, int, int) int); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, store.ListQuery) int); ok {
 		r1 = rf(ctx, q)
 	} else {
 		if ret.Get(1) != nil {

@@ -55,7 +55,7 @@ func TestInventoryListDevices(t *testing.T) {
 			datastoreError:  nil,
 			outError:        nil,
 			outDevices:      []model.Device{{ID: model.DeviceID("1")}},
-			outDeviceCount   1,
+			outDeviceCount:  1,
 		},
 		"has group true": {
 			inHasGroup:      boolPtr(true),
@@ -63,7 +63,7 @@ func TestInventoryListDevices(t *testing.T) {
 			datastoreError:  nil,
 			outError:        nil,
 			outDevices:      []model.Device{{ID: model.DeviceID("1"), Group: group}},
-			outDeviceCount   1,
+			outDeviceCount:  1,
 		},
 		"has group false": {
 			inHasGroup:      boolPtr(false),
@@ -71,7 +71,7 @@ func TestInventoryListDevices(t *testing.T) {
 			datastoreError:  nil,
 			outError:        nil,
 			outDevices:      []model.Device{{ID: model.DeviceID("1")}},
-			outDeviceCount   1,
+			outDeviceCount:  1,
 		},
 		"datastore error": {
 			inHasGroup:      nil,
@@ -79,14 +79,15 @@ func TestInventoryListDevices(t *testing.T) {
 			datastoreError:  errors.New("db connection failed"),
 			outError:        errors.New("failed to fetch devices: db connection failed"),
 			outDevices:      nil,
-			outDeviceCount   -1,
+			outDeviceCount:  -1,
 		},
 		"get devices from group": {
-			group: "asd",
+			group:           "asd",
 			outDevices: []model.Device{
 				{ID: model.DeviceID("1"), Group: group},
 				{ID: model.DeviceID("2"), Group: group},
 			},
+			outDeviceCount:  2,
 		},
 	}
 
@@ -99,7 +100,7 @@ func TestInventoryListDevices(t *testing.T) {
 		db.On("GetDevices",
 			ctx,
 			mock.AnythingOfType("store.ListQuery"),
-		).Return(tc.outDevices, tc.datastoreError)
+		).Return(tc.outDevices, tc.outDeviceCount, tc.datastoreError)
 		i := invForTest(db)
 
 		devs, totalCount, err := i.ListDevices(ctx, store.ListQuery{1, 10, nil, nil, tc.inHasGroup, tc.group})
@@ -431,25 +432,25 @@ func TestInventoryListDevicesByGroup(t *testing.T) {
 				model.DeviceID("2"),
 				model.DeviceID("3"),
 			},
-			OutDeviceCount 3,
+			OutDeviceCount:3,
 		},
 		"success - empty list": {
 			DatastoreError: nil,
 			OutError:       "",
 			OutDevices:     []model.DeviceID{},
-			OutDeviceCount  0,
+			OutDeviceCount: 0,
 		},
 		"datastore error - group not found": {
 			DatastoreError: store.ErrGroupNotFound,
 			OutError:       "group not found",
 			OutDevices:     nil,
-			OutDeviceCount  -1,
+			OutDeviceCount: -1,
 		},
 		"datastore error - generic": {
 			DatastoreError: errors.New("datastore error"),
 			OutError:       "failed to list devices by group: datastore error",
 			OutDevices:     nil,
-			OutDeviceCount  -1,
+			OutDeviceCount: -1,
 		},
 	}
 
@@ -465,7 +466,7 @@ func TestInventoryListDevicesByGroup(t *testing.T) {
 			mock.AnythingOfType("model.GroupName"),
 			mock.AnythingOfType("int"),
 			mock.AnythingOfType("int"),
-		).Return(tc.OutDevices, tc.DatastoreError)
+		).Return(tc.OutDevices, tc.OutDeviceCount, tc.DatastoreError)
 
 		i := invForTest(db)
 
@@ -478,10 +479,10 @@ func TestInventoryListDevicesByGroup(t *testing.T) {
 		} else {
 			assert.NoError(t, err)
 			if !reflect.DeepEqual(tc.OutDevices, devs) {
-				assert.Fail(t, "expected: %v\nhave: %v", tc.OutDevices, devs)
+				assert.Fail(t, "expected outDevices to match", fmt.Sprintf("Expected: %v but\n have:%v", tc.OutDevices, devs))
 			}
 			if !reflect.DeepEqual(tc.OutDeviceCount, totalCount) {
-				assert.Fail(t, "expected: %v\nhave: %v", tc.OutDeviceCount, totalCount)
+				assert.Fail(t, "expected outDeviceCount to match", fmt.Sprintf("Expected: %v but\n have:%v", tc.OutDeviceCount, totalCount))
 			}
 		}
 	}

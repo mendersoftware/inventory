@@ -15,6 +15,7 @@ package mongo_test
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -1573,7 +1574,7 @@ func TestGetDevicesByGroup(t *testing.T) {
 			InputSkip:         0,
 			InputLimit:        0,
 			OutputDevices:     nil,
-			OutputDeviceCount: -1
+			OutputDeviceCount: -1,
 			OutputError:       store.ErrGroupNotFound,
 		},
 		"dev group": {
