@@ -29,7 +29,7 @@ var (
 )
 
 type DataStore interface {
-	GetDevices(ctx context.Context, q ListQuery) ([]model.Device, error)
+	GetDevices(ctx context.Context, q ListQuery) ([]model.Device, int, error)
 
 	// find a device with given `id`, returns the device or nil,
 	// if device was not found, error and returned device are nil
@@ -60,10 +60,7 @@ type DataStore interface {
 	ListGroups(ctx context.Context) ([]model.GroupName, error)
 
 	// Lists devices belonging to a group
-	GetDevicesByGroup(ctx context.Context, group model.GroupName, skip, limit int) ([]model.DeviceID, error)
-
-	// Get number of devices belonging to a group
-	GetDeviceCountByGroup(ctx context.Context, group model.GroupName) (int, error)
+	GetDevicesByGroup(ctx context.Context, group model.GroupName, skip, limit int) ([]model.DeviceID, int, error)
 
 	// Get device's group
 	GetDeviceGroup(ctx context.Context, id model.DeviceID) (model.GroupName, error)

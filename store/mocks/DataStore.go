@@ -96,7 +96,7 @@ func (_m *DataStore) GetDeviceGroup(ctx context.Context, id model.DeviceID) (mod
 }
 
 // GetDevices provides a mock function with given fields: ctx, q
-func (_m *DataStore) GetDevices(ctx context.Context, q store.ListQuery) ([]model.Device, error) {
+func (_m *DataStore) GetDevices(ctx context.Context, q store.ListQuery) ([]model.Device, int, error) {
 	ret := _m.Called(ctx, q)
 
 	var r0 []model.Device
@@ -108,18 +108,27 @@ func (_m *DataStore) GetDevices(ctx context.Context, q store.ListQuery) ([]model
 		}
 	}
 
-	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, store.ListQuery) error); ok {
+	var r1 int
+	if rf, ok := ret.Get(1).(func(context.Context, store.ListQuery) int); ok {
 		r1 = rf(ctx, q)
 	} else {
-		r1 = ret.Error(1)
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(int)
+		}
 	}
 
-	return r0, r1
+	var r2 error
+	if rf, ok := ret.Get(2).(func(context.Context, store.ListQuery) error); ok {
+		r2 = rf(ctx, q)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
 // GetDevicesByGroup provides a mock function with given fields: ctx, group, skip, limit
-func (_m *DataStore) GetDevicesByGroup(ctx context.Context, group model.GroupName, skip int, limit int) ([]model.DeviceID, error) {
+func (_m *DataStore) GetDevicesByGroup(ctx context.Context, group model.GroupName, skip int, limit int) ([]model.DeviceID, int, error) {
 	ret := _m.Called(ctx, group, skip, limit)
 
 	var r0 []model.DeviceID
@@ -131,14 +140,23 @@ func (_m *DataStore) GetDevicesByGroup(ctx context.Context, group model.GroupNam
 		}
 	}
 
-	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, model.GroupName, int, int) error); ok {
+	var r1 int
+	if rf, ok := ret.Get(1).(func(context.Context, model.GroupName, int, int) int); ok {
 		r1 = rf(ctx, group, skip, limit)
 	} else {
-		r1 = ret.Error(1)
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(int)
+		}
 	}
 
-	return r0, r1
+	var r2 error
+	if rf, ok := ret.Get(2).(func(context.Context, model.GroupName, int, int) error); ok {
+		r2 = rf(ctx, group, skip, limit)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
 // ListGroups provides a mock function with given fields: ctx, group
