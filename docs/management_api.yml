@@ -73,6 +73,11 @@ paths:
           description: If present, limits the results only to devices assigned/not assigned to a group.
           required: false
           type: boolean
+        - name: group
+          in: query
+          description: If present, limits the results only to devices belonging to the given group.
+          required: false
+          type: string
 
       responses:
         200:
