@@ -1,4 +1,4 @@
-// Copyright 2018 Northern.tech AS
+// Copyright 2019 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -15,6 +15,7 @@ package mongo_test
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -84,6 +85,7 @@ func TestMongoGetDevices(t *testing.T) {
 
 	testCases := map[string]struct {
 		expected  []model.Device
+		devTotal  int
 		skip      int
 		limit     int
 		filters   []store.Filter
@@ -94,6 +96,7 @@ func TestMongoGetDevices(t *testing.T) {
 	}{
 		"get device from group 1": {
 			expected:  []model.Device{inputDevs[1]},
+			devTotal:  1,
 			skip:      0,
 			filters:   nil,
 			sort:      nil,
@@ -101,6 +104,7 @@ func TestMongoGetDevices(t *testing.T) {
 		},
 		"all devs, no skip, no limit": {
 			expected: inputDevs,
+			devTotal: len(inputDevs),
 			skip:     0,
 			limit:    20,
 			filters:  nil,
@@ -108,6 +112,7 @@ func TestMongoGetDevices(t *testing.T) {
 		},
 		"all devs, no skip, no limit; with tenant": {
 			expected: inputDevs,
+			devTotal: len(inputDevs),
 			skip:     0,
 			limit:    20,
 			filters:  nil,
@@ -116,6 +121,7 @@ func TestMongoGetDevices(t *testing.T) {
 		},
 		"all devs, with skip": {
 			expected: []model.Device{inputDevs[4], inputDevs[5], inputDevs[6], inputDevs[7]},
+			devTotal: len(inputDevs),
 			skip:     4,
 			limit:    20,
 			filters:  nil,
@@ -123,6 +129,7 @@ func TestMongoGetDevices(t *testing.T) {
 		},
 		"all devs, no skip, with limit": {
 			expected: []model.Device{inputDevs[0], inputDevs[1], inputDevs[2]},
+			devTotal: len(inputDevs),
 			skip:     0,
 			limit:    3,
 			filters:  nil,
@@ -130,6 +137,7 @@ func TestMongoGetDevices(t *testing.T) {
 		},
 		"skip + limit": {
 			expected: []model.Device{inputDevs[3], inputDevs[4]},
+			devTotal: len(inputDevs),
 			skip:     3,
 			limit:    2,
 			filters:  nil,
@@ -137,6 +145,7 @@ func TestMongoGetDevices(t *testing.T) {
 		},
 		"filter on attribute (equal attribute)": {
 			expected: []model.Device{inputDevs[3]},
+			devTotal: 1,
 			skip:     0,
 			limit:    20,
 			filters: []store.Filter{
@@ -149,6 +158,7 @@ func TestMongoGetDevices(t *testing.T) {
 		},
 		"filter on attribute (equal attribute float)": {
 			expected: []model.Device{inputDevs[5]},
+			devTotal: 1,
 			skip:     0,
 			limit:    20,
 			filters: []store.Filter{
@@ -163,6 +173,7 @@ func TestMongoGetDevices(t *testing.T) {
 		},
 		"filter on two attributes (equal)": {
 			expected: []model.Device{inputDevs[4]},
+			devTotal: 1,
 			skip:     0,
 			limit:    20,
 			filters: []store.Filter{
@@ -182,6 +193,7 @@ func TestMongoGetDevices(t *testing.T) {
 		},
 		"sort, limit": {
 			expected: []model.Device{inputDevs[5], inputDevs[4], inputDevs[3]},
+			devTotal: len(inputDevs),
 			skip:     0,
 			limit:    3,
 			filters:  nil,
@@ -192,6 +204,7 @@ func TestMongoGetDevices(t *testing.T) {
 		},
 		"hasGroup = true": {
 			expected: []model.Device{inputDevs[1], inputDevs[2], inputDevs[5]},
+			devTotal: 3,
 			skip:     0,
 			limit:    20,
 			filters:  nil,
@@ -200,6 +213,7 @@ func TestMongoGetDevices(t *testing.T) {
 		},
 		"hasGroup = false": {
 			expected: []model.Device{inputDevs[0], inputDevs[3], inputDevs[4], inputDevs[6], inputDevs[7]},
+			devTotal: 5,
 			skip:     0,
 			limit:    20,
 			filters:  nil,
@@ -231,10 +245,11 @@ func TestMongoGetDevices(t *testing.T) {
 		mongoStore := NewDataStoreMongoWithSession(session)
 
 		//test
-		devs, err := mongoStore.GetDevices(ctx, store.ListQuery{tc.skip, tc.limit, tc.filters, tc.sort, tc.hasGroup, tc.groupName})
+		devs, totalCount, err := mongoStore.GetDevices(ctx, store.ListQuery{tc.skip, tc.limit, tc.filters, tc.sort, tc.hasGroup, tc.groupName})
 		assert.NoError(t, err, "failed to get devices")
 
 		assert.Equal(t, len(tc.expected), len(devs))
+		assert.Equal(t, tc.devTotal, totalCount)
 
 		// Need to close all sessions to be able to call wipe at next test case
 		session.Close()
@@ -1451,18 +1466,24 @@ func TestGetDevicesByGroup(t *testing.T) {
 		t.Skip("skipping TestGetDevicesByGroup in short mode.")
 	}
 
-	inputDevices := []model.Device{
+	devDevices := []model.Device{
 		{
 			ID:    model.DeviceID("1"),
 			Group: model.GroupName("dev"),
 		},
 		{
-			ID:    model.DeviceID("2"),
-			Group: model.GroupName("prod"),
+			ID:    model.DeviceID("6"),
+			Group: model.GroupName("dev"),
 		},
 		{
-			ID:    model.DeviceID("3"),
-			Group: model.GroupName("test"),
+			ID:    model.DeviceID("8"),
+			Group: model.GroupName("dev"),
+		},
+	}
+	prodDevices := []model.Device{
+		{
+			ID:    model.DeviceID("2"),
+			Group: model.GroupName("prod"),
 		},
 		{
 			ID:    model.DeviceID("4"),
@@ -1472,48 +1493,53 @@ func TestGetDevicesByGroup(t *testing.T) {
 			ID:    model.DeviceID("5"),
 			Group: model.GroupName("prod"),
 		},
+	}
+	testDevices := []model.Device{
 		{
-			ID:    model.DeviceID("6"),
-			Group: model.GroupName("dev"),
+			ID:    model.DeviceID("3"),
+			Group: model.GroupName("test"),
 		},
 		{
 			ID:    model.DeviceID("7"),
 			Group: model.GroupName("test"),
 		},
-		{
-			ID:    model.DeviceID("8"),
-			Group: model.GroupName("dev"),
-		},
 	}
 
+	inputDevices := make([]model.Device, 0, len(devDevices) + len(prodDevices) + len(testDevices))
+	inputDevices = append(inputDevices, devDevices...)
+	inputDevices = append(inputDevices, prodDevices...)
+	inputDevices = append(inputDevices, testDevices...)
+	
 	testCases := map[string]struct {
-		InputGroupName model.GroupName
-		InputSkip      int
-		InputLimit     int
-		OutputDevices  []model.DeviceID
-		OutputError    error
+		InputGroupName    model.GroupName
+		InputSkip         int
+		InputLimit        int
+		OutputDevices     []model.DeviceID
+		OutputDeviceCount int
+		OutputError       error
 	}{
 		"no skip, no limit": {
-			InputGroupName: "dev",
-			InputSkip:      0,
-			InputLimit:     0,
+			InputGroupName:    "dev",
+			InputSkip:         0,
+			InputLimit:        0,
 			OutputDevices: []model.DeviceID{
-
 				model.DeviceID("1"),
 				model.DeviceID("6"),
 				model.DeviceID("8"),
 			},
-			OutputError: nil,
+			OutputDeviceCount: len(devDevices),
+			OutputError:       nil,
 		},
 		"no skip, limit": {
-			InputGroupName: "prod",
-			InputSkip:      0,
-			InputLimit:     2,
+			InputGroupName:    "prod",
+			InputSkip:         0,
+			InputLimit:        2,
 			OutputDevices: []model.DeviceID{
 				model.DeviceID("2"),
 				model.DeviceID("4"),
 			},
-			OutputError: nil,
+			OutputDeviceCount: len(prodDevices),
+			OutputError:       nil,
 		},
 		"skip, no limit": {
 			InputGroupName: "dev",
@@ -1522,30 +1548,69 @@ func TestGetDevicesByGroup(t *testing.T) {
 			OutputDevices: []model.DeviceID{
 				model.DeviceID("8"),
 			},
+			OutputDeviceCount: len(devDevices),
 			OutputError: nil,
 		},
 		"skip + limit": {
-			InputGroupName: "prod",
-			InputSkip:      1,
-			InputLimit:     1,
-			OutputDevices: []model.DeviceID{
+			InputGroupName:    "prod",
+			InputSkip:         1,
+			InputLimit:        1,
+			OutputDevices:     []model.DeviceID{
 				model.DeviceID("4"),
 			},
-			OutputError: nil,
+			OutputDeviceCount: len(prodDevices),
+			OutputError:       nil,
 		},
 		"no results (past last page)": {
-			InputGroupName: "dev",
-			InputSkip:      10,
-			InputLimit:     1,
-			OutputDevices:  []model.DeviceID{},
-			OutputError:    nil,
+			InputGroupName:    "dev",
+			InputSkip:         10,
+			InputLimit:        1,
+			OutputDevices:     []model.DeviceID{},
+			OutputDeviceCount: len(devDevices),
+			OutputError:       nil,
 		},
 		"group doesn't exist": {
-			InputGroupName: "unknown",
-			InputSkip:      0,
-			InputLimit:     0,
-			OutputDevices:  nil,
-			OutputError:    store.ErrGroupNotFound,
+			InputGroupName:    "unknown",
+			InputSkip:         0,
+			InputLimit:        0,
+			OutputDevices:     nil,
+			OutputDeviceCount: -1,
+			OutputError:       store.ErrGroupNotFound,
+		},
+		"dev group": {
+			InputGroupName:    "dev",
+			InputSkip:         0,
+			InputLimit:        10,
+			OutputDevices:     []model.DeviceID{
+				model.DeviceID("1"),
+				model.DeviceID("6"),
+				model.DeviceID("8"),
+			},
+			OutputDeviceCount: len(devDevices),
+			OutputError:       nil,
+		},
+		"prod group": {
+			InputGroupName:    "prod",
+			InputSkip:         0,
+			InputLimit:        10,
+			OutputDevices:     []model.DeviceID{
+				model.DeviceID("2"),
+				model.DeviceID("4"),
+				model.DeviceID("5"),
+			},
+			OutputDeviceCount: len(prodDevices),
+			OutputError:       nil,
+		},
+		"test group": {
+			InputGroupName:    "test",
+			InputSkip:         0,
+			InputLimit:        10,
+			OutputDevices:     []model.DeviceID{
+				model.DeviceID("3"),
+				model.DeviceID("7"),
+			},
+			OutputDeviceCount: len(testDevices),
+			OutputError:       nil,
 		},
 	}
 
@@ -1563,14 +1628,17 @@ func TestGetDevicesByGroup(t *testing.T) {
 		store := NewDataStoreMongoWithSession(session)
 
 		ctx := context.Background()
-		devs, err := store.GetDevicesByGroup(ctx, tc.InputGroupName, tc.InputSkip, tc.InputLimit)
+		devs, totalCount, err := store.GetDevicesByGroup(ctx, tc.InputGroupName, tc.InputSkip, tc.InputLimit)
 
 		if tc.OutputError != nil {
 			assert.EqualError(t, err, tc.OutputError.Error())
 		} else {
 			assert.NoError(t, err, "expected no error")
 			if !reflect.DeepEqual(tc.OutputDevices, devs) {
-				assert.Fail(t, "expected: %v\nhave: %v", tc.OutputDevices, devs)
+				assert.Fail(t, "expected outputDevices to match", fmt.Sprintf("Expected: %v but\n have:%v", tc.OutputDevices, devs))
+			}
+			if !reflect.DeepEqual(tc.OutputDeviceCount, totalCount) {
+				assert.Fail(t, "expected outputDeviceCount to match", fmt.Sprintf("Expected: %v but\n have:%v",  tc.OutputDeviceCount, totalCount))
 			}
 		}
 	}
@@ -1619,65 +1687,71 @@ func TestGetDevicesByGroupWithTenant(t *testing.T) {
 	}
 
 	testCases := map[string]struct {
-		InputGroupName model.GroupName
-		InputSkip      int
-		InputLimit     int
-		OutputDevices  []model.DeviceID
-		OutputError    error
+		InputGroupName    model.GroupName
+		InputSkip         int
+		InputLimit        int
+		OutputDevices     []model.DeviceID
+		OutputDeviceCount int
+		OutputError       error
 	}{
 		"no skip, no limit": {
-			InputGroupName: "dev",
-			InputSkip:      0,
-			InputLimit:     0,
-			OutputDevices: []model.DeviceID{
-
+			InputGroupName:    "dev",
+			InputSkip:         0,
+			InputLimit:        0,
+			OutputDevices:     []model.DeviceID{
 				model.DeviceID("1"),
 				model.DeviceID("6"),
 				model.DeviceID("8"),
 			},
-			OutputError: nil,
+			OutputDeviceCount: 3,
+			OutputError:       nil,
 		},
 		"no skip, limit": {
-			InputGroupName: "prod",
-			InputSkip:      0,
-			InputLimit:     2,
+			InputGroupName:    "prod",
+			InputSkip:         0,
+			InputLimit:        2,
 			OutputDevices: []model.DeviceID{
 				model.DeviceID("2"),
 				model.DeviceID("4"),
 			},
-			OutputError: nil,
+			OutputDeviceCount: 3,
+			OutputError:       nil,
 		},
 		"skip, no limit": {
-			InputGroupName: "dev",
-			InputSkip:      2,
-			InputLimit:     0,
+			InputGroupName:    "dev",
+			InputSkip:         2,
+			InputLimit:        0,
 			OutputDevices: []model.DeviceID{
 				model.DeviceID("8"),
 			},
-			OutputError: nil,
+			OutputDeviceCount: 3,
+			OutputError:       nil,
 		},
 		"skip + limit": {
-			InputGroupName: "prod",
-			InputSkip:      1,
-			InputLimit:     1,
+			InputGroupName:    "prod",
+			InputSkip:         1,
+			InputLimit:        1,
 			OutputDevices: []model.DeviceID{
 				model.DeviceID("4"),
 			},
-			OutputError: nil,
+			OutputDeviceCount: 3,
+			OutputError:       nil,
 		},
 		"no results (past last page)": {
-			InputGroupName: "dev",
-			InputSkip:      10,
-			InputLimit:     1,
-			OutputDevices:  []model.DeviceID{},
-			OutputError:    nil,
+			InputGroupName:    "dev",
+			InputSkip:         10,
+			InputLimit:        1,
+			OutputDevices:     []model.DeviceID{},
+			OutputDeviceCount: 3,
+			OutputError:       nil,
 		},
 		"group doesn't exist": {
-			InputGroupName: "unknown",
-			InputSkip:      0,
-			InputLimit:     0,
-			OutputDevices:  nil,
-			OutputError:    store.ErrGroupNotFound,
+			InputGroupName:    "unknown",
+			InputSkip:         0,
+			InputLimit:        0,
+			OutputDevices:     nil,
+			OutputDeviceCount: -1,
+			OutputError:       store.ErrGroupNotFound,
 		},
 	}
 
@@ -1698,14 +1772,17 @@ func TestGetDevicesByGroupWithTenant(t *testing.T) {
 		ctx = identity.WithContext(ctx, &identity.Identity{
 			Tenant: "foo",
 		})
-		devs, err := store.GetDevicesByGroup(ctx, tc.InputGroupName, tc.InputSkip, tc.InputLimit)
+		devs, totalCount, err := store.GetDevicesByGroup(ctx, tc.InputGroupName, tc.InputSkip, tc.InputLimit)
 
 		if tc.OutputError != nil {
 			assert.EqualError(t, err, tc.OutputError.Error())
 		} else {
 			assert.NoError(t, err, "expected no error")
 			if !reflect.DeepEqual(tc.OutputDevices, devs) {
-				assert.Fail(t, "expected: %v\nhave: %v", tc.OutputDevices, devs)
+				assert.Fail(t, "expected outputDevices to match", fmt.Sprintf("Expected: %v but\n have:%v", tc.OutputDevices, devs))
+			}
+			if !reflect.DeepEqual(tc.OutputDeviceCount, totalCount) {
+				assert.Fail(t, "expected outputDeviceCount to match", fmt.Sprintf("Expected: %v but\n have:%v", tc.OutputDeviceCount, totalCount))
 			}
 		}
 	}

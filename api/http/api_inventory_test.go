@@ -1,4 +1,4 @@
-// Copyright 2018 Northern.tech AS
+// Copyright 2019 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -162,15 +162,17 @@ func TestApiInventoryGetDevices(t *testing.T) {
 	rest.ErrorFieldName = "error"
 
 	testCases := map[string]struct {
-		listDevicesNum int
-		listDevicesErr error
-		inReq          *http.Request
-		resp           utils.JSONResponseParams
+		listDevicesNum  int
+		listDevicesErr  error
+		listDeviceTotal int
+		inReq           *http.Request
+		resp            utils.JSONResponseParams
 	}{
 		"get all devices in group": {
-			listDevicesNum: 3,
-			listDevicesErr: nil,
-			inReq:          test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=4&per_page=5&group=foo", nil),
+			listDevicesNum:  3,
+			listDevicesErr:  nil,
+			listDeviceTotal: 18,
+			inReq:           test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=4&per_page=5&group=foo", nil),
 			resp: utils.JSONResponseParams{
 				OutputStatus:     200,
 				OutputBodyObject: mockListDevices(3),
@@ -179,13 +181,15 @@ func TestApiInventoryGetDevices(t *testing.T) {
 						fmt.Sprintf(utils.LinkTmpl, "devices", "group=foo&page=3&per_page=5", "prev"),
 						fmt.Sprintf(utils.LinkTmpl, "devices", "group=foo&page=1&per_page=5", "first"),
 					},
+					"X-Total-Count": { "18" },
 				},
 			},
 		},
 		"valid pagination, no next page": {
-			listDevicesNum: 5,
-			listDevicesErr: nil,
-			inReq:          test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=4&per_page=5", nil),
+			listDevicesNum:  5,
+			listDevicesErr:  nil,
+			listDeviceTotal: 20,
+			inReq:           test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=4&per_page=5", nil),
 			resp: utils.JSONResponseParams{
 				OutputStatus:     200,
 				OutputBodyObject: mockListDevices(5),
@@ -194,13 +198,15 @@ func TestApiInventoryGetDevices(t *testing.T) {
 						fmt.Sprintf(utils.LinkTmpl, "devices", "page=3&per_page=5", "prev"),
 						fmt.Sprintf(utils.LinkTmpl, "devices", "page=1&per_page=5", "first"),
 					},
+					"X-Total-Count": { "20" },
 				},
 			},
 		},
 		"valid pagination, with next page": {
-			listDevicesNum: 9,
-			listDevicesErr: nil,
-			inReq:          test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=4&per_page=5", nil),
+			listDevicesNum:  5,
+			listDevicesErr:  nil,
+			listDeviceTotal: 21,
+			inReq:           test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=4&per_page=5", nil),
 			resp: utils.JSONResponseParams{
 				OutputStatus:     200,
 				OutputBodyObject: mockListDevices(5),
@@ -209,13 +215,15 @@ func TestApiInventoryGetDevices(t *testing.T) {
 						fmt.Sprintf(utils.LinkTmpl, "devices", "page=3&per_page=5", "prev"),
 						fmt.Sprintf(utils.LinkTmpl, "devices", "page=1&per_page=5", "first"),
 					},
+					"X-Total-Count": { "21" },
 				},
 			},
 		},
 		"invalid pagination - page format": {
-			listDevicesNum: 5,
-			listDevicesErr: nil,
-			inReq:          test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=foo&per_page=5", nil),
+			listDevicesNum:  5,
+			listDevicesErr:  nil,
+			listDeviceTotal: 5,
+			inReq:           test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=foo&per_page=5", nil),
 			resp: utils.JSONResponseParams{
 				OutputStatus:     400,
 				OutputBodyObject: RestError(utils.MsgQueryParmInvalid("page")),
@@ -223,9 +231,10 @@ func TestApiInventoryGetDevices(t *testing.T) {
 			},
 		},
 		"invalid pagination - per_page format": {
-			listDevicesNum: 5,
-			listDevicesErr: nil,
-			inReq:          test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=foo", nil),
+			listDevicesNum:  5,
+			listDevicesErr:  nil,
+			listDeviceTotal: 5,
+			inReq:           test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=foo", nil),
 			resp: utils.JSONResponseParams{
 				OutputStatus:     400,
 				OutputBodyObject: RestError(utils.MsgQueryParmInvalid("per_page")),
@@ -233,9 +242,10 @@ func TestApiInventoryGetDevices(t *testing.T) {
 			},
 		},
 		"invalid pagination - bounds": {
-			listDevicesNum: 5,
-			listDevicesErr: nil,
-			inReq:          test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=0&per_page=5", nil),
+			listDevicesNum:  5,
+			listDevicesErr:  nil,
+			listDeviceTotal: 5,
+			inReq:           test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=0&per_page=5", nil),
 			resp: utils.JSONResponseParams{
 				OutputStatus:     400,
 				OutputBodyObject: RestError(utils.MsgQueryParmLimit("page")),
@@ -243,9 +253,10 @@ func TestApiInventoryGetDevices(t *testing.T) {
 			},
 		},
 		"valid attribute filter": {
-			listDevicesNum: 5,
-			listDevicesErr: nil,
-			inReq:          test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&attr_name1=qe:123:123:123", nil),
+			listDevicesNum:  5,
+			listDevicesErr:  nil,
+			listDeviceTotal: 5,
+			inReq:           test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&attr_name1=qe:123:123:123", nil),
 			resp: utils.JSONResponseParams{
 				OutputStatus:     200,
 				OutputBodyObject: mockListDevices(5),
@@ -253,13 +264,15 @@ func TestApiInventoryGetDevices(t *testing.T) {
 					"Link": {
 						fmt.Sprintf(utils.LinkTmpl, "devices", "attr_name1=qe%3A123%3A123%3A123&page=1&per_page=5", "first"),
 					},
+					"X-Total-Count": { "5" },
 				},
 			},
 		},
 		"invalid attribute filter operator": {
-			listDevicesNum: 5,
-			listDevicesErr: nil,
-			inReq:          test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&attr_name1=neq:123", nil),
+			listDevicesNum:  5,
+			listDevicesErr:  nil,
+			listDeviceTotal: 5,
+			inReq:           test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&attr_name1=neq:123", nil),
 			resp: utils.JSONResponseParams{
 				OutputStatus:     400,
 				OutputBodyObject: RestError("invalid filter operator"),
@@ -267,9 +280,10 @@ func TestApiInventoryGetDevices(t *testing.T) {
 			},
 		},
 		"valid sort order value": {
-			listDevicesNum: 5,
-			listDevicesErr: nil,
-			inReq:          test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?sort=attr_name1:asc&page=1&per_page=5", nil),
+			listDevicesNum:  5,
+			listDevicesErr:  nil,
+			listDeviceTotal: 5,
+			inReq:           test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?sort=attr_name1:asc&page=1&per_page=5", nil),
 			resp: utils.JSONResponseParams{
 				OutputStatus:     200,
 				OutputBodyObject: mockListDevices(5),
@@ -277,13 +291,15 @@ func TestApiInventoryGetDevices(t *testing.T) {
 					"Link": {
 						fmt.Sprintf(utils.LinkTmpl, "devices", "page=1&per_page=5&sort=attr_name1%3Aasc", "first"),
 					},
+					"X-Total-Count": { "5" },
 				},
 			},
 		},
 		"invalid sort order value": {
-			listDevicesNum: 5,
-			listDevicesErr: nil,
-			inReq:          test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&sort=attr_name1:gte", nil),
+			listDevicesNum:  5,
+			listDevicesErr:  nil,
+			listDeviceTotal: 5,
+			inReq:           test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&sort=attr_name1:gte", nil),
 			resp: utils.JSONResponseParams{
 				OutputStatus:     400,
 				OutputBodyObject: RestError("invalid sort order"),
@@ -291,9 +307,10 @@ func TestApiInventoryGetDevices(t *testing.T) {
 			},
 		},
 		"valid has_group": {
-			listDevicesNum: 5,
-			listDevicesErr: nil,
-			inReq:          test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?has_group=true&page=1&per_page=5", nil),
+			listDevicesNum:  5,
+			listDevicesErr:  nil,
+			listDeviceTotal: 5,
+			inReq:           test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?has_group=true&page=1&per_page=5", nil),
 			resp: utils.JSONResponseParams{
 				OutputStatus:     200,
 				OutputBodyObject: mockListDevices(5),
@@ -301,13 +318,15 @@ func TestApiInventoryGetDevices(t *testing.T) {
 					"Link": {
 						fmt.Sprintf(utils.LinkTmpl, "devices", "has_group=true&page=1&per_page=5", "first"),
 					},
+					"X-Total-Count": { "5" },
 				},
 			},
 		},
 		"invalid has_group": {
-			listDevicesNum: 5,
-			listDevicesErr: nil,
-			inReq:          test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&has_group=asd", nil),
+			listDevicesNum:  5,
+			listDevicesErr:  nil,
+			listDeviceTotal: 5,
+			inReq:           test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&has_group=asd", nil),
 			resp: utils.JSONResponseParams{
 				OutputStatus:     400,
 				OutputBodyObject: RestError(utils.MsgQueryParmInvalid("has_group")),
@@ -315,9 +334,10 @@ func TestApiInventoryGetDevices(t *testing.T) {
 			},
 		},
 		"inv.ListDevices error": {
-			listDevicesNum: 5,
-			listDevicesErr: errors.New("inventory error"),
-			inReq:          test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=4&per_page=5", nil),
+			listDevicesNum:  5,
+			listDevicesErr:  errors.New("inventory error"),
+			listDeviceTotal: 20,
+			inReq:           test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=4&per_page=5", nil),
 			resp: utils.JSONResponseParams{
 				OutputStatus:     500,
 				OutputBodyObject: RestError("internal error"),
@@ -335,7 +355,7 @@ func TestApiInventoryGetDevices(t *testing.T) {
 		inv.On("ListDevices",
 			ctx,
 			mock.AnythingOfType("store.ListQuery"),
-		).Return(mockListDevices(testCase.listDevicesNum), testCase.listDevicesErr)
+		).Return(mockListDevices(testCase.listDevicesNum), testCase.listDeviceTotal, testCase.listDevicesErr)
 
 		apih := makeMockApiHandler(t, &inv)
 
@@ -981,15 +1001,17 @@ func TestApiInventoryGetDevicesByGroup(t *testing.T) {
 	rest.ErrorFieldName = "error"
 
 	testCases := map[string]struct {
-		listDevicesNum int
-		listDevicesErr error
-		inReq          *http.Request
-		resp           utils.JSONResponseParams
+		listDevicesNum   int
+		listDevicesErr   error
+		listDevicesTotal int
+		inReq            *http.Request
+		resp             utils.JSONResponseParams
 	}{
 		"valid pagination, no next page": {
-			listDevicesNum: 5,
-			listDevicesErr: nil,
-			inReq:          test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/groups/foo/devices?page=4&per_page=5", nil),
+			listDevicesNum:   5,
+			listDevicesErr:   nil,
+			listDevicesTotal: 20,
+			inReq:            test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/groups/foo/devices?page=4&per_page=5", nil),
 			resp: utils.JSONResponseParams{
 				OutputStatus:     200,
 				OutputBodyObject: mockListDeviceIDs(5),
@@ -998,13 +1020,15 @@ func TestApiInventoryGetDevicesByGroup(t *testing.T) {
 						fmt.Sprintf(utils.LinkTmpl, "devices", "page=3&per_page=5", "prev"),
 						fmt.Sprintf(utils.LinkTmpl, "devices", "page=1&per_page=5", "first"),
 					},
+					"X-Total-Count": { "20" },
 				},
 			},
 		},
 		"valid pagination, with next page": {
-			listDevicesNum: 9,
-			listDevicesErr: nil,
-			inReq:          test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/groups/foo/devices?page=4&per_page=5", nil),
+			listDevicesNum:   5,
+			listDevicesErr:   nil,
+			listDevicesTotal: 21,
+			inReq:            test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/groups/foo/devices?page=4&per_page=5", nil),
 			resp: utils.JSONResponseParams{
 				OutputStatus:     200,
 				OutputBodyObject: mockListDeviceIDs(5),
@@ -1013,13 +1037,15 @@ func TestApiInventoryGetDevicesByGroup(t *testing.T) {
 						fmt.Sprintf(utils.LinkTmpl, "devices", "page=3&per_page=5", "prev"),
 						fmt.Sprintf(utils.LinkTmpl, "devices", "page=1&per_page=5", "first"),
 					},
+					"X-Total-Count": { "21" },
 				},
 			},
 		},
 		"invalid pagination - page format": {
-			listDevicesNum: 5,
-			listDevicesErr: nil,
-			inReq:          test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/groups/foo/devices?page=foo&per_page=5", nil),
+			listDevicesNum:   5,
+			listDevicesErr:   nil,
+			listDevicesTotal: 5,
+			inReq:            test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/groups/foo/devices?page=foo&per_page=5", nil),
 			resp: utils.JSONResponseParams{
 				OutputStatus:     400,
 				OutputBodyObject: RestError(utils.MsgQueryParmInvalid("page")),
@@ -1027,9 +1053,10 @@ func TestApiInventoryGetDevicesByGroup(t *testing.T) {
 			},
 		},
 		"invalid pagination - per_page format": {
-			listDevicesNum: 5,
-			listDevicesErr: nil,
-			inReq:          test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/groups/foo/devices?page=1&per_page=foo", nil),
+			listDevicesNum:   5,
+			listDevicesErr:   nil,
+			listDevicesTotal: 5,
+			inReq:            test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/groups/foo/devices?page=1&per_page=foo", nil),
 			resp: utils.JSONResponseParams{
 				OutputStatus:     400,
 				OutputBodyObject: RestError(utils.MsgQueryParmInvalid("per_page")),
@@ -1037,9 +1064,10 @@ func TestApiInventoryGetDevicesByGroup(t *testing.T) {
 			},
 		},
 		"invalid pagination - bounds": {
-			listDevicesNum: 5,
-			listDevicesErr: nil,
-			inReq:          test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/groups/foo/devices?page=0&per_page=5", nil),
+			listDevicesNum:   5,
+			listDevicesErr:   nil,
+			listDevicesTotal: 5,
+			inReq:            test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/groups/foo/devices?page=0&per_page=5", nil),
 			resp: utils.JSONResponseParams{
 				OutputStatus:     400,
 				OutputBodyObject: RestError(utils.MsgQueryParmLimit("page")),
@@ -1047,9 +1075,10 @@ func TestApiInventoryGetDevicesByGroup(t *testing.T) {
 			},
 		},
 		"inv.ListDevicesByGroup error - group not found": {
-			listDevicesNum: 5,
-			listDevicesErr: store.ErrGroupNotFound,
-			inReq:          test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/groups/foo/devices?page=4&per_page=5", nil),
+			listDevicesNum:   5,
+			listDevicesErr:   store.ErrGroupNotFound,
+			listDevicesTotal: 20,
+			inReq:            test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/groups/foo/devices?page=4&per_page=5", nil),
 			resp: utils.JSONResponseParams{
 				OutputStatus:     404,
 				OutputBodyObject: RestError("group not found"),
@@ -1057,9 +1086,10 @@ func TestApiInventoryGetDevicesByGroup(t *testing.T) {
 			},
 		},
 		"inv.ListDevicesByGroup error - internal": {
-			listDevicesNum: 5,
-			listDevicesErr: errors.New("inventory error"),
-			inReq:          test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/groups/foo/devices?page=4&per_page=5", nil),
+			listDevicesNum:   5,
+			listDevicesErr:   errors.New("inventory error"),
+			listDevicesTotal: 20,
+			inReq:            test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/groups/foo/devices?page=4&per_page=5", nil),
 			resp: utils.JSONResponseParams{
 				OutputStatus:     500,
 				OutputBodyObject: RestError("internal error"),
@@ -1079,7 +1109,7 @@ func TestApiInventoryGetDevicesByGroup(t *testing.T) {
 			mock.AnythingOfType("model.GroupName"),
 			mock.AnythingOfType("int"),
 			mock.AnythingOfType("int"),
-		).Return(mockListDeviceIDs(testCase.listDevicesNum), testCase.listDevicesErr)
+		).Return(mockListDeviceIDs(testCase.listDevicesNum), testCase.listDevicesTotal, testCase.listDevicesErr)
 
 		apih := makeMockApiHandler(t, &inv)
 

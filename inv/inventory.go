@@ -1,4 +1,4 @@
-// Copyright 2017 Northern.tech AS
+// Copyright 2019 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -25,14 +25,14 @@ import (
 
 // this inventory service interface
 type InventoryApp interface {
-	ListDevices(ctx context.Context, q store.ListQuery) ([]model.Device, error)
+	ListDevices(ctx context.Context, q store.ListQuery) ([]model.Device, int, error)
 	GetDevice(ctx context.Context, id model.DeviceID) (*model.Device, error)
 	AddDevice(ctx context.Context, d *model.Device) error
 	UpsertAttributes(ctx context.Context, id model.DeviceID, attrs model.DeviceAttributes) error
 	UnsetDeviceGroup(ctx context.Context, id model.DeviceID, groupName model.GroupName) error
 	UpdateDeviceGroup(ctx context.Context, id model.DeviceID, group model.GroupName) error
 	ListGroups(ctx context.Context) ([]model.GroupName, error)
-	ListDevicesByGroup(ctx context.Context, group model.GroupName, skip int, limit int) ([]model.DeviceID, error)
+	ListDevicesByGroup(ctx context.Context, group model.GroupName, skip int, limit int) ([]model.DeviceID, int, error)
 	GetDeviceGroup(ctx context.Context, id model.DeviceID) (model.GroupName, error)
 	DeleteDevice(ctx context.Context, id model.DeviceID) error
 	CreateTenant(ctx context.Context, tenant model.NewTenant) error
@@ -48,14 +48,14 @@ func NewInventory(d store.DataStore, tenantKeeper store.TenantDataKeeper,
 	return &inventory{db: d, tenantKeeper: tenantKeeper}
 }
 
-func (i *inventory) ListDevices(ctx context.Context, q store.ListQuery) ([]model.Device, error) {
-	devs, err := i.db.GetDevices(ctx, q)
+func (i *inventory) ListDevices(ctx context.Context, q store.ListQuery) ([]model.Device, int, error) {
+	devs, totalCount, err := i.db.GetDevices(ctx, q)
 
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to fetch devices")
+		return nil, -1, errors.Wrap(err, "failed to fetch devices")
 	}
 
-	return devs, nil
+	return devs, totalCount, nil
 }
 
 func (i *inventory) GetDevice(ctx context.Context, id model.DeviceID) (*model.Device, error) {
@@ -131,17 +131,17 @@ func (i *inventory) ListGroups(ctx context.Context) ([]model.GroupName, error) {
 	return groups, nil
 }
 
-func (i *inventory) ListDevicesByGroup(ctx context.Context, group model.GroupName, skip, limit int) ([]model.DeviceID, error) {
-	ids, err := i.db.GetDevicesByGroup(ctx, group, skip, limit)
+func (i *inventory) ListDevicesByGroup(ctx context.Context, group model.GroupName, skip, limit int) ([]model.DeviceID, int, error) {
+	ids, totalCount, err := i.db.GetDevicesByGroup(ctx, group, skip, limit)
 	if err != nil {
 		if err == store.ErrGroupNotFound {
-			return nil, err
+			return nil, -1, err
 		} else {
-			return nil, errors.Wrap(err, "failed to list devices by group")
+			return nil, -1, errors.Wrap(err, "failed to list devices by group")
 		}
 	}
 
-	return ids, nil
+	return ids, totalCount, nil
 }
 
 func (i *inventory) GetDeviceGroup(ctx context.Context, id model.DeviceID) (model.GroupName, error) {

@@ -1,4 +1,4 @@
-// Copyright 2018 Northern.tech AS
+// Copyright 2019 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -29,7 +29,7 @@ var (
 )
 
 type DataStore interface {
-	GetDevices(ctx context.Context, q ListQuery) ([]model.Device, error)
+	GetDevices(ctx context.Context, q ListQuery) ([]model.Device, int, error)
 
 	// find a device with given `id`, returns the device or nil,
 	// if device was not found, error and returned device are nil
@@ -60,7 +60,7 @@ type DataStore interface {
 	ListGroups(ctx context.Context) ([]model.GroupName, error)
 
 	// Lists devices belonging to a group
-	GetDevicesByGroup(ctx context.Context, group model.GroupName, skip, limit int) ([]model.DeviceID, error)
+	GetDevicesByGroup(ctx context.Context, group model.GroupName, skip, limit int) ([]model.DeviceID, int, error)
 
 	// Get device's group
 	GetDeviceGroup(ctx context.Context, id model.DeviceID) (model.GroupName, error)

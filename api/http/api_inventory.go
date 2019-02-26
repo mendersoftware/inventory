@@ -1,4 +1,4 @@
-// Copyright 2018 Northern.tech AS
+// Copyright 2019 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -204,34 +204,28 @@ func (i *inventoryHandlers) GetDevicesHandler(w rest.ResponseWriter, r *rest.Req
 		return
 	}
 
-	//get one extra device to see if there's a 'next' page
 	ld := store.ListQuery{int((page - 1) * perPage),
-		int(perPage + 1),
+		int(perPage),
 		filters,
 		sort,
 		hasGroup,
 		groupName}
 
-	devs, err := i.inventory.ListDevices(ctx, ld)
+	devs, totalCount, err := i.inventory.ListDevices(ctx, ld)
 
 	if err != nil {
 		u.RestErrWithLogInternal(w, r, l, err)
 		return
 	}
 
-	len := len(devs)
-	hasNext := false
-	if uint64(len) > perPage {
-		hasNext = true
-		len = int(perPage)
-	}
-
+	hasNext := totalCount > int(page * perPage)
 	links := utils.MakePageLinkHdrs(r, page, perPage, hasNext)
-
 	for _, l := range links {
 		w.Header().Add("Link", l)
 	}
-	w.WriteJson(devs[:len])
+	// the response writer will ensure the header name is in Kebab-Pascal-Case
+	w.Header().Add("X-Total-Count", strconv.Itoa(totalCount))
+	w.WriteJson(devs)
 }
 
 func (i *inventoryHandlers) GetDeviceHandler(w rest.ResponseWriter, r *rest.Request) {
@@ -395,7 +389,7 @@ func (i *inventoryHandlers) GetDevicesByGroup(w rest.ResponseWriter, r *rest.Req
 	}
 
 	//get one extra device to see if there's a 'next' page
-	ids, err := i.inventory.ListDevicesByGroup(ctx, model.GroupName(group), int((page-1)*perPage), int(perPage+1))
+	ids, totalCount, err := i.inventory.ListDevicesByGroup(ctx, model.GroupName(group), int((page-1)*perPage), int(perPage))
 	if err != nil {
 		if err == store.ErrGroupNotFound {
 			u.RestErrWithLog(w, r, l, err, http.StatusNotFound)
@@ -405,19 +399,15 @@ func (i *inventoryHandlers) GetDevicesByGroup(w rest.ResponseWriter, r *rest.Req
 		return
 	}
 
-	len := len(ids)
-	hasNext := false
-	if uint64(len) > perPage {
-		hasNext = true
-		len = int(perPage)
-	}
+	hasNext := totalCount > int(page * perPage)
 
 	links := utils.MakePageLinkHdrs(r, page, perPage, hasNext)
 	for _, l := range links {
 		w.Header().Add("Link", l)
 	}
-	w.WriteJson(ids[:len])
-
+	// the response writer will ensure the header name is in Kebab-Pascal-Case
+	w.Header().Add("X-Total-Count", strconv.Itoa(totalCount))
+	w.WriteJson(ids)
 }
 
 func parseDevice(r *rest.Request) (*model.Device, error) {
