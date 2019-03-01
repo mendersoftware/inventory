@@ -77,6 +77,12 @@
 			"revisionTime": "2018-06-15T13:49:36Z"
 		},
 		{
+			"checksumSHA1": "ciubIc63PLO+sFwDbvafqiU/Rv4=",
+			"path": "github.com/go-ozzo/ozzo-validation",
+			"revision": "2f76ea62300c36e72bd56c804484cb6db53b69a5",
+			"revisionTime": "2018-11-16T12:45:51Z"
+		},
+		{
 			"checksumSHA1": "7JBkp3EZoc0MSbiyWfzVhO4RYoY=",
 			"path": "github.com/hashicorp/hcl",
 			"revision": "8f6b1344a92ff8877cf24a5de9177bf7d0a2a187",
