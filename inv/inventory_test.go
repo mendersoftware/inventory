@@ -82,12 +82,12 @@ func TestInventoryListDevices(t *testing.T) {
 			outDeviceCount:  -1,
 		},
 		"get devices from group": {
-			group:           "asd",
+			group: "asd",
 			outDevices: []model.Device{
 				{ID: model.DeviceID("1"), Group: group},
 				{ID: model.DeviceID("2"), Group: group},
 			},
-			outDeviceCount:  2,
+			outDeviceCount: 2,
 		},
 	}
 
@@ -432,7 +432,7 @@ func TestInventoryListDevicesByGroup(t *testing.T) {
 				model.DeviceID("2"),
 				model.DeviceID("3"),
 			},
-			OutDeviceCount:3,
+			OutDeviceCount: 3,
 		},
 		"success - empty list": {
 			DatastoreError: nil,

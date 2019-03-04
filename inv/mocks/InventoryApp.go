@@ -164,7 +164,6 @@ func (_m *InventoryApp) ListDevicesByGroup(ctx context.Context, group model.Grou
 		}
 	}
 
-
 	var r2 error
 	if rf, ok := ret.Get(2).(func(context.Context, model.GroupName, int, int) error); ok {
 		r2 = rf(ctx, group, skip, limit)
