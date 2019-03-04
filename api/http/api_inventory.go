@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"github.com/ant0ine/go-json-rest/rest"
+	"github.com/go-ozzo/ozzo-validation"
 	"github.com/mendersoftware/go-lib-micro/log"
 	u "github.com/mendersoftware/go-lib-micro/rest_utils"
 	"github.com/pkg/errors"
@@ -60,6 +61,12 @@ const (
 // model of device's group name response at /devices/:id/group endpoint
 type InventoryApiGroup struct {
 	Group string `json:"group"`
+}
+
+func (g InventoryApiGroup) Validate() error {
+	return validation.ValidateStruct(&g,
+		validation.Field(&g.Group, validation.Required),
+	)
 }
 
 type inventoryHandlers struct {
@@ -353,6 +360,11 @@ func (i *inventoryHandlers) AddDeviceToGroupHandler(w rest.ResponseWriter, r *re
 		return
 	}
 
+	if err = group.Validate(); err != nil {
+		u.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
+		return
+	}
+
 	if !regexp.MustCompile("^[A-Za-z0-9_-]*$").MatchString(group.Group) {
 		u.RestErrWithLog(w, r, l, errors.New("Group name can only contain: upper/lowercase alphanum, -(dash), _(underscore)"), http.StatusBadRequest)
 		return
@@ -429,6 +441,12 @@ func parseAttributes(r *rest.Request) (model.DeviceAttributes, error) {
 		return nil, errors.Wrap(err, "failed to decode request body")
 	}
 
+	for _, a := range attrs {
+		if err = a.Validate(); err != nil {
+			return nil, err
+		}
+	}
+
 	return attrs, nil
 }
 
@@ -480,6 +498,12 @@ type newTenantRequest struct {
 	TenantID string `json:"tenant_id" valid:"required"`
 }
 
+func (t newTenantRequest) Validate() error {
+	return validation.ValidateStruct(&t,
+		validation.Field(&t.TenantID, validation.Required),
+	)
+}
+
 func (i *inventoryHandlers) CreateTenantHandler(w rest.ResponseWriter, r *rest.Request) {
 	ctx := r.Context()
 
@@ -488,6 +512,11 @@ func (i *inventoryHandlers) CreateTenantHandler(w rest.ResponseWriter, r *rest.R
 	var newTenant newTenantRequest
 
 	if err := r.DecodeJsonPayload(&newTenant); err != nil {
+		u.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
+		return
+	}
+
+	if err := newTenant.Validate(); err != nil {
 		u.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
 		return
 	}
