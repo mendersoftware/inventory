@@ -163,11 +163,11 @@ func (db *DataStoreMongo) GetDevices(ctx context.Context, q store.ListQuery) ([]
 	}
 	groupFilter := bson.M{}
 	if q.GroupName != "" {
-		groupFilter = bson.M{ DbDevGroup: q.GroupName }
+		groupFilter = bson.M{DbDevGroup: q.GroupName}
 	}
 	groupExistenceFilter := bson.M{}
 	if q.HasGroup != nil {
-		groupExistenceFilter = bson.M{ DbDevGroup: bson.M{ "$exists": *q.HasGroup } }
+		groupExistenceFilter = bson.M{DbDevGroup: bson.M{"$exists": *q.HasGroup}}
 	}
 	filter := bson.M{
 		"$match": bson.M{
@@ -181,7 +181,7 @@ func (db *DataStoreMongo) GetDevices(ctx context.Context, q store.ListQuery) ([]
 
 	// since the sorting step will have to be executable we have to use a noop here instead of just
 	// an empty query object, as unsorted queries would fail otherwise
-	sortQuery := bson.M{ "$skip": 0 }
+	sortQuery := bson.M{"$skip": 0}
 	if q.Sort != nil {
 		sortField := fmt.Sprintf("%s.%s.%s", DbDevAttributes, q.Sort.AttrName, DbDevAttributesValue)
 		sortFieldQuery := bson.M{}
@@ -189,22 +189,22 @@ func (db *DataStoreMongo) GetDevices(ctx context.Context, q store.ListQuery) ([]
 		if !q.Sort.Ascending {
 			sortFieldQuery[sortField] = -1
 		}
-		sortQuery = bson.M{ "$sort": sortFieldQuery }
+		sortQuery = bson.M{"$sort": sortFieldQuery}
 	}
-	limitQuery := bson.M{ "$skip": 0 }
+	limitQuery := bson.M{"$skip": 0}
 	// exchange the limit query only if limit is set, as limits need to be positive in an aggregation pipeline
 	if q.Limit > 0 {
-		limitQuery = bson.M{ "$limit": q.Limit }
+		limitQuery = bson.M{"$limit": q.Limit}
 	}
 	combinedQuery := bson.M{
 		"$facet": bson.M{
 			"results": []bson.M{
 				sortQuery,
-				bson.M{ "$skip": q.Skip },
+				bson.M{"$skip": q.Skip},
 				limitQuery,
 			},
 			"totalCount": []bson.M{
-				bson.M{ "$count": "count" },
+				bson.M{"$count": "count"},
 			},
 		},
 	}
@@ -214,7 +214,7 @@ func (db *DataStoreMongo) GetDevices(ctx context.Context, q store.ListQuery) ([]
 			"totalCount": bson.M{
 				"$ifNull": []interface{}{
 					bson.M{
-						"$arrayElemAt": []interface{}{ "$totalCount.count", 0 },
+						"$arrayElemAt": []interface{}{"$totalCount.count", 0},
 					},
 					0,
 				},
@@ -399,7 +399,7 @@ func (db *DataStoreMongo) GetDevicesByGroup(ctx context.Context, group model.Gro
 	defer s.Close()
 	// compose aggregation pipeline
 	c := s.DB(mstore.DbFromContext(ctx, DbName)).C(DbDevicesColl)
-	
+
 	//first, find if the group exists at all, i.e. if any dev is assigned
 	var dev model.Device
 	filter := bson.M{DbDevGroup: group}

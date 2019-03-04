@@ -218,7 +218,7 @@ func (i *inventoryHandlers) GetDevicesHandler(w rest.ResponseWriter, r *rest.Req
 		return
 	}
 
-	hasNext := totalCount > int(page * perPage)
+	hasNext := totalCount > int(page*perPage)
 	links := utils.MakePageLinkHdrs(r, page, perPage, hasNext)
 	for _, l := range links {
 		w.Header().Add("Link", l)
@@ -399,7 +399,7 @@ func (i *inventoryHandlers) GetDevicesByGroup(w rest.ResponseWriter, r *rest.Req
 		return
 	}
 
-	hasNext := totalCount > int(page * perPage)
+	hasNext := totalCount > int(page*perPage)
 
 	links := utils.MakePageLinkHdrs(r, page, perPage, hasNext)
 	for _, l := range links {

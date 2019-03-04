@@ -27,10 +27,11 @@ import (
 	"github.com/mendersoftware/inventory/store"
 	. "github.com/mendersoftware/inventory/store/mongo"
 
+	"unsafe"
+
 	"github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
 	mstore "github.com/mendersoftware/go-lib-micro/store"
-	"unsafe"
 )
 
 // test funcs
@@ -1505,11 +1506,11 @@ func TestGetDevicesByGroup(t *testing.T) {
 		},
 	}
 
-	inputDevices := make([]model.Device, 0, len(devDevices) + len(prodDevices) + len(testDevices))
+	inputDevices := make([]model.Device, 0, len(devDevices)+len(prodDevices)+len(testDevices))
 	inputDevices = append(inputDevices, devDevices...)
 	inputDevices = append(inputDevices, prodDevices...)
 	inputDevices = append(inputDevices, testDevices...)
-	
+
 	testCases := map[string]struct {
 		InputGroupName    model.GroupName
 		InputSkip         int
@@ -1519,9 +1520,9 @@ func TestGetDevicesByGroup(t *testing.T) {
 		OutputError       error
 	}{
 		"no skip, no limit": {
-			InputGroupName:    "dev",
-			InputSkip:         0,
-			InputLimit:        0,
+			InputGroupName: "dev",
+			InputSkip:      0,
+			InputLimit:     0,
 			OutputDevices: []model.DeviceID{
 				model.DeviceID("1"),
 				model.DeviceID("6"),
@@ -1531,9 +1532,9 @@ func TestGetDevicesByGroup(t *testing.T) {
 			OutputError:       nil,
 		},
 		"no skip, limit": {
-			InputGroupName:    "prod",
-			InputSkip:         0,
-			InputLimit:        2,
+			InputGroupName: "prod",
+			InputSkip:      0,
+			InputLimit:     2,
 			OutputDevices: []model.DeviceID{
 				model.DeviceID("2"),
 				model.DeviceID("4"),
@@ -1549,13 +1550,13 @@ func TestGetDevicesByGroup(t *testing.T) {
 				model.DeviceID("8"),
 			},
 			OutputDeviceCount: len(devDevices),
-			OutputError: nil,
+			OutputError:       nil,
 		},
 		"skip + limit": {
-			InputGroupName:    "prod",
-			InputSkip:         1,
-			InputLimit:        1,
-			OutputDevices:     []model.DeviceID{
+			InputGroupName: "prod",
+			InputSkip:      1,
+			InputLimit:     1,
+			OutputDevices: []model.DeviceID{
 				model.DeviceID("4"),
 			},
 			OutputDeviceCount: len(prodDevices),
@@ -1578,10 +1579,10 @@ func TestGetDevicesByGroup(t *testing.T) {
 			OutputError:       store.ErrGroupNotFound,
 		},
 		"dev group": {
-			InputGroupName:    "dev",
-			InputSkip:         0,
-			InputLimit:        10,
-			OutputDevices:     []model.DeviceID{
+			InputGroupName: "dev",
+			InputSkip:      0,
+			InputLimit:     10,
+			OutputDevices: []model.DeviceID{
 				model.DeviceID("1"),
 				model.DeviceID("6"),
 				model.DeviceID("8"),
@@ -1590,10 +1591,10 @@ func TestGetDevicesByGroup(t *testing.T) {
 			OutputError:       nil,
 		},
 		"prod group": {
-			InputGroupName:    "prod",
-			InputSkip:         0,
-			InputLimit:        10,
-			OutputDevices:     []model.DeviceID{
+			InputGroupName: "prod",
+			InputSkip:      0,
+			InputLimit:     10,
+			OutputDevices: []model.DeviceID{
 				model.DeviceID("2"),
 				model.DeviceID("4"),
 				model.DeviceID("5"),
@@ -1602,10 +1603,10 @@ func TestGetDevicesByGroup(t *testing.T) {
 			OutputError:       nil,
 		},
 		"test group": {
-			InputGroupName:    "test",
-			InputSkip:         0,
-			InputLimit:        10,
-			OutputDevices:     []model.DeviceID{
+			InputGroupName: "test",
+			InputSkip:      0,
+			InputLimit:     10,
+			OutputDevices: []model.DeviceID{
 				model.DeviceID("3"),
 				model.DeviceID("7"),
 			},
@@ -1638,7 +1639,7 @@ func TestGetDevicesByGroup(t *testing.T) {
 				assert.Fail(t, "expected outputDevices to match", fmt.Sprintf("Expected: %v but\n have:%v", tc.OutputDevices, devs))
 			}
 			if !reflect.DeepEqual(tc.OutputDeviceCount, totalCount) {
-				assert.Fail(t, "expected outputDeviceCount to match", fmt.Sprintf("Expected: %v but\n have:%v",  tc.OutputDeviceCount, totalCount))
+				assert.Fail(t, "expected outputDeviceCount to match", fmt.Sprintf("Expected: %v but\n have:%v", tc.OutputDeviceCount, totalCount))
 			}
 		}
 	}
@@ -1695,10 +1696,10 @@ func TestGetDevicesByGroupWithTenant(t *testing.T) {
 		OutputError       error
 	}{
 		"no skip, no limit": {
-			InputGroupName:    "dev",
-			InputSkip:         0,
-			InputLimit:        0,
-			OutputDevices:     []model.DeviceID{
+			InputGroupName: "dev",
+			InputSkip:      0,
+			InputLimit:     0,
+			OutputDevices: []model.DeviceID{
 				model.DeviceID("1"),
 				model.DeviceID("6"),
 				model.DeviceID("8"),
@@ -1707,9 +1708,9 @@ func TestGetDevicesByGroupWithTenant(t *testing.T) {
 			OutputError:       nil,
 		},
 		"no skip, limit": {
-			InputGroupName:    "prod",
-			InputSkip:         0,
-			InputLimit:        2,
+			InputGroupName: "prod",
+			InputSkip:      0,
+			InputLimit:     2,
 			OutputDevices: []model.DeviceID{
 				model.DeviceID("2"),
 				model.DeviceID("4"),
@@ -1718,9 +1719,9 @@ func TestGetDevicesByGroupWithTenant(t *testing.T) {
 			OutputError:       nil,
 		},
 		"skip, no limit": {
-			InputGroupName:    "dev",
-			InputSkip:         2,
-			InputLimit:        0,
+			InputGroupName: "dev",
+			InputSkip:      2,
+			InputLimit:     0,
 			OutputDevices: []model.DeviceID{
 				model.DeviceID("8"),
 			},
@@ -1728,9 +1729,9 @@ func TestGetDevicesByGroupWithTenant(t *testing.T) {
 			OutputError:       nil,
 		},
 		"skip + limit": {
-			InputGroupName:    "prod",
-			InputSkip:         1,
-			InputLimit:        1,
+			InputGroupName: "prod",
+			InputSkip:      1,
+			InputLimit:     1,
 			OutputDevices: []model.DeviceID{
 				model.DeviceID("4"),
 			},
