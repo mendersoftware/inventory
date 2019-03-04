@@ -210,12 +210,12 @@ func (i *inventoryHandlers) GetDevicesHandler(w rest.ResponseWriter, r *rest.Req
 		return
 	}
 
-	ld := store.ListQuery{int((page - 1) * perPage),
-		int(perPage),
-		filters,
-		sort,
-		hasGroup,
-		groupName}
+	ld := store.ListQuery{Skip: int((page - 1) * perPage),
+		Limit:     int(perPage),
+		Filters:   filters,
+		Sort:      sort,
+		HasGroup:  hasGroup,
+		GroupName: groupName}
 
 	devs, totalCount, err := i.inventory.ListDevices(ctx, ld)
 

@@ -103,7 +103,14 @@ func TestInventoryListDevices(t *testing.T) {
 		).Return(tc.outDevices, tc.outDeviceCount, tc.datastoreError)
 		i := invForTest(db)
 
-		devs, totalCount, err := i.ListDevices(ctx, store.ListQuery{1, 10, nil, nil, tc.inHasGroup, tc.group})
+		devs, totalCount, err := i.ListDevices(ctx,
+			store.ListQuery{
+				Skip:      1,
+				Limit:     10,
+				Filters:   nil,
+				Sort:      nil,
+				HasGroup:  tc.inHasGroup,
+				GroupName: tc.group})
 
 		if tc.outError != nil {
 			if assert.Error(t, err) {

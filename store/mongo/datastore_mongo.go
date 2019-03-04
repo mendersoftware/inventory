@@ -413,7 +413,14 @@ func (db *DataStoreMongo) GetDevicesByGroup(ctx context.Context, group model.Gro
 	}
 
 	hasGroup := group != ""
-	devices, totalDevices, e := db.GetDevices(ctx, store.ListQuery{skip, limit, nil, nil, &hasGroup, string(group)})
+	devices, totalDevices, e := db.GetDevices(ctx,
+		store.ListQuery{
+			Skip:      skip,
+			Limit:     limit,
+			Filters:   nil,
+			Sort:      nil,
+			HasGroup:  &hasGroup,
+			GroupName: string(group)})
 	if e != nil {
 		return nil, -1, errors.Wrap(e, "failed to get device list for group")
 	}

@@ -22,7 +22,7 @@ addons:
 
 # Golang version matrix
 go:
-    - 1.9
+    - "1.11"
 
 cache:
   directories:
