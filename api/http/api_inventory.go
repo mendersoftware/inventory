@@ -21,7 +21,6 @@ import (
 	"strings"
 
 	"github.com/ant0ine/go-json-rest/rest"
-	"github.com/asaskevich/govalidator"
 	"github.com/mendersoftware/go-lib-micro/log"
 	u "github.com/mendersoftware/go-lib-micro/rest_utils"
 	"github.com/pkg/errors"
@@ -60,7 +59,7 @@ const (
 
 // model of device's group name response at /devices/:id/group endpoint
 type InventoryApiGroup struct {
-	Group string `json:"group" valid:"required"`
+	Group string `json:"group"`
 }
 
 type inventoryHandlers struct {
@@ -353,10 +352,6 @@ func (i *inventoryHandlers) AddDeviceToGroupHandler(w rest.ResponseWriter, r *re
 			http.StatusBadRequest)
 		return
 	}
-	if _, err = govalidator.ValidateStruct(group); err != nil {
-		u.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
-		return
-	}
 
 	if !regexp.MustCompile("^[A-Za-z0-9_-]*$").MatchString(group.Group) {
 		u.RestErrWithLog(w, r, l, errors.New("Group name can only contain: upper/lowercase alphanum, -(dash), _(underscore)"), http.StatusBadRequest)
@@ -434,12 +429,6 @@ func parseAttributes(r *rest.Request) (model.DeviceAttributes, error) {
 		return nil, errors.Wrap(err, "failed to decode request body")
 	}
 
-	for _, a := range attrs {
-		if _, err = govalidator.ValidateStruct(a); err != nil {
-			return nil, err
-		}
-	}
-
 	return attrs, nil
 }
 
@@ -499,11 +488,6 @@ func (i *inventoryHandlers) CreateTenantHandler(w rest.ResponseWriter, r *rest.R
 	var newTenant newTenantRequest
 
 	if err := r.DecodeJsonPayload(&newTenant); err != nil {
-		u.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
-		return
-	}
-
-	if _, err := govalidator.ValidateStruct(newTenant); err != nil {
 		u.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
 		return
 	}
