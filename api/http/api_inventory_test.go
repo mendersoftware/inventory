@@ -424,7 +424,7 @@ func TestApiInventoryAddDevice(t *testing.T) {
 			inventoryErr: nil,
 			JSONResponseParams: utils.JSONResponseParams{
 				OutputStatus:     http.StatusBadRequest,
-				OutputBodyObject: RestError("failed to decode request body: json: cannot unmarshal number into Go struct field Device.attributes of type []model.DeviceAttribute"),
+				OutputBodyObject: RestError("failed to decode request body: json: cannot unmarshal number into Go value of type []model.DeviceAttribute"),
 			},
 		},
 		"body formatted ok, 'id' missing": {
@@ -435,7 +435,7 @@ func TestApiInventoryAddDevice(t *testing.T) {
 			inventoryErr: nil,
 			JSONResponseParams: utils.JSONResponseParams{
 				OutputStatus:     http.StatusBadRequest,
-				OutputBodyObject: RestError("ID: non zero value required;"),
+				OutputBodyObject: RestError("id: cannot be blank."),
 			},
 		},
 		"body formatted ok, incorrect attribute value": {
@@ -452,7 +452,7 @@ func TestApiInventoryAddDevice(t *testing.T) {
 			inventoryErr: nil,
 			JSONResponseParams: utils.JSONResponseParams{
 				OutputStatus:     http.StatusBadRequest,
-				OutputBodyObject: RestError("Value: [asd 123] does not validate as deviceAttributeValueValidator;;;"),
+				OutputBodyObject: RestError("attributes: (asd: (value: array values must be of consistent type (string or float64).); asd2: (value: array values must be of consistent type (string or float64).).)."),
 			},
 		},
 		"body formatted ok, attribute name missing": {
@@ -468,7 +468,7 @@ func TestApiInventoryAddDevice(t *testing.T) {
 			inventoryErr: nil,
 			JSONResponseParams: utils.JSONResponseParams{
 				OutputStatus:     http.StatusBadRequest,
-				OutputBodyObject: RestError("Name: non zero value required;;"),
+				OutputBodyObject: RestError("attributes: (: (name: cannot be blank.).)."),
 			},
 		},
 		"body formatted ok, inv error": {
@@ -595,7 +595,7 @@ func TestApiInventoryUpsertAttributes(t *testing.T) {
 			inventoryErr: nil,
 			resp: utils.JSONResponseParams{
 				OutputStatus:     http.StatusBadRequest,
-				OutputBodyObject: RestError("Name: non zero value required;"),
+				OutputBodyObject: RestError("name: cannot be blank."),
 			},
 		},
 
@@ -824,7 +824,7 @@ func TestApiInventoryAddDeviceToGroup(t *testing.T) {
 				InventoryApiGroup{}),
 			JSONResponseParams: utils.JSONResponseParams{
 				OutputStatus:     http.StatusBadRequest,
-				OutputBodyObject: RestError("Group: non zero value required;"),
+				OutputBodyObject: RestError("group: cannot be blank."),
 			},
 			inventoryErr: nil,
 		},
@@ -1295,7 +1295,7 @@ func TestUserAdmApiCreateTenant(t *testing.T) {
 			checker: mt.NewJSONResponse(
 				http.StatusBadRequest,
 				nil,
-				restError("TenantID: non zero value required;"),
+				restError("tenant_id: cannot be blank."),
 			),
 		},
 		"error: empty json": {

@@ -21,7 +21,7 @@ import (
 	"strings"
 
 	"github.com/ant0ine/go-json-rest/rest"
-	"github.com/asaskevich/govalidator"
+	"github.com/go-ozzo/ozzo-validation"
 	"github.com/mendersoftware/go-lib-micro/log"
 	u "github.com/mendersoftware/go-lib-micro/rest_utils"
 	"github.com/pkg/errors"
@@ -60,7 +60,13 @@ const (
 
 // model of device's group name response at /devices/:id/group endpoint
 type InventoryApiGroup struct {
-	Group string `json:"group" valid:"required"`
+	Group string `json:"group"`
+}
+
+func (g InventoryApiGroup) Validate() error {
+	return validation.ValidateStruct(&g,
+		validation.Field(&g.Group, validation.Required),
+	)
 }
 
 type inventoryHandlers struct {
@@ -204,12 +210,12 @@ func (i *inventoryHandlers) GetDevicesHandler(w rest.ResponseWriter, r *rest.Req
 		return
 	}
 
-	ld := store.ListQuery{int((page - 1) * perPage),
-		int(perPage),
-		filters,
-		sort,
-		hasGroup,
-		groupName}
+	ld := store.ListQuery{Skip: int((page - 1) * perPage),
+		Limit:     int(perPage),
+		Filters:   filters,
+		Sort:      sort,
+		HasGroup:  hasGroup,
+		GroupName: groupName}
 
 	devs, totalCount, err := i.inventory.ListDevices(ctx, ld)
 
@@ -353,7 +359,8 @@ func (i *inventoryHandlers) AddDeviceToGroupHandler(w rest.ResponseWriter, r *re
 			http.StatusBadRequest)
 		return
 	}
-	if _, err = govalidator.ValidateStruct(group); err != nil {
+
+	if err = group.Validate(); err != nil {
 		u.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
 		return
 	}
@@ -435,7 +442,7 @@ func parseAttributes(r *rest.Request) (model.DeviceAttributes, error) {
 	}
 
 	for _, a := range attrs {
-		if _, err = govalidator.ValidateStruct(a); err != nil {
+		if err = a.Validate(); err != nil {
 			return nil, err
 		}
 	}
@@ -491,6 +498,12 @@ type newTenantRequest struct {
 	TenantID string `json:"tenant_id" valid:"required"`
 }
 
+func (t newTenantRequest) Validate() error {
+	return validation.ValidateStruct(&t,
+		validation.Field(&t.TenantID, validation.Required),
+	)
+}
+
 func (i *inventoryHandlers) CreateTenantHandler(w rest.ResponseWriter, r *rest.Request) {
 	ctx := r.Context()
 
@@ -503,7 +516,7 @@ func (i *inventoryHandlers) CreateTenantHandler(w rest.ResponseWriter, r *rest.R
 		return
 	}
 
-	if _, err := govalidator.ValidateStruct(newTenant); err != nil {
+	if err := newTenant.Validate(); err != nil {
 		u.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
 		return
 	}

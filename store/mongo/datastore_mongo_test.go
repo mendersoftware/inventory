@@ -246,7 +246,14 @@ func TestMongoGetDevices(t *testing.T) {
 		mongoStore := NewDataStoreMongoWithSession(session)
 
 		//test
-		devs, totalCount, err := mongoStore.GetDevices(ctx, store.ListQuery{tc.skip, tc.limit, tc.filters, tc.sort, tc.hasGroup, tc.groupName})
+		devs, totalCount, err := mongoStore.GetDevices(ctx,
+			store.ListQuery{
+				Skip:      tc.skip,
+				Limit:     tc.limit,
+				Filters:   tc.filters,
+				Sort:      tc.sort,
+				HasGroup:  tc.hasGroup,
+				GroupName: tc.groupName})
 		assert.NoError(t, err, "failed to get devices")
 
 		assert.Equal(t, len(tc.expected), len(devs))
