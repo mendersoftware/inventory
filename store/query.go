@@ -17,6 +17,7 @@ type ComparisonOperator int
 
 const (
 	Eq ComparisonOperator = 1 << iota
+	Regex
 )
 
 type Filter struct {
