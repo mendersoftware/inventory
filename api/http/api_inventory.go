@@ -157,17 +157,27 @@ func parseFilterParams(r *rest.Request) ([]store.Filter, error) {
 			switch valueStrArray[filterEqOperatorIdx] {
 			case "eq":
 				filter.Operator = store.Eq
+			case "regex":
+				filter.Operator = store.Regex
 			default:
 				return nil, errors.New("invalid filter operator")
 			}
 			filter.Value = valueStrArray[filterEqOperatorIdx+1]
+		} else if strings.HasPrefix(valueStrArray[0], "~") {
+			// regex
+			filter.Operator = store.Regex
+			filter.Value = valueStrArray[0][1:]
 		} else {
+			// generic 'eq' search
 			filter.Operator = store.Eq
 			filter.Value = valueStr
 		}
-		floatValue, err := strconv.ParseFloat(filter.Value, 64)
-		if err == nil {
-			filter.ValueFloat = &floatValue
+		// only parse floats if we're not in regex
+		if filter.Operator != store.Regex {
+			floatValue, err := strconv.ParseFloat(filter.Value, 64)
+			if err == nil {
+				filter.ValueFloat = &floatValue
+			}
 		}
 
 		filters = append(filters, filter)
