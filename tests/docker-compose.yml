@@ -8,6 +8,7 @@ services:
             - "${TESTS_DIR}:/testing"
         depends_on:
             - mender-inventory
+      # command: -k test_regex
     mender-inventory:
             # built/tagged locally and only used for testing
             image: mendersoftware/inventory:prtest
