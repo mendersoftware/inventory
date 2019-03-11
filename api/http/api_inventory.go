@@ -55,7 +55,6 @@ const (
 	sortOrderDesc            = "desc"
 	sortAttributeNameIdx     = 0
 	sortOrderIdx             = 1
-	filterEqOperatorIdx      = 0
 )
 
 // model of device's group name response at /devices/:id/group endpoint
@@ -151,27 +150,46 @@ func parseFilterParams(r *rest.Request) ([]store.Filter, error) {
 		if err != nil {
 			return nil, err
 		}
-		valueStrArray := strings.Split(valueStr, queryParamValueSeparator)
+
 		filter = store.Filter{AttrName: name}
-		if len(valueStrArray) == 2 {
-			switch valueStrArray[filterEqOperatorIdx] {
-			case "eq":
-				filter.Operator = store.Eq
-			case "regex":
-				filter.Operator = store.Regex
-			default:
-				return nil, errors.New("invalid filter operator")
-			}
-			filter.Value = valueStrArray[filterEqOperatorIdx+1]
-		} else if strings.HasPrefix(valueStrArray[0], "~") {
-			// regex
-			filter.Operator = store.Regex
-			filter.Value = valueStrArray[0][1:]
-		} else {
-			// generic 'eq' search
-			filter.Operator = store.Eq
+
+		// make sure we parse ':'s in value, it's either:
+		// not there
+		// after a valid operator specifier
+		// or/and inside the value itself(mac, etc), in which case leave it alone
+		sepIdx := strings.Index(valueStr, ":")
+		if sepIdx == -1 {
 			filter.Value = valueStr
+			filter.Operator = store.Eq
+		} else {
+			validOps := []string{"eq", "regex"}
+			for _, o := range validOps {
+				if valueStr[:sepIdx] == o {
+					switch o {
+					case "eq":
+						filter.Operator = store.Eq
+						filter.Value = valueStr[sepIdx+1:]
+					case "regex":
+						filter.Operator = store.Regex
+						filter.Value = valueStr[sepIdx+1:]
+					}
+					break
+				}
+			}
+
+			if filter.Value == "" {
+				filter.Value = valueStr
+				filter.Operator = store.Eq
+			}
 		}
+
+		// we have a short form of the regex op, so check if the
+		// value doesn't contain it
+		if strings.HasPrefix(filter.Value, "~") {
+			filter.Operator = store.Regex
+			filter.Value = filter.Value[1:]
+		}
+
 		// only parse floats if we're not in regex
 		if filter.Operator != store.Regex {
 			floatValue, err := strconv.ParseFloat(filter.Value, 64)

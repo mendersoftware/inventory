@@ -130,11 +130,12 @@ func TestApiParseFilterParams(t *testing.T) {
 		},
 		"valid filter with multiple colons and ignore known operator": {
 			inReq:  test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&attr_name1=eq:qe:123:123:123", nil),
-			filter: "eq:qe:123:123:123",
+			filter: "qe:123:123:123",
 		},
+		/* no more invalid filters - they may simply be parts of valid values
 		"invalid filter with colon": {
 			inReq: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&attr_name1=qe:123", nil),
-		},
+		}, */
 		"valid filter with colon": {
 			inReq:  test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&attr_name1=eq:123", nil),
 			filter: "123",
@@ -268,6 +269,7 @@ func TestApiInventoryGetDevices(t *testing.T) {
 				},
 			},
 		},
+		/* no more invalid filters - they may simply be parts of valid values
 		"invalid attribute filter operator": {
 			listDevicesNum:  5,
 			listDevicesErr:  nil,
@@ -278,7 +280,7 @@ func TestApiInventoryGetDevices(t *testing.T) {
 				OutputBodyObject: RestError("invalid filter operator"),
 				OutputHeaders:    nil,
 			},
-		},
+		},*/
 		"valid sort order value": {
 			listDevicesNum:  5,
 			listDevicesErr:  nil,
