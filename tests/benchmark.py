@@ -27,7 +27,7 @@ def with_qs(url, qs):
     return url
 
 # bench funcs return test query dict
-def _do_simple_attr(ndevs, nmatching, nattrs, where):
+def _do_simple_attr(ndevs, nmatching, nattrs, where, index=False):
     ''' generate ndevs devices, of which there will be nmatches (pattern 'A1', where = [prefix|infix]), 
         each dev has a total of nattrs attributes
     '''
@@ -38,7 +38,7 @@ def _do_simple_attr(ndevs, nmatching, nattrs, where):
     for _ in range(ndevs):
         if nmatching > 0:
             if where == 'prefix':
-                d = dev({'sn': '^A1{}'.format(rstr(8))})
+                d = dev({'sn': 'A1{}'.format(rstr(8))})
             elif where == 'infix':
                 d = dev({'sn': '{}A1{}'.format(rstr(4), rstr(4))})
             nmatching -= 1
@@ -51,6 +51,8 @@ def _do_simple_attr(ndevs, nmatching, nattrs, where):
         devs.append(d)
 
     mongo.inventory.devices.insert_many(devs)
+    if index:
+        mongo.inventory.devices.create_index('attributes.sn.value')
 
     assert mongo.inventory.devices.find({'devices.sn.value':{'$regex':'A1'}}).count() == nmatching 
 
@@ -59,7 +61,7 @@ def _do_simple_attr(ndevs, nmatching, nattrs, where):
     else:
         return {'sn': '~A1'}
 
-def _do_simple_attr_mac(ndevs, nmatching, nattrs):
+def _do_simple_attr_mac(ndevs, nmatching, nattrs, index=False):
     ''' like _do_simple_attr, but the matching attribute is a mac,
         and the query is a not so trivial regex
     '''
@@ -81,6 +83,8 @@ def _do_simple_attr_mac(ndevs, nmatching, nattrs):
         devs.append(d)
 
     mongo.inventory.devices.insert_many(devs)
+    if index:
+        mongo.inventory.devices.create_index('attributes.mac.value')
 
     assert mongo.inventory.devices.find({'devices.mac.value':{'$regex':'^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$'}}).count() == nmatching
     return {'mac': '~^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$'}
@@ -96,11 +100,22 @@ benchmarks = {
     '5_attr_500_devs_prefix': lambda : _do_simple_attr(500, 10, 5, 'prefix'),
     '5_attr_1000_devs_prefix': lambda : _do_simple_attr(1000, 10, 5, 'prefix'),
     '5_attr_5000_devs_prefix': lambda : _do_simple_attr(5000, 10, 5, 'prefix'),
+    '5_attr_50000_devs_prefix': lambda : _do_simple_attr(50000, 10, 5, 'prefix'),
     '10_attr_10_devs_prefix': lambda : _do_simple_attr(10, 10, 10, 'prefix'),
     '10_attr_100_devs_prefix': lambda : _do_simple_attr(100, 10, 10, 'prefix'),
     '10_attr_500_devs_prefix': lambda : _do_simple_attr(500, 10, 10, 'prefix'),
     '10_attr_1000_devs_prefix': lambda : _do_simple_attr(1000, 10, 10, 'prefix'),
     '10_attr_5000_devs_prefix': lambda : _do_simple_attr(5000, 10, 10, 'prefix'),
+    '10_attr_10000_devs_prefix': lambda : _do_simple_attr(10000, 10, 10, 'prefix'),
+    '10_attr_20000_devs_prefix': lambda : _do_simple_attr(20000, 10, 10, 'prefix'),
+    '10_attr_50000_devs_prefix': lambda : _do_simple_attr(50000, 10, 10, 'prefix'),
+    '10_attr_5000_devs_prefix_index': lambda : _do_simple_attr(5000, 10, 10, 'prefix', index=True),
+    '10_attr_10000_devs_prefix_index': lambda : _do_simple_attr(10000, 10, 10, 'prefix', index=True),
+    '10_attr_20000_devs_prefix_index': lambda : _do_simple_attr(20000, 10, 10, 'prefix', index=True),
+    '10_attr_50000_devs_prefix_index': lambda : _do_simple_attr(50000, 10, 10, 'prefix', index=True),
+    '10_attr_100000_devs_prefix_index': lambda : _do_simple_attr(100000, 10, 10, 'prefix', index=True),
+    '10_attr_200000_devs_prefix_index': lambda : _do_simple_attr(200000, 10, 10, 'prefix', index=True),
+    '10_attr_1000000_devs_prefix_index': lambda : _do_simple_attr(1000000, 10, 10, 'prefix', index=True),
     '1_attr_10_devs_infix': lambda : _do_simple_attr(10, 10, 1, 'infix'),
     '1_attr_100_devs_infix': lambda : _do_simple_attr(100, 10, 1, 'infix'),
     '1_attr_500_devs_infix': lambda : _do_simple_attr(500, 10, 1, 'infix'),
@@ -116,6 +131,10 @@ benchmarks = {
     '10_attr_500_devs_infix': lambda : _do_simple_attr(500, 10, 10, 'infix'),
     '10_attr_1000_devs_infix': lambda : _do_simple_attr(1000, 10, 10, 'infix'),
     '10_attr_5000_devs_infix': lambda : _do_simple_attr(5000, 10, 10, 'infix'),
+    '10_attr_10000_devs_infix': lambda : _do_simple_attr(10000, 10, 10, 'infix'),
+    '10_attr_20000_devs_infix': lambda : _do_simple_attr(20000, 10, 10, 'infix'),
+    '10_attr_50000_devs_infix': lambda : _do_simple_attr(50000, 10, 10, 'infix'),
+    '10_attr_100000_devs_infix': lambda : _do_simple_attr(100000, 10, 10, 'infix'),
     '1_attr_10_devs_mac': lambda : _do_simple_attr_mac(10, 10, 1),
     '1_attr_100_devs_mac': lambda : _do_simple_attr_mac(100, 10, 1),
     '1_attr_500_devs_mac': lambda : _do_simple_attr_mac(500, 10, 1),
@@ -131,6 +150,16 @@ benchmarks = {
     '10_attr_500_devs_mac': lambda : _do_simple_attr_mac(500, 10, 10),
     '10_attr_1000_devs_mac': lambda : _do_simple_attr_mac(1000, 10, 10),
     '10_attr_5000_devs_mac': lambda : _do_simple_attr_mac(5000, 10, 10),
+    '10_attr_10000_devs_mac': lambda : _do_simple_attr_mac(10000, 10, 10),
+    '10_attr_20000_devs_mac': lambda : _do_simple_attr_mac(20000, 10, 10),
+    '10_attr_100000_devs_mac': lambda : _do_simple_attr_mac(100000, 10, 10),
+    '10_attr_200000_devs_mac': lambda : _do_simple_attr_mac(100000, 10, 10),
+    '10_attr_5000_devs_mac_index': lambda : _do_simple_attr_mac(5000, 10, 10, index=True),
+    '10_attr_10000_devs_mac_index': lambda : _do_simple_attr_mac(10000, 10, 10, index=True),
+    '10_attr_20000_devs_mac_index': lambda : _do_simple_attr_mac(20000, 10, 10, index=True),
+    '10_attr_50000_devs_mac_index': lambda : _do_simple_attr_mac(50000, 10, 10, index=True),
+    '10_attr_100000_devs_mac_index': lambda : _do_simple_attr_mac(100000, 10, 10, index=True),
+    '10_attr_200000_devs_mac_index': lambda : _do_simple_attr_mac(200000, 10, 10, index=True),
 }
 
 if __name__ == '__main__':

@@ -60,9 +60,19 @@ To run a benchmark:
 Benchmarks are predefined in the 'benchmarks' dict.
 
 # Results
+
 Full results are available as a calc sheet at https://docs.google.com/spreadsheets/d/1ZuAWO3ymPx994vFIKmAJE7UUTj_x1unBYszgy879tZI/edit?usp=sharing.
 
+There were 2 runs of the benchmark:
+- without indexes
+    - tested because of some limitiations of indexes (limited number; work only for anchored queries)
+    - good to know the absolute worst case
+- with indexes
+    - after some discussions re: bad performance of no indexes
+
 ## Discussion
+
+### Run 1 - No indexing
 Let's assume some limits/rules of thumb we're aiming at; these are based on different numbers floating
 around the net. It's a very open question as to what the numbers should be:
 
@@ -92,3 +102,34 @@ I don't want to draw too many conclusions from this, but it seems like:
 - with an average ~10 attributes
 - we should be ok up to a couple hundred connections
 - esp. if we limit the queries to prefix
+
+### Run 2 - with indexing
+We decided that the above doesn't cut it in terms of performance.
+
+A second run was prepared:
+- this time with indexes
+- indexes work for anchored queries only so prefix and mac queries were tested
+- we went straight for a larger number of devices - from 5000 to 200000
+- 1, 10, and 100 concurrent connections were tested
+    - we decided that maybe the used connection count was a bit much, and we should focus at around 10
+
+The results at at sheet #2 of the calc linked above, and are extremely promising:
+
+- even at 200k devices, queries run well below 100ms
+- at 1-10 concurrent connections the time is simply close to 0 
+    - most of it is spent serializing the request probably
+
+So, indexed anchored queries are extremely fast. Part of it is that the index easily fits into memory.
+At 200k, the index size is only 4mb - so not only does the index itself speed up the query, but the fact
+that the whole index search go over ram, not disk.
+
+We can conclude that millions of devices can be handled this way - 1mil = only 20mb...
+
+The risks of indexing:
+- they run out at 64 indexes
+    - each tenant can have max 64 unique attributes, across all devices
+    - say - 10 attributes per device gives max 6 separate products (with diff. attributes)
+    - when the pool runs out - new attributes will not have an index, so we're back to figures from Run 1
+- used only with anchored queries
+    - if we expose free-form regexes, users can potentially use non-performant queries
+    - maybe we should add an anchor automatically on the backend after all...?
