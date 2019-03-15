@@ -36,19 +36,20 @@ def _do_simple_attr(ndevs, nmatching, nattrs, where, index=False):
 
     devs = []
     for _ in range(ndevs):
+        attrs={}
         if nmatching > 0:
             if where == 'prefix':
-                d = dev({'sn': 'A1{}'.format(rstr(8))})
+                attrs['sn'] = 'A1{}'.format(rstr(8))
             elif where == 'infix':
-                d = dev({'sn': '{}A1{}'.format(rstr(4), rstr(4))})
+                attrs['sn'] = '{}A1{}'.format(rstr(4), rstr(4))
             nmatching -= 1
         else:
-            d = dev({'sn': '{}'.format(rstr(10))})
+            attrs['sn'] = '{}'.format(rstr(10))
 
         for i in range(nattrs-1):
-            d['foo{}'.format(i)] = '{}'.format(rstr(10))
+            attrs['foo{}'.format(i)] = '{}'.format(rstr(10))
 
-        devs.append(d)
+        devs.append(dev(attrs))
 
     mongo.inventory.devices.insert_many(devs)
     if index:
@@ -71,16 +72,17 @@ def _do_simple_attr_mac(ndevs, nmatching, nattrs, index=False):
 
     devs = []
     for _ in range(ndevs):
+        attrs={}
         if nmatching > 0:
-            d = dev({'mac': "02:00:00:%02x:%02x:%02x" % (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))})
+            attrs['mac'] = "02:00:00:%02x:%02x:%02x" % (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
             nmatching -= 1
         else:
-            d = dev({'foo': '{}'.format(rstr(10))})
+            attrs['mac'] = '{}'.format(rstr(10))
 
         for i in range(nattrs-1):
-            d['foo{}'.format(i)] = '{}'.format(rstr(10))
+            attrs['foo{}'.format(i)] = '{}'.format(rstr(10))
 
-        devs.append(d)
+        devs.append(dev(attrs))
 
     mongo.inventory.devices.insert_many(devs)
     if index:
@@ -152,8 +154,9 @@ benchmarks = {
     '10_attr_5000_devs_mac': lambda : _do_simple_attr_mac(5000, 10, 10),
     '10_attr_10000_devs_mac': lambda : _do_simple_attr_mac(10000, 10, 10),
     '10_attr_20000_devs_mac': lambda : _do_simple_attr_mac(20000, 10, 10),
+    '10_attr_50000_devs_mac': lambda : _do_simple_attr_mac(50000, 10, 10),
     '10_attr_100000_devs_mac': lambda : _do_simple_attr_mac(100000, 10, 10),
-    '10_attr_200000_devs_mac': lambda : _do_simple_attr_mac(100000, 10, 10),
+    '10_attr_200000_devs_mac': lambda : _do_simple_attr_mac(200000, 10, 10),
     '10_attr_5000_devs_mac_index': lambda : _do_simple_attr_mac(5000, 10, 10, index=True),
     '10_attr_10000_devs_mac_index': lambda : _do_simple_attr_mac(10000, 10, 10, index=True),
     '10_attr_20000_devs_mac_index': lambda : _do_simple_attr_mac(20000, 10, 10, index=True),
