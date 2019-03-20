@@ -117,24 +117,124 @@ func mockListDeviceIDs(num int) []model.DeviceID {
 	return devs
 }
 
+func floatPtr(f float64) *float64 {
+	ret := f
+	return &ret
+}
 func TestApiParseFilterParams(t *testing.T) {
 	t.Parallel()
 
 	testCases := map[string]struct {
-		inReq  *http.Request
-		filter string
+		inReq   *http.Request
+		filters []store.Filter
+		err     error
 	}{
-		"valid filter with multiple colons": {
-			inReq:  test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&attr_name1=qe:123:123:123", nil),
-			filter: "qe:123:123:123",
+
+		"eq - short form(implicit)": {
+			inReq: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&attr_name1=A0001", nil),
+			filters: []store.Filter{
+				store.Filter{
+					AttrName: "attr_name1",
+					Value:    "A0001",
+					Operator: store.Eq,
+				},
+			},
 		},
-		"valid filter with multiple colons and ignore known operator": {
-			inReq:  test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&attr_name1=eq:qe:123:123:123", nil),
-			filter: "qe:123:123:123",
+		"eq - short form(implicit), colons": {
+			inReq: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&attr_name1=qe:123:123:123", nil),
+			filters: []store.Filter{
+				store.Filter{
+					AttrName: "attr_name1",
+					Value:    "qe:123:123:123",
+					Operator: store.Eq,
+				},
+			},
 		},
-		"valid filter with colon": {
-			inReq:  test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&attr_name1=eq:123", nil),
-			filter: "123",
+		"eq - short form(implicit), float": {
+			inReq: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&attr_name1=3.14", nil),
+			filters: []store.Filter{
+				store.Filter{
+					AttrName:   "attr_name1",
+					Value:      "3.14",
+					ValueFloat: floatPtr(3.14),
+					Operator:   store.Eq,
+				},
+			},
+		},
+		"eq - long form": {
+			inReq: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&attr_name1=eq:A0001", nil),
+			filters: []store.Filter{
+				store.Filter{
+					AttrName: "attr_name1",
+					Value:    "A0001",
+					Operator: store.Eq,
+				},
+			},
+		},
+		"eq - long form, colons": {
+			inReq: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&attr_name1=eq:qe:123:123:123", nil),
+			filters: []store.Filter{
+				store.Filter{
+					AttrName: "attr_name1",
+					Value:    "qe:123:123:123",
+					Operator: store.Eq,
+				},
+			},
+		},
+		"regex - short form": {
+			inReq: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&attr_name1=~^abc[0-9].*$", nil),
+			filters: []store.Filter{
+				store.Filter{
+					AttrName: "attr_name1",
+					Value:    "^abc[0-9].*$",
+					Operator: store.Regex,
+				},
+			},
+		},
+		"regex - short form, colons": {
+			inReq: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&attr_name1=~^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$", nil),
+			filters: []store.Filter{
+				store.Filter{
+					AttrName: "attr_name1",
+					Value:    "^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$",
+					Operator: store.Regex,
+				},
+			},
+		},
+		"regex - long form": {
+			inReq: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&attr_name1=regex:^abc[0-9].*$", nil),
+			filters: []store.Filter{
+				store.Filter{
+					AttrName: "attr_name1",
+					Value:    "^abc[0-9].*$",
+					Operator: store.Regex,
+				},
+			},
+		},
+		"regex - long form, colons": {
+			inReq: test.MakeSimpleRequest("get", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&attr_name1=regex:^([0-9a-fa-f]{2}[:-]){5}([0-9a-fa-f]{2})$", nil),
+			filters: []store.Filter{
+				store.Filter{
+					AttrName: "attr_name1",
+					Value:    "^([0-9a-fa-f]{2}[:-]){5}([0-9a-fa-f]{2})$",
+					Operator: store.Regex,
+				},
+			},
+		},
+		"eq + regex- short form": {
+			inReq: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&attr_name1=A0001&attr_name2=~^asdf$", nil),
+			filters: []store.Filter{
+				store.Filter{
+					AttrName: "attr_name1",
+					Value:    "A0001",
+					Operator: store.Eq,
+				},
+				store.Filter{
+					AttrName: "attr_name2",
+					Value:    "^asdf$",
+					Operator: store.Regex,
+				},
+			},
 		},
 	}
 
@@ -142,13 +242,14 @@ func TestApiParseFilterParams(t *testing.T) {
 		t.Run(fmt.Sprintf("tc %s", name), func(t *testing.T) {
 			req := rest.Request{Request: testCase.inReq}
 			filters, err := parseFilterParams(&req)
-			if testCase.filter == "" {
-				assert.Error(t, err)
+			if testCase.err != nil {
+				assert.Error(t, testCase.err, err.Error())
 			} else {
 				assert.NoError(t, err)
 				assert.NotNil(t, filters)
 				assert.NotEmpty(t, filters)
-				assert.Equal(t, testCase.filter, filters[0].Value)
+
+				assert.Equal(t, testCase.filters, filters)
 			}
 		})
 	}
