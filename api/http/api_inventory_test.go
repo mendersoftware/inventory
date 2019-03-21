@@ -249,7 +249,7 @@ func TestApiParseFilterParams(t *testing.T) {
 				assert.NotNil(t, filters)
 				assert.NotEmpty(t, filters)
 
-				assert.Equal(t, testCase.filters, filters)
+				assert.ElementsMatch(t, testCase.filters, filters)
 			}
 		})
 	}
