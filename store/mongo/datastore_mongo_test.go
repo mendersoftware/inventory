@@ -1113,7 +1113,7 @@ func TestMongoUpsertAttributes(t *testing.T) {
 				},
 				"new-1": {
 					Name:  "new-1",
-					Value: []string{"new-1-0", "new-1-0"},
+					Value: []interface{}{"new-1-0", "new-1-0"},
 				},
 				"new-2": {
 					Name:        "new-2",
@@ -1172,7 +1172,7 @@ func TestMongoUpsertAttributes(t *testing.T) {
 				},
 				"new-1": {
 					Name:  "new-1",
-					Value: []string{"new-1-0", "new-1-0"},
+					Value: []interface{}{"new-1-0", "new-1-0"},
 				},
 				"new-2": {
 					Name:        "new-2",
@@ -1435,16 +1435,7 @@ func compare(a, b model.DeviceAttributes) bool {
 			return false
 		}
 
-		if va.Description == nil &&
-			vb.Description == nil {
-			return true
-		}
-
-		if va.Description != nil &&
-			vb.Description != nil &&
-			*va.Description == *vb.Description {
-			return true
-		} else {
+		if !reflect.DeepEqual(va.Description, vb.Description) {
 			return false
 		}
 	}
