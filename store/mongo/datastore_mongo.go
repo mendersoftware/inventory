@@ -338,6 +338,8 @@ func mongoOperator(co store.ComparisonOperator) string {
 	switch co {
 	case store.Eq:
 		return "$eq"
+	case store.Regex:
+		return "$regex"
 	}
 	return ""
 }
