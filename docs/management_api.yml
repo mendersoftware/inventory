@@ -73,6 +73,11 @@ paths:
           description: If present, limits the results only to devices assigned/not assigned to a group.
           required: false
           type: boolean
+        - name: group
+          in: query
+          description: If present, limits the results only to devices belonging to the given group.
+          required: false
+          type: string
 
       responses:
         200:
@@ -84,6 +89,9 @@ paths:
                 Standard header, used for page navigation.
 
                 Supported relation types are 'first', 'next' and 'prev'.
+            X-Total-Count:
+              type: string
+              description: Custom header indicating the total number of devices for the given query parameters
           schema:
             title: ListOfDevices
             type: array
@@ -356,6 +364,9 @@ paths:
             Link:
               type: string
               description: Standard header, we support 'first', 'next', and 'prev'.
+            X-Total-Count:
+              type: string
+              description: Custom header indicating the total number of devices in the given group
           schema:
             title: ListOfIDs
             type: array

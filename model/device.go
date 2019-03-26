@@ -1,4 +1,4 @@
-// Copyright 2017 Northern.tech AS
+// Copyright 2019 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -15,9 +15,10 @@ package model
 
 import (
 	"encoding/json"
+	"errors"
 	"time"
 
-	"github.com/asaskevich/govalidator"
+	"github.com/go-ozzo/ozzo-validation"
 )
 
 type DeviceID string
@@ -25,25 +26,70 @@ type DeviceID string
 type GroupName string
 
 type DeviceAttribute struct {
-	Name        string      `json:"name" bson:",omitempty"  valid:"length(1|4096),required"`
-	Description *string     `json:"description,omitempty" bson:",omitempty"  valid:"optional"`
-	Value       interface{} `json:"value" bson:",omitempty"  valid:"length(1|4096),required,deviceAttributeValueValidator"`
+	Name        string      `json:"name" bson:",omitempty"`
+	Description *string     `json:"description,omitempty" bson:",omitempty"`
+	Value       interface{} `json:"value" bson:",omitempty"`
+}
+
+func (da DeviceAttribute) Validate() error {
+	return validation.ValidateStruct(&da,
+		validation.Field(&da.Name, validation.Required, validation.Length(1, 1024)),
+		validation.Field(&da.Value, validation.Required, validation.By(validateDeviceAttrVal)),
+	)
+}
+
+func validateDeviceAttrVal(i interface{}) error {
+	switch v := i.(type) {
+	case float64, string:
+		return nil
+	case []interface{}:
+		return validateDeviceAttrValArray(v)
+	default:
+		return errors.New("supported types are string, float64, and arrays thereof")
+	}
+}
+
+func validateDeviceAttrValArray(arr []interface{}) error {
+	var firstValueString, firstValueFloat64 bool
+	for i, v := range arr {
+		_, isstring := v.(string)
+		_, isfloat64 := v.(float64)
+		if i == 0 {
+			if isstring {
+				firstValueString = true
+			} else if isfloat64 {
+				firstValueFloat64 = true
+			} else {
+				return errors.New("array values must be either string or float64")
+			}
+		} else if (firstValueString && !isstring) || (firstValueFloat64 && !isfloat64) {
+			return errors.New("array values must be of consistent type (string or float64)")
+		}
+	}
+	return nil
 }
 
 // Device wrapper
 type Device struct {
 	//system-generated device ID
-	ID DeviceID `json:"id" bson:"_id,omitempty" valid:"length(1|1024),required"`
+	ID DeviceID `json:"id" bson:"_id,omitempty"`
 
 	//a map of attributes names and their values.
-	Attributes DeviceAttributes `json:"attributes,omitempty" bson:",omitempty" valid:"optional"`
+	Attributes DeviceAttributes `json:"attributes,omitempty" bson:",omitempty"`
 
 	//device's group name
-	Group GroupName `json:"-" bson:"group,omitempty" valid:"optional"`
+	Group GroupName `json:"-" bson:"group,omitempty"`
 
 	CreatedTs time.Time `json:"-" bson:"created_ts,omitempty"`
 	//Timestamp of the last attribute update.
 	UpdatedTs time.Time `json:"updated_ts" bson:"updated_ts,omitempty"`
+}
+
+func (d Device) Validate() error {
+	return validation.ValidateStruct(&d,
+		validation.Field(&d.ID, validation.Required, validation.Length(1, 1024)),
+		validation.Field(&d.Attributes),
+	)
 }
 
 func (did DeviceID) String() string {
@@ -83,50 +129,4 @@ func (d DeviceAttributes) MarshalJSON() ([]byte, error) {
 	}
 
 	return json.Marshal(attrsArray)
-}
-
-var deviceAttributeValueValidator = govalidator.CustomTypeValidator(func(i interface{}, context interface{}) bool {
-	switch v := i.(type) {
-	case float64:
-		return true
-	case string:
-		return true
-	case []interface{}:
-		return validateDeviceAttributeValueArray(v)
-	default:
-		return false
-	}
-})
-
-func init() {
-	govalidator.CustomTypeTagMap.Set("deviceAttributeValueValidator", deviceAttributeValueValidator)
-}
-
-// device attributes value array can not have mixed types
-func validateDeviceAttributeValueArray(arr []interface{}) bool {
-	var firstValueString, firstValueFloat64 bool
-	for i, v := range arr {
-		_, isstring := v.(string)
-		_, isfloat64 := v.(float64)
-		if i == 0 {
-			if isstring {
-				firstValueString = true
-			} else if isfloat64 {
-				firstValueFloat64 = true
-			} else {
-				return false
-			}
-		} else if (firstValueString && !isstring) || (firstValueFloat64 && !isfloat64) {
-			return false
-		}
-	}
-	return true
-}
-
-// Validate checkes structure according to valid tags
-func (d *Device) Validate() error {
-	if _, err := govalidator.ValidateStruct(d); err != nil {
-		return err
-	}
-	return nil
 }

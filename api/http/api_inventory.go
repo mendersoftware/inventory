@@ -1,4 +1,4 @@
-// Copyright 2018 Northern.tech AS
+// Copyright 2019 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ import (
 	"strings"
 
 	"github.com/ant0ine/go-json-rest/rest"
-	"github.com/asaskevich/govalidator"
+	"github.com/go-ozzo/ozzo-validation"
 	"github.com/mendersoftware/go-lib-micro/log"
 	u "github.com/mendersoftware/go-lib-micro/rest_utils"
 	"github.com/pkg/errors"
@@ -55,12 +55,17 @@ const (
 	sortOrderDesc            = "desc"
 	sortAttributeNameIdx     = 0
 	sortOrderIdx             = 1
-	filterEqOperatorIdx      = 0
 )
 
 // model of device's group name response at /devices/:id/group endpoint
 type InventoryApiGroup struct {
-	Group string `json:"group" valid:"required"`
+	Group string `json:"group"`
+}
+
+func (g InventoryApiGroup) Validate() error {
+	return validation.ValidateStruct(&g,
+		validation.Field(&g.Group, validation.Required),
+	)
 }
 
 type inventoryHandlers struct {
@@ -145,23 +150,52 @@ func parseFilterParams(r *rest.Request) ([]store.Filter, error) {
 		if err != nil {
 			return nil, err
 		}
-		valueStrArray := strings.Split(valueStr, queryParamValueSeparator)
+
 		filter = store.Filter{AttrName: name}
-		if len(valueStrArray) == 2 {
-			switch valueStrArray[filterEqOperatorIdx] {
-			case "eq":
-				filter.Operator = store.Eq
-			default:
-				return nil, errors.New("invalid filter operator")
-			}
-			filter.Value = valueStrArray[filterEqOperatorIdx+1]
-		} else {
-			filter.Operator = store.Eq
+
+		// make sure we parse ':'s in value, it's either:
+		// not there
+		// after a valid operator specifier
+		// or/and inside the value itself(mac, etc), in which case leave it alone
+		sepIdx := strings.Index(valueStr, ":")
+		if sepIdx == -1 {
 			filter.Value = valueStr
+			filter.Operator = store.Eq
+		} else {
+			validOps := []string{"eq", "regex"}
+			for _, o := range validOps {
+				if valueStr[:sepIdx] == o {
+					switch o {
+					case "eq":
+						filter.Operator = store.Eq
+						filter.Value = valueStr[sepIdx+1:]
+					case "regex":
+						filter.Operator = store.Regex
+						filter.Value = valueStr[sepIdx+1:]
+					}
+					break
+				}
+			}
+
+			if filter.Value == "" {
+				filter.Value = valueStr
+				filter.Operator = store.Eq
+			}
 		}
-		floatValue, err := strconv.ParseFloat(filter.Value, 64)
-		if err == nil {
-			filter.ValueFloat = &floatValue
+
+		// we have a short form of the regex op, so check if the
+		// value doesn't contain it
+		if strings.HasPrefix(filter.Value, "~") {
+			filter.Operator = store.Regex
+			filter.Value = filter.Value[1:]
+		}
+
+		// only parse floats if we're not in regex
+		if filter.Operator != store.Regex {
+			floatValue, err := strconv.ParseFloat(filter.Value, 64)
+			if err == nil {
+				filter.ValueFloat = &floatValue
+			}
 		}
 
 		filters = append(filters, filter)
@@ -204,34 +238,28 @@ func (i *inventoryHandlers) GetDevicesHandler(w rest.ResponseWriter, r *rest.Req
 		return
 	}
 
-	//get one extra device to see if there's a 'next' page
-	ld := store.ListQuery{int((page - 1) * perPage),
-		int(perPage + 1),
-		filters,
-		sort,
-		hasGroup,
-		groupName}
+	ld := store.ListQuery{Skip: int((page - 1) * perPage),
+		Limit:     int(perPage),
+		Filters:   filters,
+		Sort:      sort,
+		HasGroup:  hasGroup,
+		GroupName: groupName}
 
-	devs, err := i.inventory.ListDevices(ctx, ld)
+	devs, totalCount, err := i.inventory.ListDevices(ctx, ld)
 
 	if err != nil {
 		u.RestErrWithLogInternal(w, r, l, err)
 		return
 	}
 
-	len := len(devs)
-	hasNext := false
-	if uint64(len) > perPage {
-		hasNext = true
-		len = int(perPage)
-	}
-
+	hasNext := totalCount > int(page*perPage)
 	links := utils.MakePageLinkHdrs(r, page, perPage, hasNext)
-
 	for _, l := range links {
 		w.Header().Add("Link", l)
 	}
-	w.WriteJson(devs[:len])
+	// the response writer will ensure the header name is in Kebab-Pascal-Case
+	w.Header().Add("X-Total-Count", strconv.Itoa(totalCount))
+	w.WriteJson(devs)
 }
 
 func (i *inventoryHandlers) GetDeviceHandler(w rest.ResponseWriter, r *rest.Request) {
@@ -359,7 +387,8 @@ func (i *inventoryHandlers) AddDeviceToGroupHandler(w rest.ResponseWriter, r *re
 			http.StatusBadRequest)
 		return
 	}
-	if _, err = govalidator.ValidateStruct(group); err != nil {
+
+	if err = group.Validate(); err != nil {
 		u.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
 		return
 	}
@@ -395,7 +424,7 @@ func (i *inventoryHandlers) GetDevicesByGroup(w rest.ResponseWriter, r *rest.Req
 	}
 
 	//get one extra device to see if there's a 'next' page
-	ids, err := i.inventory.ListDevicesByGroup(ctx, model.GroupName(group), int((page-1)*perPage), int(perPage+1))
+	ids, totalCount, err := i.inventory.ListDevicesByGroup(ctx, model.GroupName(group), int((page-1)*perPage), int(perPage))
 	if err != nil {
 		if err == store.ErrGroupNotFound {
 			u.RestErrWithLog(w, r, l, err, http.StatusNotFound)
@@ -405,19 +434,15 @@ func (i *inventoryHandlers) GetDevicesByGroup(w rest.ResponseWriter, r *rest.Req
 		return
 	}
 
-	len := len(ids)
-	hasNext := false
-	if uint64(len) > perPage {
-		hasNext = true
-		len = int(perPage)
-	}
+	hasNext := totalCount > int(page*perPage)
 
 	links := utils.MakePageLinkHdrs(r, page, perPage, hasNext)
 	for _, l := range links {
 		w.Header().Add("Link", l)
 	}
-	w.WriteJson(ids[:len])
-
+	// the response writer will ensure the header name is in Kebab-Pascal-Case
+	w.Header().Add("X-Total-Count", strconv.Itoa(totalCount))
+	w.WriteJson(ids)
 }
 
 func parseDevice(r *rest.Request) (*model.Device, error) {
@@ -445,7 +470,7 @@ func parseAttributes(r *rest.Request) (model.DeviceAttributes, error) {
 	}
 
 	for _, a := range attrs {
-		if _, err = govalidator.ValidateStruct(a); err != nil {
+		if err = a.Validate(); err != nil {
 			return nil, err
 		}
 	}
@@ -501,6 +526,12 @@ type newTenantRequest struct {
 	TenantID string `json:"tenant_id" valid:"required"`
 }
 
+func (t newTenantRequest) Validate() error {
+	return validation.ValidateStruct(&t,
+		validation.Field(&t.TenantID, validation.Required),
+	)
+}
+
 func (i *inventoryHandlers) CreateTenantHandler(w rest.ResponseWriter, r *rest.Request) {
 	ctx := r.Context()
 
@@ -513,7 +544,7 @@ func (i *inventoryHandlers) CreateTenantHandler(w rest.ResponseWriter, r *rest.R
 		return
 	}
 
-	if _, err := govalidator.ValidateStruct(newTenant); err != nil {
+	if err := newTenant.Validate(); err != nil {
 		u.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
 		return
 	}

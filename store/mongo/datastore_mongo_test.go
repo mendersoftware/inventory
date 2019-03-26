@@ -1,4 +1,4 @@
-// Copyright 2018 Northern.tech AS
+// Copyright 2019 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -15,6 +15,7 @@ package mongo_test
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -26,10 +27,11 @@ import (
 	"github.com/mendersoftware/inventory/store"
 	. "github.com/mendersoftware/inventory/store/mongo"
 
+	"unsafe"
+
 	"github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
 	mstore "github.com/mendersoftware/go-lib-micro/store"
-	"unsafe"
 )
 
 // test funcs
@@ -78,12 +80,60 @@ func TestMongoGetDevices(t *testing.T) {
 				"attrFloat":  {Name: "attrFloat", Value: 6.0, Description: strPtr("desc2")},
 			},
 		},
+		{
+			ID: model.DeviceID("8"),
+			Attributes: map[string]model.DeviceAttribute{
+				"attrString": {Name: "attrString", Value: "val8", Description: strPtr("desc1")},
+				"attrFloat":  {Name: "attrFloat", Value: 4.0, Description: strPtr("desc2")},
+			},
+			Group: model.GroupName("2"),
+		},
+		{
+			ID: model.DeviceID("9"),
+			Attributes: map[string]model.DeviceAttribute{
+				"attrString": {Name: "attrString", Value: "val8", Description: strPtr("desc1")},
+				"attrFloat":  {Name: "attrFloat", Value: 4.0, Description: strPtr("desc2")},
+			},
+			Group: model.GroupName("1"),
+		},
+		{
+			ID: model.DeviceID("10"),
+			Attributes: map[string]model.DeviceAttribute{
+				"attrString": {Name: "attrString", Value: "val3", Description: strPtr("desc1")},
+				"attrFloat":  {Name: "attrFloat", Value: 4.0, Description: strPtr("desc2")},
+			},
+			Group: model.GroupName("1"),
+		},
+		{
+			ID: model.DeviceID("11"),
+			Attributes: map[string]model.DeviceAttribute{
+				"attrList":  {Name: "attrList", Value: []interface{}{"val8", "foo", "bar"}, Description: strPtr("desc1")},
+				"attrFloat": {Name: "attrFloat", Value: 6.0, Description: strPtr("desc2")},
+			},
+			Group: model.GroupName("1"),
+		},
+		{
+			ID: model.DeviceID("12"),
+			Attributes: map[string]model.DeviceAttribute{
+				"attrList":  {Name: "attrList", Value: []interface{}{"val", "foo"}, Description: strPtr("desc1")},
+				"attrFloat": {Name: "attrFloat", Value: 6.0, Description: strPtr("desc2")},
+			},
+		},
+		{
+			ID: model.DeviceID("13"),
+			Attributes: map[string]model.DeviceAttribute{
+				"attrList":  {Name: "attrList", Value: []interface{}{"foo"}, Description: strPtr("desc1")},
+				"attrFloat": {Name: "attrFloat", Value: 8.0, Description: strPtr("desc2")},
+			},
+			Group: model.GroupName("2"),
+		},
 	}
 	floatVal4 := 4.0
 	floatVal5 := 5.0
 
 	testCases := map[string]struct {
 		expected  []model.Device
+		devTotal  int
 		skip      int
 		limit     int
 		filters   []store.Filter
@@ -92,8 +142,9 @@ func TestMongoGetDevices(t *testing.T) {
 		groupName string
 		tenant    string
 	}{
-		"get device from group 1": {
-			expected:  []model.Device{inputDevs[1]},
+		"get devices from group 1": {
+			expected:  []model.Device{inputDevs[1], inputDevs[9], inputDevs[10], inputDevs[10]},
+			devTotal:  4,
 			skip:      0,
 			filters:   nil,
 			sort:      nil,
@@ -101,6 +152,7 @@ func TestMongoGetDevices(t *testing.T) {
 		},
 		"all devs, no skip, no limit": {
 			expected: inputDevs,
+			devTotal: len(inputDevs),
 			skip:     0,
 			limit:    20,
 			filters:  nil,
@@ -108,6 +160,7 @@ func TestMongoGetDevices(t *testing.T) {
 		},
 		"all devs, no skip, no limit; with tenant": {
 			expected: inputDevs,
+			devTotal: len(inputDevs),
 			skip:     0,
 			limit:    20,
 			filters:  nil,
@@ -115,40 +168,46 @@ func TestMongoGetDevices(t *testing.T) {
 			tenant:   "foo",
 		},
 		"all devs, with skip": {
-			expected: []model.Device{inputDevs[4], inputDevs[5], inputDevs[6], inputDevs[7]},
+			expected: inputDevs[4:],
+			devTotal: len(inputDevs),
 			skip:     4,
 			limit:    20,
 			filters:  nil,
 			sort:     nil,
 		},
 		"all devs, no skip, with limit": {
-			expected: []model.Device{inputDevs[0], inputDevs[1], inputDevs[2]},
+			expected: inputDevs[0:3],
+			devTotal: len(inputDevs),
 			skip:     0,
 			limit:    3,
 			filters:  nil,
 			sort:     nil,
 		},
 		"skip + limit": {
-			expected: []model.Device{inputDevs[3], inputDevs[4]},
+			expected: inputDevs[3:5],
+			devTotal: len(inputDevs),
 			skip:     3,
 			limit:    2,
 			filters:  nil,
 			sort:     nil,
 		},
 		"filter on attribute (equal attribute)": {
-			expected: []model.Device{inputDevs[3]},
+			expected: []model.Device{inputDevs[3], inputDevs[10]},
+			devTotal: 2,
 			skip:     0,
 			limit:    20,
 			filters: []store.Filter{
 				{
 					AttrName: "attrString",
-					Value:    "val3", Operator: store.Eq,
+					Value:    "val3",
+					Operator: store.Eq,
 				},
 			},
 			sort: nil,
 		},
 		"filter on attribute (equal attribute float)": {
 			expected: []model.Device{inputDevs[5]},
+			devTotal: 1,
 			skip:     0,
 			limit:    20,
 			filters: []store.Filter{
@@ -163,6 +222,7 @@ func TestMongoGetDevices(t *testing.T) {
 		},
 		"filter on two attributes (equal)": {
 			expected: []model.Device{inputDevs[4]},
+			devTotal: 1,
 			skip:     0,
 			limit:    20,
 			filters: []store.Filter{
@@ -182,6 +242,7 @@ func TestMongoGetDevices(t *testing.T) {
 		},
 		"sort, limit": {
 			expected: []model.Device{inputDevs[5], inputDevs[4], inputDevs[3]},
+			devTotal: len(inputDevs),
 			skip:     0,
 			limit:    3,
 			filters:  nil,
@@ -191,7 +252,8 @@ func TestMongoGetDevices(t *testing.T) {
 			},
 		},
 		"hasGroup = true": {
-			expected: []model.Device{inputDevs[1], inputDevs[2], inputDevs[5]},
+			expected: []model.Device{inputDevs[1], inputDevs[2], inputDevs[5], inputDevs[8], inputDevs[9], inputDevs[10], inputDevs[11], inputDevs[13]},
+			devTotal: 8,
 			skip:     0,
 			limit:    20,
 			filters:  nil,
@@ -199,12 +261,188 @@ func TestMongoGetDevices(t *testing.T) {
 			hasGroup: boolPtr(true),
 		},
 		"hasGroup = false": {
-			expected: []model.Device{inputDevs[0], inputDevs[3], inputDevs[4], inputDevs[6], inputDevs[7]},
+			expected: []model.Device{inputDevs[0], inputDevs[3], inputDevs[4], inputDevs[6], inputDevs[7], inputDevs[12]},
+			devTotal: 6,
 			skip:     0,
 			limit:    20,
 			filters:  nil,
 			sort:     nil,
 			hasGroup: boolPtr(false),
+		},
+		"filter regex, prefix": {
+			expected: inputDevs[3:11],
+			devTotal: 8,
+			skip:     0,
+			limit:    20,
+			filters: []store.Filter{
+				{
+					AttrName: "attrString",
+					Value:    "^val",
+					Operator: store.Regex,
+				},
+			},
+			sort: nil,
+		},
+		"filter regex, infix": {
+			expected: []model.Device{inputDevs[4], inputDevs[7]},
+			devTotal: 2,
+			skip:     0,
+			limit:    20,
+			filters: []store.Filter{
+				{
+					AttrName: "attrString",
+					Value:    "val4",
+					Operator: store.Regex,
+				},
+			},
+			sort: nil,
+		},
+		"filter regex + eq operator": {
+			expected: []model.Device{inputDevs[4], inputDevs[6], inputDevs[8], inputDevs[9], inputDevs[10]},
+			devTotal: 5,
+			skip:     0,
+			limit:    20,
+			filters: []store.Filter{
+				{
+					AttrName: "attrString",
+					Value:    "val",
+					Operator: store.Regex,
+				},
+				{
+					AttrName:   "attrFloat",
+					ValueFloat: &floatVal4,
+					Operator:   store.Eq,
+				},
+			},
+			sort: nil,
+		},
+		"2x filter regex": {
+			expected: []model.Device{inputDevs[6]},
+			devTotal: 1,
+			skip:     0,
+			limit:    20,
+			filters: []store.Filter{
+				{
+					AttrName: "attrString",
+					Value:    "val",
+					Operator: store.Regex,
+				},
+				{
+					AttrName: "attrString",
+					Value:    "6",
+					Operator: store.Regex,
+				},
+			},
+			sort: nil,
+		},
+		"regex in array": {
+			expected: inputDevs[11:],
+			devTotal: 3,
+			skip:     0,
+			limit:    20,
+			filters: []store.Filter{
+				{
+					AttrName: "attrList",
+					Value:    "foo",
+					Operator: store.Regex,
+				},
+			},
+			sort: nil,
+		},
+		"regex in array 2": {
+			expected: []model.Device{inputDevs[11]},
+			devTotal: 1,
+			skip:     0,
+			limit:    20,
+			filters: []store.Filter{
+				{
+					AttrName: "attrList",
+					Value:    "bar",
+					Operator: store.Regex,
+				},
+			},
+			sort: nil,
+		},
+		"filter regex + skip/limit": {
+			expected: inputDevs[6:9],
+			devTotal: 8,
+			skip:     3,
+			limit:    3,
+			filters: []store.Filter{
+				{
+					AttrName: "attrString",
+					Value:    "^val",
+					Operator: store.Regex,
+				},
+			},
+			sort: nil,
+		},
+		"filter regex + has_group": {
+			expected: []model.Device{inputDevs[5], inputDevs[8], inputDevs[9], inputDevs[10]},
+			devTotal: 4,
+			skip:     0,
+			limit:    20,
+			filters: []store.Filter{
+				{
+					AttrName: "attrString",
+					Value:    "^val",
+					Operator: store.Regex,
+				},
+			},
+
+			sort:     nil,
+			hasGroup: boolPtr(false),
+		},
+		"filter regex + group": {
+			expected: []model.Device{inputDevs[9], inputDevs[10]},
+			devTotal: 2,
+			skip:     0,
+			limit:    20,
+			filters: []store.Filter{
+				{
+					AttrName: "attrString",
+					Value:    "^val",
+					Operator: store.Regex,
+				},
+			},
+			sort:      nil,
+			groupName: "1",
+		},
+		"filter regex + group + skip/limit": {
+			expected: []model.Device{inputDevs[10]},
+			devTotal: 2,
+			skip:     1,
+			limit:    1,
+			filters: []store.Filter{
+				{
+					AttrName: "attrString",
+					Value:    "^val",
+					Operator: store.Regex,
+				},
+			},
+			sort:      nil,
+			groupName: "1",
+		},
+		"filter regex + filter eq + group + skip/limit": {
+			expected: inputDevs[10:11],
+			devTotal: 2,
+			skip:     1,
+			limit:    1,
+			filters: []store.Filter{
+				{
+					AttrName: "attrString",
+					Value:    "^val",
+					Operator: store.Regex,
+				},
+				{
+					AttrName:   "attrFloat",
+					Value:      "4.0",
+					ValueFloat: &floatVal4,
+					Operator:   store.Eq,
+				},
+			},
+			sort:      nil,
+			groupName: "1",
 		},
 	}
 
@@ -231,10 +469,18 @@ func TestMongoGetDevices(t *testing.T) {
 		mongoStore := NewDataStoreMongoWithSession(session)
 
 		//test
-		devs, err := mongoStore.GetDevices(ctx, store.ListQuery{tc.skip, tc.limit, tc.filters, tc.sort, tc.hasGroup, tc.groupName})
+		devs, totalCount, err := mongoStore.GetDevices(ctx,
+			store.ListQuery{
+				Skip:      tc.skip,
+				Limit:     tc.limit,
+				Filters:   tc.filters,
+				Sort:      tc.sort,
+				HasGroup:  tc.hasGroup,
+				GroupName: tc.groupName})
 		assert.NoError(t, err, "failed to get devices")
 
 		assert.Equal(t, len(tc.expected), len(devs))
+		assert.Equal(t, tc.devTotal, totalCount)
 
 		// Need to close all sessions to be able to call wipe at next test case
 		session.Close()
@@ -867,7 +1113,7 @@ func TestMongoUpsertAttributes(t *testing.T) {
 				},
 				"new-1": {
 					Name:  "new-1",
-					Value: []string{"new-1-0", "new-1-0"},
+					Value: []interface{}{"new-1-0", "new-1-0"},
 				},
 				"new-2": {
 					Name:        "new-2",
@@ -926,7 +1172,7 @@ func TestMongoUpsertAttributes(t *testing.T) {
 				},
 				"new-1": {
 					Name:  "new-1",
-					Value: []string{"new-1-0", "new-1-0"},
+					Value: []interface{}{"new-1-0", "new-1-0"},
 				},
 				"new-2": {
 					Name:        "new-2",
@@ -1189,16 +1435,7 @@ func compare(a, b model.DeviceAttributes) bool {
 			return false
 		}
 
-		if va.Description == nil &&
-			vb.Description == nil {
-			return true
-		}
-
-		if va.Description != nil &&
-			vb.Description != nil &&
-			*va.Description == *vb.Description {
-			return true
-		} else {
+		if !reflect.DeepEqual(va.Description, vb.Description) {
 			return false
 		}
 	}
@@ -1451,18 +1688,24 @@ func TestGetDevicesByGroup(t *testing.T) {
 		t.Skip("skipping TestGetDevicesByGroup in short mode.")
 	}
 
-	inputDevices := []model.Device{
+	devDevices := []model.Device{
 		{
 			ID:    model.DeviceID("1"),
 			Group: model.GroupName("dev"),
 		},
 		{
-			ID:    model.DeviceID("2"),
-			Group: model.GroupName("prod"),
+			ID:    model.DeviceID("6"),
+			Group: model.GroupName("dev"),
 		},
 		{
-			ID:    model.DeviceID("3"),
-			Group: model.GroupName("test"),
+			ID:    model.DeviceID("8"),
+			Group: model.GroupName("dev"),
+		},
+	}
+	prodDevices := []model.Device{
+		{
+			ID:    model.DeviceID("2"),
+			Group: model.GroupName("prod"),
 		},
 		{
 			ID:    model.DeviceID("4"),
@@ -1472,38 +1715,42 @@ func TestGetDevicesByGroup(t *testing.T) {
 			ID:    model.DeviceID("5"),
 			Group: model.GroupName("prod"),
 		},
+	}
+	testDevices := []model.Device{
 		{
-			ID:    model.DeviceID("6"),
-			Group: model.GroupName("dev"),
+			ID:    model.DeviceID("3"),
+			Group: model.GroupName("test"),
 		},
 		{
 			ID:    model.DeviceID("7"),
 			Group: model.GroupName("test"),
 		},
-		{
-			ID:    model.DeviceID("8"),
-			Group: model.GroupName("dev"),
-		},
 	}
 
+	inputDevices := make([]model.Device, 0, len(devDevices)+len(prodDevices)+len(testDevices))
+	inputDevices = append(inputDevices, devDevices...)
+	inputDevices = append(inputDevices, prodDevices...)
+	inputDevices = append(inputDevices, testDevices...)
+
 	testCases := map[string]struct {
-		InputGroupName model.GroupName
-		InputSkip      int
-		InputLimit     int
-		OutputDevices  []model.DeviceID
-		OutputError    error
+		InputGroupName    model.GroupName
+		InputSkip         int
+		InputLimit        int
+		OutputDevices     []model.DeviceID
+		OutputDeviceCount int
+		OutputError       error
 	}{
 		"no skip, no limit": {
 			InputGroupName: "dev",
 			InputSkip:      0,
 			InputLimit:     0,
 			OutputDevices: []model.DeviceID{
-
 				model.DeviceID("1"),
 				model.DeviceID("6"),
 				model.DeviceID("8"),
 			},
-			OutputError: nil,
+			OutputDeviceCount: len(devDevices),
+			OutputError:       nil,
 		},
 		"no skip, limit": {
 			InputGroupName: "prod",
@@ -1513,7 +1760,8 @@ func TestGetDevicesByGroup(t *testing.T) {
 				model.DeviceID("2"),
 				model.DeviceID("4"),
 			},
-			OutputError: nil,
+			OutputDeviceCount: len(prodDevices),
+			OutputError:       nil,
 		},
 		"skip, no limit": {
 			InputGroupName: "dev",
@@ -1522,7 +1770,8 @@ func TestGetDevicesByGroup(t *testing.T) {
 			OutputDevices: []model.DeviceID{
 				model.DeviceID("8"),
 			},
-			OutputError: nil,
+			OutputDeviceCount: len(devDevices),
+			OutputError:       nil,
 		},
 		"skip + limit": {
 			InputGroupName: "prod",
@@ -1531,21 +1780,59 @@ func TestGetDevicesByGroup(t *testing.T) {
 			OutputDevices: []model.DeviceID{
 				model.DeviceID("4"),
 			},
-			OutputError: nil,
+			OutputDeviceCount: len(prodDevices),
+			OutputError:       nil,
 		},
 		"no results (past last page)": {
-			InputGroupName: "dev",
-			InputSkip:      10,
-			InputLimit:     1,
-			OutputDevices:  []model.DeviceID{},
-			OutputError:    nil,
+			InputGroupName:    "dev",
+			InputSkip:         10,
+			InputLimit:        1,
+			OutputDevices:     []model.DeviceID{},
+			OutputDeviceCount: len(devDevices),
+			OutputError:       nil,
 		},
 		"group doesn't exist": {
-			InputGroupName: "unknown",
+			InputGroupName:    "unknown",
+			InputSkip:         0,
+			InputLimit:        0,
+			OutputDevices:     nil,
+			OutputDeviceCount: -1,
+			OutputError:       store.ErrGroupNotFound,
+		},
+		"dev group": {
+			InputGroupName: "dev",
 			InputSkip:      0,
-			InputLimit:     0,
-			OutputDevices:  nil,
-			OutputError:    store.ErrGroupNotFound,
+			InputLimit:     10,
+			OutputDevices: []model.DeviceID{
+				model.DeviceID("1"),
+				model.DeviceID("6"),
+				model.DeviceID("8"),
+			},
+			OutputDeviceCount: len(devDevices),
+			OutputError:       nil,
+		},
+		"prod group": {
+			InputGroupName: "prod",
+			InputSkip:      0,
+			InputLimit:     10,
+			OutputDevices: []model.DeviceID{
+				model.DeviceID("2"),
+				model.DeviceID("4"),
+				model.DeviceID("5"),
+			},
+			OutputDeviceCount: len(prodDevices),
+			OutputError:       nil,
+		},
+		"test group": {
+			InputGroupName: "test",
+			InputSkip:      0,
+			InputLimit:     10,
+			OutputDevices: []model.DeviceID{
+				model.DeviceID("3"),
+				model.DeviceID("7"),
+			},
+			OutputDeviceCount: len(testDevices),
+			OutputError:       nil,
 		},
 	}
 
@@ -1563,14 +1850,17 @@ func TestGetDevicesByGroup(t *testing.T) {
 		store := NewDataStoreMongoWithSession(session)
 
 		ctx := context.Background()
-		devs, err := store.GetDevicesByGroup(ctx, tc.InputGroupName, tc.InputSkip, tc.InputLimit)
+		devs, totalCount, err := store.GetDevicesByGroup(ctx, tc.InputGroupName, tc.InputSkip, tc.InputLimit)
 
 		if tc.OutputError != nil {
 			assert.EqualError(t, err, tc.OutputError.Error())
 		} else {
 			assert.NoError(t, err, "expected no error")
 			if !reflect.DeepEqual(tc.OutputDevices, devs) {
-				assert.Fail(t, "expected: %v\nhave: %v", tc.OutputDevices, devs)
+				assert.Fail(t, "expected outputDevices to match", fmt.Sprintf("Expected: %v but\n have:%v", tc.OutputDevices, devs))
+			}
+			if !reflect.DeepEqual(tc.OutputDeviceCount, totalCount) {
+				assert.Fail(t, "expected outputDeviceCount to match", fmt.Sprintf("Expected: %v but\n have:%v", tc.OutputDeviceCount, totalCount))
 			}
 		}
 	}
@@ -1619,23 +1909,24 @@ func TestGetDevicesByGroupWithTenant(t *testing.T) {
 	}
 
 	testCases := map[string]struct {
-		InputGroupName model.GroupName
-		InputSkip      int
-		InputLimit     int
-		OutputDevices  []model.DeviceID
-		OutputError    error
+		InputGroupName    model.GroupName
+		InputSkip         int
+		InputLimit        int
+		OutputDevices     []model.DeviceID
+		OutputDeviceCount int
+		OutputError       error
 	}{
 		"no skip, no limit": {
 			InputGroupName: "dev",
 			InputSkip:      0,
 			InputLimit:     0,
 			OutputDevices: []model.DeviceID{
-
 				model.DeviceID("1"),
 				model.DeviceID("6"),
 				model.DeviceID("8"),
 			},
-			OutputError: nil,
+			OutputDeviceCount: 3,
+			OutputError:       nil,
 		},
 		"no skip, limit": {
 			InputGroupName: "prod",
@@ -1645,7 +1936,8 @@ func TestGetDevicesByGroupWithTenant(t *testing.T) {
 				model.DeviceID("2"),
 				model.DeviceID("4"),
 			},
-			OutputError: nil,
+			OutputDeviceCount: 3,
+			OutputError:       nil,
 		},
 		"skip, no limit": {
 			InputGroupName: "dev",
@@ -1654,7 +1946,8 @@ func TestGetDevicesByGroupWithTenant(t *testing.T) {
 			OutputDevices: []model.DeviceID{
 				model.DeviceID("8"),
 			},
-			OutputError: nil,
+			OutputDeviceCount: 3,
+			OutputError:       nil,
 		},
 		"skip + limit": {
 			InputGroupName: "prod",
@@ -1663,21 +1956,24 @@ func TestGetDevicesByGroupWithTenant(t *testing.T) {
 			OutputDevices: []model.DeviceID{
 				model.DeviceID("4"),
 			},
-			OutputError: nil,
+			OutputDeviceCount: 3,
+			OutputError:       nil,
 		},
 		"no results (past last page)": {
-			InputGroupName: "dev",
-			InputSkip:      10,
-			InputLimit:     1,
-			OutputDevices:  []model.DeviceID{},
-			OutputError:    nil,
+			InputGroupName:    "dev",
+			InputSkip:         10,
+			InputLimit:        1,
+			OutputDevices:     []model.DeviceID{},
+			OutputDeviceCount: 3,
+			OutputError:       nil,
 		},
 		"group doesn't exist": {
-			InputGroupName: "unknown",
-			InputSkip:      0,
-			InputLimit:     0,
-			OutputDevices:  nil,
-			OutputError:    store.ErrGroupNotFound,
+			InputGroupName:    "unknown",
+			InputSkip:         0,
+			InputLimit:        0,
+			OutputDevices:     nil,
+			OutputDeviceCount: -1,
+			OutputError:       store.ErrGroupNotFound,
 		},
 	}
 
@@ -1698,14 +1994,17 @@ func TestGetDevicesByGroupWithTenant(t *testing.T) {
 		ctx = identity.WithContext(ctx, &identity.Identity{
 			Tenant: "foo",
 		})
-		devs, err := store.GetDevicesByGroup(ctx, tc.InputGroupName, tc.InputSkip, tc.InputLimit)
+		devs, totalCount, err := store.GetDevicesByGroup(ctx, tc.InputGroupName, tc.InputSkip, tc.InputLimit)
 
 		if tc.OutputError != nil {
 			assert.EqualError(t, err, tc.OutputError.Error())
 		} else {
 			assert.NoError(t, err, "expected no error")
 			if !reflect.DeepEqual(tc.OutputDevices, devs) {
-				assert.Fail(t, "expected: %v\nhave: %v", tc.OutputDevices, devs)
+				assert.Fail(t, "expected outputDevices to match", fmt.Sprintf("Expected: %v but\n have:%v", tc.OutputDevices, devs))
+			}
+			if !reflect.DeepEqual(tc.OutputDeviceCount, totalCount) {
+				assert.Fail(t, "expected outputDeviceCount to match", fmt.Sprintf("Expected: %v but\n have:%v", tc.OutputDeviceCount, totalCount))
 			}
 		}
 	}
