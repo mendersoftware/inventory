@@ -17,6 +17,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"sort"
 	"testing"
 	"time"
 
@@ -32,6 +33,7 @@ import (
 	"github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
 	mstore "github.com/mendersoftware/go-lib-micro/store"
+	"github.com/pkg/errors"
 )
 
 // test funcs
@@ -2259,36 +2261,155 @@ func TestMigrate(t *testing.T) {
 		t.Skip("skipping TestMigrate in short mode.")
 	}
 
+	someDevs := []model.Device{
+		{
+			ID: model.DeviceID("0"),
+			Attributes: map[string]model.DeviceAttribute{
+				"mac": {Name: "mac", Value: "foo", Description: strPtr("desc")},
+				"sn":  {Name: "sn", Value: "bar", Description: strPtr("desc")},
+			},
+		},
+		{
+			ID: model.DeviceID("1"),
+			Attributes: map[string]model.DeviceAttribute{
+				"mac": {Name: "mac", Value: "foo", Description: strPtr("desc")},
+				"foo": {Name: "foo", Value: "foo", Description: strPtr("desc")},
+				"bar": {Name: "bar", Value: "bar", Description: strPtr("desc")},
+			},
+		},
+		{
+			ID: model.DeviceID("2"),
+			Attributes: map[string]model.DeviceAttribute{
+				"baz": {Name: "baz", Value: "baz", Description: strPtr("desc")},
+			},
+		},
+	}
+
+	devMaxAttrs := model.Device{
+		ID:         model.DeviceID("3"),
+		Attributes: map[string]model.DeviceAttribute{},
+	}
+
+	devMaxAttrIndexes := []string{}
+
+	// max indexes is in fact 63, _id takes away 1
+	maxIndexes := 63
+
+	for i := 0; i < maxIndexes+1; i++ {
+		attr := fmt.Sprintf("attr%d", i)
+		devMaxAttrs.Attributes[attr] = model.DeviceAttribute{Name: attr, Value: attr}
+		if i < maxIndexes {
+			devMaxAttrIndexes = append(devMaxAttrIndexes, fmt.Sprintf("attributes.%s.value", attr))
+		}
+	}
+
 	testCases := map[string]struct {
-		version     string
-		err         string
+		versionFrom string
+		inDevs      []model.Device
 		automigrate bool
+		tenant      string
+
+		outVers    []string
+		outIndexes []string
+		err        error
 	}{
-		"0.1.0": {
-			version:     "0.1.0",
-			err:         "",
+		"from no version (fresh db)": {
+			versionFrom: "",
 			automigrate: true,
+
+			outVers: []string{
+				"0.2.0",
+			},
 		},
-		"1.2.3": {
-			version:     "1.2.3",
-			err:         "",
+		"from 0.1.0 (first, dummy migration)": {
+			versionFrom: "0.1.0",
 			automigrate: true,
+
+			outVers: []string{
+				"0.1.0",
+				"0.2.0",
+			},
 		},
-		"0.1 error": {
-			version:     "0.1",
-			err:         "failed to parse service version: failed to parse Version: unexpected EOF",
+		"from 0.1.0, no-automigrate": {
+			versionFrom: "0.1.0",
+
+			err: errors.New("failed to apply migrations: db needs migration: inventory has version 0.1.0, needs version 0.2.0"),
+		},
+		"with devices, from 0.1.0": {
+			versionFrom: "0.1.0",
+			inDevs:      someDevs,
 			automigrate: true,
+
+			outVers: []string{
+				"0.1.0",
+				"0.2.0",
+			},
+			outIndexes: []string{
+				"attributes.mac.value",
+				"attributes.sn.value",
+				"attributes.foo.value",
+				"attributes.bar.value",
+				"attributes.baz.value",
+			},
 		},
-		"0.1.0 no-automigrate": {
-			version: "0.1.0",
-			err:     "failed to apply migrations: db needs migration: inventory has version 0.0.0, needs version 0.1.0",
+		"with devices, from 0.1.0, with tenant": {
+			versionFrom: "",
+			inDevs:      someDevs,
+			automigrate: true,
+			tenant:      "tenant",
+
+			outVers: []string{
+				"0.2.0",
+			},
+			outIndexes: []string{
+				"attributes.mac.value",
+				"attributes.sn.value",
+				"attributes.foo.value",
+				"attributes.bar.value",
+				"attributes.baz.value",
+			},
+		},
+		"with devices, from 0.1.0, with tenant, other devs": {
+			versionFrom: "0.1.0",
+			inDevs:      []model.Device{someDevs[0], someDevs[2]},
+			automigrate: true,
+			tenant:      "tenant",
+
+			outVers: []string{
+				"0.1.0",
+				"0.2.0",
+			},
+			outIndexes: []string{
+				"attributes.mac.value",
+				"attributes.sn.value",
+				"attributes.baz.value",
+			},
+		},
+		"with devices, from 0.1.0, exceed max num of indexes": {
+			versionFrom: "0.1.0",
+			inDevs:      []model.Device{devMaxAttrs},
+			automigrate: true,
+
+			outVers: []string{
+				"0.1.0",
+				"0.2.0",
+			},
+			outIndexes: devMaxAttrIndexes,
 		},
 	}
 
 	for name, tc := range testCases {
 		t.Logf("case: %s", name)
 		db.Wipe()
+
 		session := db.Session()
+
+		ctx := context.Background()
+		if tc.tenant != "" {
+			ctx = identity.WithContext(ctx, &identity.Identity{
+				Tenant: tc.tenant,
+			})
+		}
 
 		store := NewDataStoreMongoWithSession(session)
 
@@ -2296,21 +2417,77 @@ func TestMigrate(t *testing.T) {
 			store = store.WithAutomigrate()
 		}
 
-		err := store.Migrate(context.Background(), tc.version)
-		if tc.err == "" {
+		// prep input data
+		// input migrations
+		if tc.versionFrom != "" {
+			v, err := migrate.NewVersion(tc.versionFrom)
 			assert.NoError(t, err)
+
+			entry := migrate.MigrationEntry{
+				Version: *v,
+			}
+			assert.NoError(t, err)
+
+			err = session.
+				DB(mstore.DbFromContext(ctx, DbName)).
+				C(migrate.DbMigrationsColl).
+				Insert(entry)
+			assert.NoError(t, err)
+		}
+
+		// input devices
+		for _, d := range tc.inDevs {
+			err := session.
+				DB(mstore.DbFromContext(ctx, DbName)).
+				C(DbDevicesColl).
+				Insert(d)
+			assert.NoError(t, err)
+		}
+
+		err := store.Migrate(ctx, DbVersion)
+		if tc.err == nil {
+			assert.NoError(t, err)
+
+			// verify migration entries
 			var out []migrate.MigrationEntry
-			session.DB(DbName).C(migrate.DbMigrationsColl).Find(nil).All(&out)
-			assert.Len(t, out, 1)
-			v, _ := migrate.NewVersion(tc.version)
-			assert.Equal(t, *v, out[0].Version)
+			session.
+				DB(mstore.DbFromContext(ctx, DbName)).
+				C(migrate.DbMigrationsColl).
+				Find(nil).
+				All(&out)
+
+			assert.Equal(t, len(tc.outVers), len(out))
+			for i, v := range tc.outVers {
+				assert.Equal(t, v, out[i].Version.String())
+			}
+
+			// verify created indexes
+			indexes, err := session.
+				DB(mstore.DbFromContext(ctx, DbName)).
+				C(DbDevicesColl).
+				Indexes()
+
+			// collection might not exist - ok, but that's a mgo error, so swallow it
+			if err != nil {
+				assert.EqualError(t, err, "Collection inventory.devices doesn't exist")
+			} else {
+				// +1 index for _id
+				assert.Equal(t, len(indexes), len(tc.outIndexes)+1)
+
+				for _, inIdx := range tc.outIndexes {
+					idx := sort.Search(len(indexes), func(i int) bool {
+						return string(indexes[i].Name) == inIdx
+					})
+					assert.Greater(t, idx, -1)
+				}
+			}
+
 		} else {
-			assert.EqualError(t, err, tc.err)
+			assert.EqualError(t, err, tc.err.Error())
 		}
 
 		session.Close()
 	}
-
 }
 
 // test funcs

@@ -19,6 +19,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net"
+	"strings"
 	"sync"
 	"time"
 
@@ -35,7 +36,7 @@ import (
 )
 
 const (
-	DbVersion = "0.1.0"
+	DbVersion = "0.2.0"
 
 	DbName        = "inventory"
 	DbDevicesColl = "devices"
@@ -514,26 +515,40 @@ func (db *DataStoreMongo) GetAllAttributeNames(ctx context.Context) ([]string, e
 	}
 }
 
-func (db *DataStoreMongo) MigrateTenant(ctx context.Context, version string, tenant string) error {
+func (db *DataStoreMongo) MigrateTenant(ctx context.Context, version string, tenantId string) error {
+	l := log.FromContext(ctx)
+
+	database := mstore.DbNameForTenant(tenantId, DbName)
+
+	l.Infof("migrating %s", database)
+
+	m := migrate.SimpleMigrator{
+		Session:     db.session,
+		Db:          database,
+		Automigrate: db.automigrate,
+	}
+
 	ver, err := migrate.NewVersion(version)
 	if err != nil {
 		return errors.Wrap(err, "failed to parse service version")
 	}
 
-	tenantCtx := identity.WithContext(ctx, &identity.Identity{
-		Tenant: tenant,
+	ctx = identity.WithContext(ctx, &identity.Identity{
+		Tenant: tenantId,
 	})
 
-	m := migrate.DummyMigrator{
-		Session:     db.session,
-		Db:          mstore.DbFromContext(tenantCtx, DbName),
-		Automigrate: db.automigrate,
+	migrations := []migrate.Migration{
+		&migration_0_2_0{
+			ms:  db,
+			ctx: ctx,
+		},
 	}
 
-	err = m.Apply(tenantCtx, *ver, nil)
+	err = m.Apply(ctx, *ver, migrations)
 	if err != nil {
 		return errors.Wrap(err, "failed to apply migrations")
 	}
+
 	return nil
 }
 
@@ -558,11 +573,9 @@ func (db *DataStoreMongo) Migrate(ctx context.Context, version string) error {
 	for _, d := range dbs {
 		l.Infof("migrating %s", d)
 
-		// if not in multi tenant, then tenant will be "" and identity
-		// will be the same as default
-		tenant := mstore.TenantFromDbName(d, DbName)
+		tenantId := mstore.TenantFromDbName(d, DbName)
 
-		if err := db.MigrateTenant(ctx, version, tenant); err != nil {
+		if err := db.MigrateTenant(ctx, version, tenantId); err != nil {
 			return err
 		}
 	}
@@ -577,4 +590,27 @@ func (db *DataStoreMongo) WithAutomigrate() *DataStoreMongo {
 		session:     db.session,
 		automigrate: true,
 	}
+}
+
+func indexAttr(s *mgo.Session, ctx context.Context, attr string) error {
+	l := log.FromContext(ctx)
+
+	err := s.DB(mstore.DbFromContext(ctx, DbName)).
+		C(DbDevicesColl).EnsureIndex(mgo.Index{
+		Key: []string{fmt.Sprintf("attributes.%s.values", attr)},
+	})
+
+	if err != nil {
+		if isTooManyIndexes(err) {
+			l.Warnf("failed to index attr %s in db %s: too many indexes", attr, mstore.DbFromContext(ctx, DbName))
+		} else {
+			return errors.Wrapf(err, "failed to index attr %s in db %s", attr, mstore.DbFromContext(ctx, DbName))
+		}
+	}
+
+	return nil
+}
+
+func isTooManyIndexes(e error) bool {
+	return strings.HasPrefix(e.Error(), "add index fails, too many indexes for inventory.devices")
 }
