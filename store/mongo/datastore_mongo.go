@@ -285,6 +285,12 @@ func (db *DataStoreMongo) AddDevice(ctx context.Context, dev *model.Device) erro
 	if err != nil {
 		return errors.Wrap(err, "failed to store device")
 	}
+
+	err = db.IndexAllAttrs(ctx, dev.Attributes)
+	if err != nil {
+		return errors.Wrap(err, "failed to index attributes for device")
+	}
+
 	return nil
 }
 

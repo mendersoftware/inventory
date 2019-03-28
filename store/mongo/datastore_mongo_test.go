@@ -706,6 +706,7 @@ func TestMongoAddDevice(t *testing.T) {
 		OutputDevice *model.Device
 		tenant       string
 		OutputError  error
+		outIndexes   []string
 	}{
 		"valid device with one attribute, no error": {
 			InputDevice: &model.Device{
@@ -721,6 +722,10 @@ func TestMongoAddDevice(t *testing.T) {
 				},
 			},
 			OutputError: nil,
+			outIndexes: []string{
+				"attributes.mac.value",
+				"attributes.sn.value",
+			},
 		},
 		"valid device with one attribute, no error; with tenant": {
 			InputDevice: &model.Device{
@@ -737,6 +742,10 @@ func TestMongoAddDevice(t *testing.T) {
 			},
 			tenant:      "foo",
 			OutputError: nil,
+			outIndexes: []string{
+				"attributes.mac.value",
+				"attributes.sn.value",
+			},
 		},
 		"valid device with two attributes, no error": {
 			InputDevice: &model.Device{
@@ -754,6 +763,10 @@ func TestMongoAddDevice(t *testing.T) {
 				},
 			},
 			OutputError: nil,
+			outIndexes: []string{
+				"attributes.mac.value",
+				"attributes.sn.value",
+			},
 		},
 		"valid device with attribute without value, no error": {
 			InputDevice: &model.Device{
@@ -769,6 +782,10 @@ func TestMongoAddDevice(t *testing.T) {
 				},
 			},
 			OutputError: nil,
+			outIndexes: []string{
+				"attributes.mac.value",
+				"attributes.sn.value",
+			},
 		},
 		"valid device with array in attribute value, no error": {
 			InputDevice: &model.Device{
@@ -784,21 +801,32 @@ func TestMongoAddDevice(t *testing.T) {
 				},
 			},
 			OutputError: nil,
+			outIndexes: []string{
+				"attributes.mac.value",
+				"attributes.sn.value",
+			},
 		},
 		"valid device without attributes, no error": {
 			InputDevice: &model.Device{
 				ID: model.DeviceID("0007"),
 				Attributes: model.DeviceAttributes{
-					"mac": {Name: "mac"},
+					"mac": {Name: "mac", Value: "asdf"},
+					"foo": {Name: "foo", Value: "asdf"},
 				},
 			},
 			OutputDevice: &model.Device{
 				ID: model.DeviceID("0007"),
 				Attributes: model.DeviceAttributes{
-					"mac": {Name: "mac"},
+					"mac": {Name: "mac", Value: "asdf"},
+					"foo": {Name: "foo", Value: "asdf"},
 				},
 			},
 			OutputError: nil,
+			outIndexes: []string{
+				"attributes.mac.value",
+				"attributes.sn.value",
+				"attributes.foo.value",
+			},
 		},
 		"valid device with upsert, all attrs updated, no error": {
 			InputDevice: &model.Device{
@@ -816,6 +844,10 @@ func TestMongoAddDevice(t *testing.T) {
 				},
 			},
 			OutputError: nil,
+			outIndexes: []string{
+				"attributes.mac.value",
+				"attributes.sn.value",
+			},
 		},
 		"valid device with upsert, one attr updated, no error": {
 			InputDevice: &model.Device{
@@ -832,6 +864,10 @@ func TestMongoAddDevice(t *testing.T) {
 				},
 			},
 			OutputError: nil,
+			outIndexes: []string{
+				"attributes.mac.value",
+				"attributes.sn.value",
+			},
 		},
 		"valid device with upsert, no attrs updated, new upserted, no error": {
 			InputDevice: &model.Device{
@@ -849,6 +885,11 @@ func TestMongoAddDevice(t *testing.T) {
 				},
 			},
 			OutputError: nil,
+			outIndexes: []string{
+				"attributes.mac.value",
+				"attributes.sn.value",
+				"attributes.other-param.value",
+			},
 		},
 		"valid device with upsert, no attrs updated, many new upserted, no error": {
 			InputDevice: &model.Device{
@@ -868,6 +909,12 @@ func TestMongoAddDevice(t *testing.T) {
 				},
 			},
 			OutputError: nil,
+			outIndexes: []string{
+				"attributes.mac.value",
+				"attributes.sn.value",
+				"attributes.other-param.value",
+				"attributes.other-param-2.value",
+			},
 		},
 	}
 
@@ -877,9 +924,6 @@ func TestMongoAddDevice(t *testing.T) {
 		// Make sure we start test with empty database
 		db.Wipe()
 
-		session := db.Session()
-		store := NewDataStoreMongoWithSession(session)
-
 		ctx := context.Background()
 		if testCase.tenant != "" {
 			ctx = identity.WithContext(ctx, &identity.Identity{
@@ -887,9 +931,15 @@ func TestMongoAddDevice(t *testing.T) {
 			})
 		}
 
+		session := db.Session()
+		store := NewDataStoreMongoWithSession(session).WithAutomigrate()
+
 		c := session.DB(mstore.DbFromContext(ctx, DbName)).C(DbDevicesColl)
 		err := c.Insert(existing...)
 		assert.NoError(t, err)
+
+		err = store.Migrate(ctx, DbVersion)
+		assert.NoError(t, err, "Migrate failed")
 
 		err = store.AddDevice(ctx, testCase.InputDevice)
 
@@ -905,6 +955,21 @@ func TestMongoAddDevice(t *testing.T) {
 			assert.NoError(t, err, "expected no error")
 
 			compareDevsWithoutTimestamps(t, testCase.OutputDevice, dbdev)
+
+			//check indexes
+			indexes, err := session.
+				DB(mstore.DbFromContext(ctx, DbName)).
+				C(DbDevicesColl).
+				Indexes()
+			assert.Equal(t, len(indexes), len(testCase.outIndexes)+1)
+
+			for _, inIdx := range testCase.outIndexes {
+				idx := sort.Search(len(indexes), func(i int) bool {
+					return string(indexes[i].Name) == inIdx
+				})
+				assert.Greater(t, idx, -1)
+			}
+
 		}
 
 		// Need to close all sessions to be able to call wipe at next test case
