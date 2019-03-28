@@ -11,6 +11,7 @@
 //    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
+
 package mocks
 
 import context "context"
@@ -49,6 +50,29 @@ func (_m *DataStore) DeleteDevice(ctx context.Context, id model.DeviceID) error 
 	}
 
 	return r0
+}
+
+// GetAllAttributeNames provides a mock function with given fields: ctx
+func (_m *DataStore) GetAllAttributeNames(ctx context.Context) ([]string, error) {
+	ret := _m.Called(ctx)
+
+	var r0 []string
+	if rf, ok := ret.Get(0).(func(context.Context) []string); ok {
+		r0 = rf(ctx)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]string)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // GetDevice provides a mock function with given fields: ctx, id
@@ -112,9 +136,7 @@ func (_m *DataStore) GetDevices(ctx context.Context, q store.ListQuery) ([]model
 	if rf, ok := ret.Get(1).(func(context.Context, store.ListQuery) int); ok {
 		r1 = rf(ctx, q)
 	} else {
-		if ret.Get(1) != nil {
-			r1 = ret.Get(1).(int)
-		}
+		r1 = ret.Get(1).(int)
 	}
 
 	var r2 error
@@ -144,9 +166,7 @@ func (_m *DataStore) GetDevicesByGroup(ctx context.Context, group model.GroupNam
 	if rf, ok := ret.Get(1).(func(context.Context, model.GroupName, int, int) int); ok {
 		r1 = rf(ctx, group, skip, limit)
 	} else {
-		if ret.Get(1) != nil {
-			r1 = ret.Get(1).(int)
-		}
+		r1 = ret.Get(1).(int)
 	}
 
 	var r2 error
@@ -157,29 +177,6 @@ func (_m *DataStore) GetDevicesByGroup(ctx context.Context, group model.GroupNam
 	}
 
 	return r0, r1, r2
-}
-
-// ListGroups provides a mock function with given fields: ctx, group
-func (_m *DataStore) GetDeviceCountByGroup(ctx context.Context, group model.GroupName) (int, error) {
-	ret := _m.Called(ctx, group)
-
-	var r0 int
-	if rf, ok := ret.Get(0).(func(context.Context, model.GroupName) int); ok {
-		r0 = rf(ctx, group)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(int)
-		}
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, model.GroupName) error); ok {
-		r1 = rf(ctx, group)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
 }
 
 // ListGroups provides a mock function with given fields: ctx
