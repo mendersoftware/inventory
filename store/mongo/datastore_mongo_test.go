@@ -945,7 +945,8 @@ func TestMongoUpsertAttributes(t *testing.T) {
 
 		tenant string
 
-		outAttrs model.DeviceAttributes
+		outAttrs   model.DeviceAttributes
+		outIndexes []string
 	}{
 		"dev exists, attributes exist, update both attrs (descr + val)": {
 			devs: []model.Device{
@@ -987,6 +988,10 @@ func TestMongoUpsertAttributes(t *testing.T) {
 					Description: strPtr("sn description"),
 					Value:       "0003-newsn",
 				},
+			},
+			outIndexes: []string{
+				"attributes.mac.value",
+				"attributes.sn.value",
 			},
 		},
 		"dev exists, attributes exist, update both attrs (descr + val); with tenant": {
@@ -1030,6 +1035,10 @@ func TestMongoUpsertAttributes(t *testing.T) {
 					Value:       "0003-newsn",
 				},
 			},
+			outIndexes: []string{
+				"attributes.mac.value",
+				"attributes.sn.value",
+			},
 		},
 		"dev exists, attributes exist, update one attr (descr + val)": {
 			devs: []model.Device{
@@ -1067,6 +1076,10 @@ func TestMongoUpsertAttributes(t *testing.T) {
 					Description: strPtr("sn description"),
 					Value:       "0003-newsn",
 				},
+			},
+			outIndexes: []string{
+				"attributes.mac.value",
+				"attributes.sn.value",
 			},
 		},
 
@@ -1106,6 +1119,10 @@ func TestMongoUpsertAttributes(t *testing.T) {
 					Value:       "0003-sn",
 				},
 			},
+			outIndexes: []string{
+				"attributes.mac.value",
+				"attributes.sn.value",
+			},
 		},
 		"dev exists, attributes exist, update one attr (value only)": {
 			devs: []model.Device{
@@ -1142,6 +1159,10 @@ func TestMongoUpsertAttributes(t *testing.T) {
 					Description: strPtr("descr"),
 					Value:       "0003-newsn",
 				},
+			},
+			outIndexes: []string{
+				"attributes.mac.value",
+				"attributes.sn.value",
 			},
 		},
 		"dev exists, attributes exist, update one attr (value only, change type)": {
@@ -1180,6 +1201,10 @@ func TestMongoUpsertAttributes(t *testing.T) {
 					//[]interface{} instead of []string - otherwise DeepEquals fails where it really shouldn't
 					Value: []interface{}{"0003-sn-1", "0003-sn-2"},
 				},
+			},
+			outIndexes: []string{
+				"attributes.mac.value",
+				"attributes.sn.value",
 			},
 		},
 		"dev exists, attributes exist, add(merge) new attrs": {
@@ -1233,6 +1258,12 @@ func TestMongoUpsertAttributes(t *testing.T) {
 					Value:       "new-2-val",
 					Description: strPtr("foo"),
 				},
+			},
+			outIndexes: []string{
+				"attributes.mac.value",
+				"attributes.sn.value",
+				"attributes.new-1.value",
+				"attributes.new-2.value",
 			},
 		},
 		"dev exists, attributes exist, add(merge) new attrs + modify existing": {
@@ -1293,6 +1324,12 @@ func TestMongoUpsertAttributes(t *testing.T) {
 					Description: strPtr("foo"),
 				},
 			},
+			outIndexes: []string{
+				"attributes.mac.value",
+				"attributes.sn.value",
+				"attributes.new-1.value",
+				"attributes.new-2.value",
+			},
 		},
 		"dev exists, no attributes exist, upsert new attrs (val + descr)": {
 			devs: []model.Device{
@@ -1323,6 +1360,10 @@ func TestMongoUpsertAttributes(t *testing.T) {
 					Description: strPtr("mac addr"),
 				},
 			},
+			outIndexes: []string{
+				"attributes.mac.value",
+				"attributes.ip.value",
+			},
 		},
 		"dev doesn't exist, upsert new attr (descr + val)": {
 			devs:    []model.Device{},
@@ -1340,6 +1381,9 @@ func TestMongoUpsertAttributes(t *testing.T) {
 					Value:       []interface{}{"1.2.3.4", "1.2.3.5"},
 				},
 			},
+			outIndexes: []string{
+				"attributes.ip.value",
+			},
 		},
 		"dev doesn't exist, upsert new attr (val only)": {
 			devs:    []model.Device{},
@@ -1354,6 +1398,9 @@ func TestMongoUpsertAttributes(t *testing.T) {
 				"ip": {
 					Value: []interface{}{"1.2.3.4", "1.2.3.5"},
 				},
+			},
+			outIndexes: []string{
+				"attributes.ip.value",
 			},
 		},
 		"dev doesn't exist, upsert with new attrs (val + descr)": {
@@ -1379,6 +1426,10 @@ func TestMongoUpsertAttributes(t *testing.T) {
 					Description: strPtr("mac addr"),
 				},
 			},
+			outIndexes: []string{
+				"attributes.ip.value",
+				"attributes.mac.value",
+			},
 		},
 	}
 
@@ -1403,9 +1454,11 @@ func TestMongoUpsertAttributes(t *testing.T) {
 		}
 
 		//test
-		d := NewDataStoreMongoWithSession(s)
+		d := NewDataStoreMongoWithSession(s).WithAutomigrate()
+		err := d.Migrate(ctx, DbVersion)
+		assert.NoError(t, err, "Migrate failed")
 
-		err := d.UpsertAttributes(ctx, tc.inDevId, tc.inAttrs)
+		err = d.UpsertAttributes(ctx, tc.inDevId, tc.inAttrs)
 		assert.NoError(t, err, "UpsertAttributes failed")
 
 		//get the device back
@@ -1424,6 +1477,21 @@ func TestMongoUpsertAttributes(t *testing.T) {
 				return dev.UpdatedTs.After(dev.CreatedTs) ||
 					dev.UpdatedTs.Unix() == dev.CreatedTs.Unix()
 			})
+
+		//check indexes
+		indexes, err := s.
+			DB(mstore.DbFromContext(ctx, DbName)).
+			C(DbDevicesColl).
+			Indexes()
+		assert.Equal(t, len(indexes), len(tc.outIndexes)+1)
+
+		for _, inIdx := range tc.outIndexes {
+			idx := sort.Search(len(indexes), func(i int) bool {
+				return string(indexes[i].Name) == inIdx
+			})
+			assert.Greater(t, idx, -1)
+		}
+
 		s.Close()
 	}
 
