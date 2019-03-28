@@ -28,8 +28,6 @@ import (
 	"github.com/mendersoftware/inventory/store"
 	. "github.com/mendersoftware/inventory/store/mongo"
 
-	"unsafe"
-
 	"github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
 	mstore "github.com/mendersoftware/go-lib-micro/store"
@@ -2709,5 +2707,5 @@ func TestWithAutomigrate(t *testing.T) {
 
 	newStore := store.WithAutomigrate()
 
-	assert.NotEqual(t, unsafe.Pointer(store), unsafe.Pointer(newStore))
+	assert.NotEqual(t, store, newStore)
 }

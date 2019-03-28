@@ -11,7 +11,6 @@
 //    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
-
 package mocks
 
 import context "context"
@@ -202,6 +201,34 @@ func (_m *DataStore) ListGroups(ctx context.Context) ([]model.GroupName, error) 
 	return r0, r1
 }
 
+// Migrate provides a mock function with given fields: ctx, version
+func (_m *DataStore) Migrate(ctx context.Context, version string) error {
+	ret := _m.Called(ctx, version)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) error); ok {
+		r0 = rf(ctx, version)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MigrateTenant provides a mock function with given fields: ctx, version, tenantId
+func (_m *DataStore) MigrateTenant(ctx context.Context, version string, tenantId string) error {
+	ret := _m.Called(ctx, version, tenantId)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
+		r0 = rf(ctx, version, tenantId)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // UnsetDeviceGroup provides a mock function with given fields: ctx, id, groupName
 func (_m *DataStore) UnsetDeviceGroup(ctx context.Context, id model.DeviceID, groupName model.GroupName) error {
 	ret := _m.Called(ctx, id, groupName)
@@ -239,6 +266,22 @@ func (_m *DataStore) UpsertAttributes(ctx context.Context, id model.DeviceID, at
 		r0 = rf(ctx, id, attrs)
 	} else {
 		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// WithAutomigrate provides a mock function with given fields:
+func (_m *DataStore) WithAutomigrate() store.DataStore {
+	ret := _m.Called()
+
+	var r0 store.DataStore
+	if rf, ok := ret.Get(0).(func() store.DataStore); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(store.DataStore)
+		}
 	}
 
 	return r0

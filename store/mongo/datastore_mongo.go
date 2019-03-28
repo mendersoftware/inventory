@@ -74,11 +74,11 @@ type DataStoreMongo struct {
 	automigrate bool
 }
 
-func NewDataStoreMongoWithSession(session *mgo.Session) *DataStoreMongo {
+func NewDataStoreMongoWithSession(session *mgo.Session) store.DataStore {
 	return &DataStoreMongo{session: session}
 }
 
-func NewDataStoreMongo(config DataStoreMongoConfig) (*DataStoreMongo, error) {
+func NewDataStoreMongo(config DataStoreMongoConfig) (store.DataStore, error) {
 	//init master session
 	var err error
 	once.Do(func() {
@@ -599,7 +599,7 @@ func (db *DataStoreMongo) Migrate(ctx context.Context, version string) error {
 
 // WithAutomigrate enables automatic migration and returns a new datastore based
 // on current one
-func (db *DataStoreMongo) WithAutomigrate() *DataStoreMongo {
+func (db *DataStoreMongo) WithAutomigrate() store.DataStore {
 	return &DataStoreMongo{
 		session:     db.session,
 		automigrate: true,

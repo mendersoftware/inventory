@@ -50,7 +50,7 @@ func RunServer(c config.Reader) error {
 		return errors.Wrap(err, "database connection failed")
 	}
 
-	inv := inventory.NewInventory(db, mongo.NewTenantStoreMongo(db))
+	inv := inventory.NewInventory(db)
 
 	invapi := api_http.NewInventoryApiHandlers(inv)
 
