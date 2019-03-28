@@ -467,6 +467,53 @@ func (db *DataStoreMongo) DeleteDevice(ctx context.Context, id model.DeviceID) e
 	return nil
 }
 
+func (db *DataStoreMongo) GetAllAttributeNames(ctx context.Context) ([]string, error) {
+	s := db.session.Copy()
+	defer s.Close()
+
+	project := bson.M{
+		"$project": bson.M{
+			"arrayofkeyvalue": bson.M{
+				"$objectToArray": "$$ROOT.attributes",
+			},
+		},
+	}
+
+	unwind := bson.M{
+		"$unwind": "$arrayofkeyvalue",
+	}
+
+	group := bson.M{
+		"$group": bson.M{
+			"_id": nil,
+			"allkeys": bson.M{
+				"$addToSet": "$arrayofkeyvalue.k",
+			},
+		},
+	}
+
+	c := s.DB(mstore.DbFromContext(ctx, DbName)).C(DbDevicesColl)
+	pipe := c.Pipe([]bson.M{
+		project,
+		unwind,
+		group,
+	})
+
+	type Res struct {
+		AllKeys []string `bson:"allkeys"`
+	}
+
+	var res Res
+
+	err := pipe.One(&res)
+	switch err {
+	case nil, mgo.ErrNotFound:
+		return res.AllKeys, nil
+	default:
+		return nil, errors.Wrap(err, "failed to get attributes")
+	}
+}
+
 func (db *DataStoreMongo) MigrateTenant(ctx context.Context, version string, tenant string) error {
 	ver, err := migrate.NewVersion(version)
 	if err != nil {

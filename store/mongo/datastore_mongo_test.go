@@ -487,6 +487,117 @@ func TestMongoGetDevices(t *testing.T) {
 	}
 }
 
+func TestMongoGetAllAttributeNames(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping TestMongoGetAllAttributeNames in short mode.")
+	}
+
+	testCases := map[string]struct {
+		inDevs []model.Device
+		tenant string
+
+		outAttrs []string
+	}{
+		"single dev": {
+			inDevs: []model.Device{
+				{
+					ID: model.DeviceID("1"),
+					Attributes: map[string]model.DeviceAttribute{
+						"mac": {Name: "mac", Value: "foo", Description: strPtr("desc")},
+						"sn":  {Name: "sn", Value: "bar", Description: strPtr("desc")},
+					},
+				},
+			},
+			outAttrs: []string{"mac", "sn"},
+		},
+		"two devs, non-overlapping attrs": {
+			inDevs: []model.Device{
+				{
+					ID: model.DeviceID("1"),
+					Attributes: map[string]model.DeviceAttribute{
+						"mac": {Name: "mac", Value: "foo", Description: strPtr("desc")},
+						"sn":  {Name: "sn", Value: "bar", Description: strPtr("desc")},
+					},
+				},
+				{
+					ID: model.DeviceID("2"),
+					Attributes: map[string]model.DeviceAttribute{
+						"foo": {Name: "foo", Value: "foo", Description: strPtr("desc")},
+						"bar": {Name: "bar", Value: "bar", Description: strPtr("desc")},
+					},
+				},
+			},
+			outAttrs: []string{"mac", "sn", "foo", "bar"},
+		},
+		"two devs, overlapping attrs": {
+			inDevs: []model.Device{
+				{
+					ID: model.DeviceID("1"),
+					Attributes: map[string]model.DeviceAttribute{
+						"mac": {Name: "mac", Value: "foo", Description: strPtr("desc")},
+						"sn":  {Name: "sn", Value: "bar", Description: strPtr("desc")},
+					},
+				},
+				{
+					ID: model.DeviceID("2"),
+					Attributes: map[string]model.DeviceAttribute{
+						"mac": {Name: "mac", Value: "foo", Description: strPtr("desc")},
+						"foo": {Name: "foo", Value: "foo", Description: strPtr("desc")},
+						"bar": {Name: "bar", Value: "bar", Description: strPtr("desc")},
+					},
+				},
+			},
+			outAttrs: []string{"mac", "sn", "foo", "bar"},
+		},
+		"single dev, tenant": {
+			inDevs: []model.Device{
+				{
+					ID: model.DeviceID("1"),
+					Attributes: map[string]model.DeviceAttribute{
+						"mac": {Name: "mac", Value: "foo", Description: strPtr("desc")},
+						"sn":  {Name: "sn", Value: "bar", Description: strPtr("desc")},
+					},
+				},
+			},
+			outAttrs: []string{"mac", "sn"},
+			tenant:   "tenant1",
+		},
+		"no devs": {
+			outAttrs: []string{},
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Logf("test case: %s", name)
+
+		// Make sure we start test with empty database
+		db.Wipe()
+
+		session := db.Session()
+
+		ctx := context.Background()
+		if tc.tenant != "" {
+			ctx = identity.WithContext(ctx, &identity.Identity{
+				Tenant: tc.tenant,
+			})
+		}
+
+		for _, d := range tc.inDevs {
+			err := session.DB(mstore.DbFromContext(ctx, DbName)).C(DbDevicesColl).Insert(d)
+			assert.NoError(t, err, "failed to setup input data")
+		}
+
+		mongoStore := NewDataStoreMongoWithSession(session)
+
+		//test
+		names, err := mongoStore.GetAllAttributeNames(ctx)
+		assert.NoError(t, err, "failed to get devices")
+
+		assert.ElementsMatch(t, tc.outAttrs, names)
+
+		session.Close()
+	}
+}
 func TestMongoGetDevice(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping TestMongoGetDevice in short mode.")

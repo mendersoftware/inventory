@@ -64,6 +64,9 @@ type DataStore interface {
 
 	// Get device's group
 	GetDeviceGroup(ctx context.Context, id model.DeviceID) (model.GroupName, error)
+
+	// Scan all devices in collection, grab all (unique) attribute names
+	GetAllAttributeNames(ctx context.Context) ([]string, error)
 }
 
 // TenantDataKeeper is an interface for executing administrative operations on
