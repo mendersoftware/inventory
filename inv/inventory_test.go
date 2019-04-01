@@ -605,7 +605,7 @@ func TestInventoryDeleteDevice(t *testing.T) {
 func TestNewInventory(t *testing.T) {
 	t.Parallel()
 
-	i := NewInventory(&mstore.DataStore{}, nil)
+	i := NewInventory(&mstore.DataStore{})
 
 	assert.NotNil(t, i)
 }
@@ -636,10 +636,11 @@ func TestUserAdmCreateTenant(t *testing.T) {
 
 			ctx := context.Background()
 
-			tenantDb := &mstore.TenantDataKeeper{}
-			tenantDb.On("MigrateTenant", ctx, tc.tenant).Return(tc.tenantErr)
+			tenantDb := &mstore.DataStore{}
+			tenantDb.On("MigrateTenant", ctx, "0.2.0", tc.tenant).Return(tc.tenantErr)
+			tenantDb.On("WithAutomigrate").Return(tenantDb)
 
-			useradm := NewInventory(nil, tenantDb)
+			useradm := NewInventory(tenantDb)
 
 			err := useradm.CreateTenant(ctx, model.NewTenant{ID: tc.tenant})
 			if tc.err != nil {

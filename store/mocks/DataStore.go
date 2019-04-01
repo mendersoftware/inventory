@@ -51,6 +51,29 @@ func (_m *DataStore) DeleteDevice(ctx context.Context, id model.DeviceID) error 
 	return r0
 }
 
+// GetAllAttributeNames provides a mock function with given fields: ctx
+func (_m *DataStore) GetAllAttributeNames(ctx context.Context) ([]string, error) {
+	ret := _m.Called(ctx)
+
+	var r0 []string
+	if rf, ok := ret.Get(0).(func(context.Context) []string); ok {
+		r0 = rf(ctx)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]string)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetDevice provides a mock function with given fields: ctx, id
 func (_m *DataStore) GetDevice(ctx context.Context, id model.DeviceID) (*model.Device, error) {
 	ret := _m.Called(ctx, id)
@@ -112,9 +135,7 @@ func (_m *DataStore) GetDevices(ctx context.Context, q store.ListQuery) ([]model
 	if rf, ok := ret.Get(1).(func(context.Context, store.ListQuery) int); ok {
 		r1 = rf(ctx, q)
 	} else {
-		if ret.Get(1) != nil {
-			r1 = ret.Get(1).(int)
-		}
+		r1 = ret.Get(1).(int)
 	}
 
 	var r2 error
@@ -144,9 +165,7 @@ func (_m *DataStore) GetDevicesByGroup(ctx context.Context, group model.GroupNam
 	if rf, ok := ret.Get(1).(func(context.Context, model.GroupName, int, int) int); ok {
 		r1 = rf(ctx, group, skip, limit)
 	} else {
-		if ret.Get(1) != nil {
-			r1 = ret.Get(1).(int)
-		}
+		r1 = ret.Get(1).(int)
 	}
 
 	var r2 error
@@ -157,29 +176,6 @@ func (_m *DataStore) GetDevicesByGroup(ctx context.Context, group model.GroupNam
 	}
 
 	return r0, r1, r2
-}
-
-// ListGroups provides a mock function with given fields: ctx, group
-func (_m *DataStore) GetDeviceCountByGroup(ctx context.Context, group model.GroupName) (int, error) {
-	ret := _m.Called(ctx, group)
-
-	var r0 int
-	if rf, ok := ret.Get(0).(func(context.Context, model.GroupName) int); ok {
-		r0 = rf(ctx, group)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(int)
-		}
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, model.GroupName) error); ok {
-		r1 = rf(ctx, group)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
 }
 
 // ListGroups provides a mock function with given fields: ctx
@@ -203,6 +199,34 @@ func (_m *DataStore) ListGroups(ctx context.Context) ([]model.GroupName, error) 
 	}
 
 	return r0, r1
+}
+
+// Migrate provides a mock function with given fields: ctx, version
+func (_m *DataStore) Migrate(ctx context.Context, version string) error {
+	ret := _m.Called(ctx, version)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) error); ok {
+		r0 = rf(ctx, version)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MigrateTenant provides a mock function with given fields: ctx, version, tenantId
+func (_m *DataStore) MigrateTenant(ctx context.Context, version string, tenantId string) error {
+	ret := _m.Called(ctx, version, tenantId)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
+		r0 = rf(ctx, version, tenantId)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
 }
 
 // UnsetDeviceGroup provides a mock function with given fields: ctx, id, groupName
@@ -242,6 +266,22 @@ func (_m *DataStore) UpsertAttributes(ctx context.Context, id model.DeviceID, at
 		r0 = rf(ctx, id, attrs)
 	} else {
 		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// WithAutomigrate provides a mock function with given fields:
+func (_m *DataStore) WithAutomigrate() store.DataStore {
+	ret := _m.Called()
+
+	var r0 store.DataStore
+	if rf, ok := ret.Get(0).(func() store.DataStore); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(store.DataStore)
+		}
 	}
 
 	return r0

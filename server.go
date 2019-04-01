@@ -1,4 +1,4 @@
-// Copyright 2017 Northern.tech AS
+// Copyright 2019 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -50,7 +50,7 @@ func RunServer(c config.Reader) error {
 		return errors.Wrap(err, "database connection failed")
 	}
 
-	inv := inventory.NewInventory(db, mongo.NewTenantStoreMongo(db))
+	inv := inventory.NewInventory(db)
 
 	invapi := api_http.NewInventoryApiHandlers(inv)
 

@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# Copyright 2017 Mender Software AS
+# Copyright 2019 Mender Software AS
 #
 #    Licensed under the Apache License, Version 2.0 (the "License");
 #    you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@ from common import cli, mongo, clean_db
 
 DB_NAME = "inventory"
 MIGRATION_COLLECTION = "migration_info"
-DB_VERSION = "0.1.0"
+DB_VERSION = "0.2.0"
 
 class TestMigration:
     @staticmethod

@@ -21,6 +21,7 @@ import (
 
 	"github.com/mendersoftware/inventory/model"
 	"github.com/mendersoftware/inventory/store"
+	"github.com/mendersoftware/inventory/store/mongo"
 )
 
 // this inventory service interface
@@ -39,13 +40,11 @@ type InventoryApp interface {
 }
 
 type inventory struct {
-	db           store.DataStore
-	tenantKeeper store.TenantDataKeeper
+	db store.DataStore
 }
 
-func NewInventory(d store.DataStore, tenantKeeper store.TenantDataKeeper,
-) InventoryApp {
-	return &inventory{db: d, tenantKeeper: tenantKeeper}
+func NewInventory(d store.DataStore) InventoryApp {
+	return &inventory{db: d}
 }
 
 func (i *inventory) ListDevices(ctx context.Context, q store.ListQuery) ([]model.Device, int, error) {
@@ -158,7 +157,8 @@ func (i *inventory) GetDeviceGroup(ctx context.Context, id model.DeviceID) (mode
 }
 
 func (i *inventory) CreateTenant(ctx context.Context, tenant model.NewTenant) error {
-	if err := i.tenantKeeper.MigrateTenant(ctx, tenant.ID); err != nil {
+	if err := i.db.WithAutomigrate().
+		MigrateTenant(ctx, mongo.DbVersion, tenant.ID); err != nil {
 		return errors.Wrapf(err, "failed to apply migrations for tenant %v", tenant.ID)
 	}
 	return nil

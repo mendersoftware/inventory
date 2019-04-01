@@ -64,11 +64,13 @@ type DataStore interface {
 
 	// Get device's group
 	GetDeviceGroup(ctx context.Context, id model.DeviceID) (model.GroupName, error)
-}
 
-// TenantDataKeeper is an interface for executing administrative operations on
-// tenants
-type TenantDataKeeper interface {
-	// MigrateTenant migrates given tenant to the latest DB version
-	MigrateTenant(ctx context.Context, id string) error
+	// Scan all devices in collection, grab all (unique) attribute names
+	GetAllAttributeNames(ctx context.Context) ([]string, error)
+
+	MigrateTenant(ctx context.Context, version string, tenantId string) error
+
+	Migrate(ctx context.Context, version string) error
+
+	WithAutomigrate() DataStore
 }

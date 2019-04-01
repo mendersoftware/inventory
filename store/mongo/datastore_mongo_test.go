@@ -17,6 +17,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"sort"
 	"testing"
 	"time"
 
@@ -27,11 +28,10 @@ import (
 	"github.com/mendersoftware/inventory/store"
 	. "github.com/mendersoftware/inventory/store/mongo"
 
-	"unsafe"
-
 	"github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
 	mstore "github.com/mendersoftware/go-lib-micro/store"
+	"github.com/pkg/errors"
 )
 
 // test funcs
@@ -487,6 +487,117 @@ func TestMongoGetDevices(t *testing.T) {
 	}
 }
 
+func TestMongoGetAllAttributeNames(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping TestMongoGetAllAttributeNames in short mode.")
+	}
+
+	testCases := map[string]struct {
+		inDevs []model.Device
+		tenant string
+
+		outAttrs []string
+	}{
+		"single dev": {
+			inDevs: []model.Device{
+				{
+					ID: model.DeviceID("1"),
+					Attributes: map[string]model.DeviceAttribute{
+						"mac": {Name: "mac", Value: "foo", Description: strPtr("desc")},
+						"sn":  {Name: "sn", Value: "bar", Description: strPtr("desc")},
+					},
+				},
+			},
+			outAttrs: []string{"mac", "sn"},
+		},
+		"two devs, non-overlapping attrs": {
+			inDevs: []model.Device{
+				{
+					ID: model.DeviceID("1"),
+					Attributes: map[string]model.DeviceAttribute{
+						"mac": {Name: "mac", Value: "foo", Description: strPtr("desc")},
+						"sn":  {Name: "sn", Value: "bar", Description: strPtr("desc")},
+					},
+				},
+				{
+					ID: model.DeviceID("2"),
+					Attributes: map[string]model.DeviceAttribute{
+						"foo": {Name: "foo", Value: "foo", Description: strPtr("desc")},
+						"bar": {Name: "bar", Value: "bar", Description: strPtr("desc")},
+					},
+				},
+			},
+			outAttrs: []string{"mac", "sn", "foo", "bar"},
+		},
+		"two devs, overlapping attrs": {
+			inDevs: []model.Device{
+				{
+					ID: model.DeviceID("1"),
+					Attributes: map[string]model.DeviceAttribute{
+						"mac": {Name: "mac", Value: "foo", Description: strPtr("desc")},
+						"sn":  {Name: "sn", Value: "bar", Description: strPtr("desc")},
+					},
+				},
+				{
+					ID: model.DeviceID("2"),
+					Attributes: map[string]model.DeviceAttribute{
+						"mac": {Name: "mac", Value: "foo", Description: strPtr("desc")},
+						"foo": {Name: "foo", Value: "foo", Description: strPtr("desc")},
+						"bar": {Name: "bar", Value: "bar", Description: strPtr("desc")},
+					},
+				},
+			},
+			outAttrs: []string{"mac", "sn", "foo", "bar"},
+		},
+		"single dev, tenant": {
+			inDevs: []model.Device{
+				{
+					ID: model.DeviceID("1"),
+					Attributes: map[string]model.DeviceAttribute{
+						"mac": {Name: "mac", Value: "foo", Description: strPtr("desc")},
+						"sn":  {Name: "sn", Value: "bar", Description: strPtr("desc")},
+					},
+				},
+			},
+			outAttrs: []string{"mac", "sn"},
+			tenant:   "tenant1",
+		},
+		"no devs": {
+			outAttrs: []string{},
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Logf("test case: %s", name)
+
+		// Make sure we start test with empty database
+		db.Wipe()
+
+		session := db.Session()
+
+		ctx := context.Background()
+		if tc.tenant != "" {
+			ctx = identity.WithContext(ctx, &identity.Identity{
+				Tenant: tc.tenant,
+			})
+		}
+
+		for _, d := range tc.inDevs {
+			err := session.DB(mstore.DbFromContext(ctx, DbName)).C(DbDevicesColl).Insert(d)
+			assert.NoError(t, err, "failed to setup input data")
+		}
+
+		mongoStore := NewDataStoreMongoWithSession(session)
+
+		//test
+		names, err := mongoStore.GetAllAttributeNames(ctx)
+		assert.NoError(t, err, "failed to get devices")
+
+		assert.ElementsMatch(t, tc.outAttrs, names)
+
+		session.Close()
+	}
+}
 func TestMongoGetDevice(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping TestMongoGetDevice in short mode.")
@@ -593,6 +704,7 @@ func TestMongoAddDevice(t *testing.T) {
 		OutputDevice *model.Device
 		tenant       string
 		OutputError  error
+		outIndexes   []string
 	}{
 		"valid device with one attribute, no error": {
 			InputDevice: &model.Device{
@@ -608,6 +720,10 @@ func TestMongoAddDevice(t *testing.T) {
 				},
 			},
 			OutputError: nil,
+			outIndexes: []string{
+				"attributes.mac.value",
+				"attributes.sn.value",
+			},
 		},
 		"valid device with one attribute, no error; with tenant": {
 			InputDevice: &model.Device{
@@ -624,6 +740,10 @@ func TestMongoAddDevice(t *testing.T) {
 			},
 			tenant:      "foo",
 			OutputError: nil,
+			outIndexes: []string{
+				"attributes.mac.value",
+				"attributes.sn.value",
+			},
 		},
 		"valid device with two attributes, no error": {
 			InputDevice: &model.Device{
@@ -641,6 +761,10 @@ func TestMongoAddDevice(t *testing.T) {
 				},
 			},
 			OutputError: nil,
+			outIndexes: []string{
+				"attributes.mac.value",
+				"attributes.sn.value",
+			},
 		},
 		"valid device with attribute without value, no error": {
 			InputDevice: &model.Device{
@@ -656,6 +780,10 @@ func TestMongoAddDevice(t *testing.T) {
 				},
 			},
 			OutputError: nil,
+			outIndexes: []string{
+				"attributes.mac.value",
+				"attributes.sn.value",
+			},
 		},
 		"valid device with array in attribute value, no error": {
 			InputDevice: &model.Device{
@@ -671,21 +799,32 @@ func TestMongoAddDevice(t *testing.T) {
 				},
 			},
 			OutputError: nil,
+			outIndexes: []string{
+				"attributes.mac.value",
+				"attributes.sn.value",
+			},
 		},
 		"valid device without attributes, no error": {
 			InputDevice: &model.Device{
 				ID: model.DeviceID("0007"),
 				Attributes: model.DeviceAttributes{
-					"mac": {Name: "mac"},
+					"mac": {Name: "mac", Value: "asdf"},
+					"foo": {Name: "foo", Value: "asdf"},
 				},
 			},
 			OutputDevice: &model.Device{
 				ID: model.DeviceID("0007"),
 				Attributes: model.DeviceAttributes{
-					"mac": {Name: "mac"},
+					"mac": {Name: "mac", Value: "asdf"},
+					"foo": {Name: "foo", Value: "asdf"},
 				},
 			},
 			OutputError: nil,
+			outIndexes: []string{
+				"attributes.mac.value",
+				"attributes.sn.value",
+				"attributes.foo.value",
+			},
 		},
 		"valid device with upsert, all attrs updated, no error": {
 			InputDevice: &model.Device{
@@ -703,6 +842,10 @@ func TestMongoAddDevice(t *testing.T) {
 				},
 			},
 			OutputError: nil,
+			outIndexes: []string{
+				"attributes.mac.value",
+				"attributes.sn.value",
+			},
 		},
 		"valid device with upsert, one attr updated, no error": {
 			InputDevice: &model.Device{
@@ -719,6 +862,10 @@ func TestMongoAddDevice(t *testing.T) {
 				},
 			},
 			OutputError: nil,
+			outIndexes: []string{
+				"attributes.mac.value",
+				"attributes.sn.value",
+			},
 		},
 		"valid device with upsert, no attrs updated, new upserted, no error": {
 			InputDevice: &model.Device{
@@ -736,6 +883,11 @@ func TestMongoAddDevice(t *testing.T) {
 				},
 			},
 			OutputError: nil,
+			outIndexes: []string{
+				"attributes.mac.value",
+				"attributes.sn.value",
+				"attributes.other-param.value",
+			},
 		},
 		"valid device with upsert, no attrs updated, many new upserted, no error": {
 			InputDevice: &model.Device{
@@ -755,6 +907,12 @@ func TestMongoAddDevice(t *testing.T) {
 				},
 			},
 			OutputError: nil,
+			outIndexes: []string{
+				"attributes.mac.value",
+				"attributes.sn.value",
+				"attributes.other-param.value",
+				"attributes.other-param-2.value",
+			},
 		},
 	}
 
@@ -764,9 +922,6 @@ func TestMongoAddDevice(t *testing.T) {
 		// Make sure we start test with empty database
 		db.Wipe()
 
-		session := db.Session()
-		store := NewDataStoreMongoWithSession(session)
-
 		ctx := context.Background()
 		if testCase.tenant != "" {
 			ctx = identity.WithContext(ctx, &identity.Identity{
@@ -774,9 +929,15 @@ func TestMongoAddDevice(t *testing.T) {
 			})
 		}
 
+		session := db.Session()
+		store := NewDataStoreMongoWithSession(session).WithAutomigrate()
+
 		c := session.DB(mstore.DbFromContext(ctx, DbName)).C(DbDevicesColl)
 		err := c.Insert(existing...)
 		assert.NoError(t, err)
+
+		err = store.Migrate(ctx, DbVersion)
+		assert.NoError(t, err, "Migrate failed")
 
 		err = store.AddDevice(ctx, testCase.InputDevice)
 
@@ -792,6 +953,21 @@ func TestMongoAddDevice(t *testing.T) {
 			assert.NoError(t, err, "expected no error")
 
 			compareDevsWithoutTimestamps(t, testCase.OutputDevice, dbdev)
+
+			//check indexes
+			indexes, err := session.
+				DB(mstore.DbFromContext(ctx, DbName)).
+				C(DbDevicesColl).
+				Indexes()
+			assert.Equal(t, len(indexes), len(testCase.outIndexes)+1)
+
+			for _, inIdx := range testCase.outIndexes {
+				idx := sort.Search(len(indexes), func(i int) bool {
+					return string(indexes[i].Name) == inIdx
+				})
+				assert.Greater(t, idx, -1)
+			}
+
 		}
 
 		// Need to close all sessions to be able to call wipe at next test case
@@ -832,7 +1008,8 @@ func TestMongoUpsertAttributes(t *testing.T) {
 
 		tenant string
 
-		outAttrs model.DeviceAttributes
+		outAttrs   model.DeviceAttributes
+		outIndexes []string
 	}{
 		"dev exists, attributes exist, update both attrs (descr + val)": {
 			devs: []model.Device{
@@ -874,6 +1051,10 @@ func TestMongoUpsertAttributes(t *testing.T) {
 					Description: strPtr("sn description"),
 					Value:       "0003-newsn",
 				},
+			},
+			outIndexes: []string{
+				"attributes.mac.value",
+				"attributes.sn.value",
 			},
 		},
 		"dev exists, attributes exist, update both attrs (descr + val); with tenant": {
@@ -917,6 +1098,10 @@ func TestMongoUpsertAttributes(t *testing.T) {
 					Value:       "0003-newsn",
 				},
 			},
+			outIndexes: []string{
+				"attributes.mac.value",
+				"attributes.sn.value",
+			},
 		},
 		"dev exists, attributes exist, update one attr (descr + val)": {
 			devs: []model.Device{
@@ -954,6 +1139,10 @@ func TestMongoUpsertAttributes(t *testing.T) {
 					Description: strPtr("sn description"),
 					Value:       "0003-newsn",
 				},
+			},
+			outIndexes: []string{
+				"attributes.mac.value",
+				"attributes.sn.value",
 			},
 		},
 
@@ -993,6 +1182,10 @@ func TestMongoUpsertAttributes(t *testing.T) {
 					Value:       "0003-sn",
 				},
 			},
+			outIndexes: []string{
+				"attributes.mac.value",
+				"attributes.sn.value",
+			},
 		},
 		"dev exists, attributes exist, update one attr (value only)": {
 			devs: []model.Device{
@@ -1029,6 +1222,10 @@ func TestMongoUpsertAttributes(t *testing.T) {
 					Description: strPtr("descr"),
 					Value:       "0003-newsn",
 				},
+			},
+			outIndexes: []string{
+				"attributes.mac.value",
+				"attributes.sn.value",
 			},
 		},
 		"dev exists, attributes exist, update one attr (value only, change type)": {
@@ -1067,6 +1264,10 @@ func TestMongoUpsertAttributes(t *testing.T) {
 					//[]interface{} instead of []string - otherwise DeepEquals fails where it really shouldn't
 					Value: []interface{}{"0003-sn-1", "0003-sn-2"},
 				},
+			},
+			outIndexes: []string{
+				"attributes.mac.value",
+				"attributes.sn.value",
 			},
 		},
 		"dev exists, attributes exist, add(merge) new attrs": {
@@ -1120,6 +1321,12 @@ func TestMongoUpsertAttributes(t *testing.T) {
 					Value:       "new-2-val",
 					Description: strPtr("foo"),
 				},
+			},
+			outIndexes: []string{
+				"attributes.mac.value",
+				"attributes.sn.value",
+				"attributes.new-1.value",
+				"attributes.new-2.value",
 			},
 		},
 		"dev exists, attributes exist, add(merge) new attrs + modify existing": {
@@ -1180,6 +1387,12 @@ func TestMongoUpsertAttributes(t *testing.T) {
 					Description: strPtr("foo"),
 				},
 			},
+			outIndexes: []string{
+				"attributes.mac.value",
+				"attributes.sn.value",
+				"attributes.new-1.value",
+				"attributes.new-2.value",
+			},
 		},
 		"dev exists, no attributes exist, upsert new attrs (val + descr)": {
 			devs: []model.Device{
@@ -1210,6 +1423,10 @@ func TestMongoUpsertAttributes(t *testing.T) {
 					Description: strPtr("mac addr"),
 				},
 			},
+			outIndexes: []string{
+				"attributes.mac.value",
+				"attributes.ip.value",
+			},
 		},
 		"dev doesn't exist, upsert new attr (descr + val)": {
 			devs:    []model.Device{},
@@ -1227,6 +1444,9 @@ func TestMongoUpsertAttributes(t *testing.T) {
 					Value:       []interface{}{"1.2.3.4", "1.2.3.5"},
 				},
 			},
+			outIndexes: []string{
+				"attributes.ip.value",
+			},
 		},
 		"dev doesn't exist, upsert new attr (val only)": {
 			devs:    []model.Device{},
@@ -1241,6 +1461,9 @@ func TestMongoUpsertAttributes(t *testing.T) {
 				"ip": {
 					Value: []interface{}{"1.2.3.4", "1.2.3.5"},
 				},
+			},
+			outIndexes: []string{
+				"attributes.ip.value",
 			},
 		},
 		"dev doesn't exist, upsert with new attrs (val + descr)": {
@@ -1266,6 +1489,10 @@ func TestMongoUpsertAttributes(t *testing.T) {
 					Description: strPtr("mac addr"),
 				},
 			},
+			outIndexes: []string{
+				"attributes.ip.value",
+				"attributes.mac.value",
+			},
 		},
 	}
 
@@ -1290,9 +1517,11 @@ func TestMongoUpsertAttributes(t *testing.T) {
 		}
 
 		//test
-		d := NewDataStoreMongoWithSession(s)
+		d := NewDataStoreMongoWithSession(s).WithAutomigrate()
+		err := d.Migrate(ctx, DbVersion)
+		assert.NoError(t, err, "Migrate failed")
 
-		err := d.UpsertAttributes(ctx, tc.inDevId, tc.inAttrs)
+		err = d.UpsertAttributes(ctx, tc.inDevId, tc.inAttrs)
 		assert.NoError(t, err, "UpsertAttributes failed")
 
 		//get the device back
@@ -1311,6 +1540,21 @@ func TestMongoUpsertAttributes(t *testing.T) {
 				return dev.UpdatedTs.After(dev.CreatedTs) ||
 					dev.UpdatedTs.Unix() == dev.CreatedTs.Unix()
 			})
+
+		//check indexes
+		indexes, err := s.
+			DB(mstore.DbFromContext(ctx, DbName)).
+			C(DbDevicesColl).
+			Indexes()
+		assert.Equal(t, len(indexes), len(tc.outIndexes)+1)
+
+		for _, inIdx := range tc.outIndexes {
+			idx := sort.Search(len(indexes), func(i int) bool {
+				return string(indexes[i].Name) == inIdx
+			})
+			assert.Greater(t, idx, -1)
+		}
+
 		s.Close()
 	}
 
@@ -2148,36 +2392,155 @@ func TestMigrate(t *testing.T) {
 		t.Skip("skipping TestMigrate in short mode.")
 	}
 
+	someDevs := []model.Device{
+		{
+			ID: model.DeviceID("0"),
+			Attributes: map[string]model.DeviceAttribute{
+				"mac": {Name: "mac", Value: "foo", Description: strPtr("desc")},
+				"sn":  {Name: "sn", Value: "bar", Description: strPtr("desc")},
+			},
+		},
+		{
+			ID: model.DeviceID("1"),
+			Attributes: map[string]model.DeviceAttribute{
+				"mac": {Name: "mac", Value: "foo", Description: strPtr("desc")},
+				"foo": {Name: "foo", Value: "foo", Description: strPtr("desc")},
+				"bar": {Name: "bar", Value: "bar", Description: strPtr("desc")},
+			},
+		},
+		{
+			ID: model.DeviceID("2"),
+			Attributes: map[string]model.DeviceAttribute{
+				"baz": {Name: "baz", Value: "baz", Description: strPtr("desc")},
+			},
+		},
+	}
+
+	devMaxAttrs := model.Device{
+		ID:         model.DeviceID("3"),
+		Attributes: map[string]model.DeviceAttribute{},
+	}
+
+	devMaxAttrIndexes := []string{}
+
+	// max indexes is in fact 63, _id takes away 1
+	maxIndexes := 63
+
+	for i := 0; i < maxIndexes+1; i++ {
+		attr := fmt.Sprintf("attr%d", i)
+		devMaxAttrs.Attributes[attr] = model.DeviceAttribute{Name: attr, Value: attr}
+		if i < maxIndexes {
+			devMaxAttrIndexes = append(devMaxAttrIndexes, fmt.Sprintf("attributes.%s.value", attr))
+		}
+	}
+
 	testCases := map[string]struct {
-		version     string
-		err         string
+		versionFrom string
+		inDevs      []model.Device
 		automigrate bool
+		tenant      string
+
+		outVers    []string
+		outIndexes []string
+		err        error
 	}{
-		"0.1.0": {
-			version:     "0.1.0",
-			err:         "",
+		"from no version (fresh db)": {
+			versionFrom: "",
 			automigrate: true,
+
+			outVers: []string{
+				"0.2.0",
+			},
 		},
-		"1.2.3": {
-			version:     "1.2.3",
-			err:         "",
+		"from 0.1.0 (first, dummy migration)": {
+			versionFrom: "0.1.0",
 			automigrate: true,
+
+			outVers: []string{
+				"0.1.0",
+				"0.2.0",
+			},
 		},
-		"0.1 error": {
-			version:     "0.1",
-			err:         "failed to parse service version: failed to parse Version: unexpected EOF",
+		"from 0.1.0, no-automigrate": {
+			versionFrom: "0.1.0",
+
+			err: errors.New("failed to apply migrations: db needs migration: inventory has version 0.1.0, needs version 0.2.0"),
+		},
+		"with devices, from 0.1.0": {
+			versionFrom: "0.1.0",
+			inDevs:      someDevs,
 			automigrate: true,
+
+			outVers: []string{
+				"0.1.0",
+				"0.2.0",
+			},
+			outIndexes: []string{
+				"attributes.mac.value",
+				"attributes.sn.value",
+				"attributes.foo.value",
+				"attributes.bar.value",
+				"attributes.baz.value",
+			},
 		},
-		"0.1.0 no-automigrate": {
-			version: "0.1.0",
-			err:     "failed to apply migrations: db needs migration: inventory has version 0.0.0, needs version 0.1.0",
+		"with devices, from 0.1.0, with tenant": {
+			versionFrom: "",
+			inDevs:      someDevs,
+			automigrate: true,
+			tenant:      "tenant",
+
+			outVers: []string{
+				"0.2.0",
+			},
+			outIndexes: []string{
+				"attributes.mac.value",
+				"attributes.sn.value",
+				"attributes.foo.value",
+				"attributes.bar.value",
+				"attributes.baz.value",
+			},
+		},
+		"with devices, from 0.1.0, with tenant, other devs": {
+			versionFrom: "0.1.0",
+			inDevs:      []model.Device{someDevs[0], someDevs[2]},
+			automigrate: true,
+			tenant:      "tenant",
+
+			outVers: []string{
+				"0.1.0",
+				"0.2.0",
+			},
+			outIndexes: []string{
+				"attributes.mac.value",
+				"attributes.sn.value",
+				"attributes.baz.value",
+			},
+		},
+		"with devices, from 0.1.0, exceed max num of indexes": {
+			versionFrom: "0.1.0",
+			inDevs:      []model.Device{devMaxAttrs},
+			automigrate: true,
+
+			outVers: []string{
+				"0.1.0",
+				"0.2.0",
+			},
+			outIndexes: devMaxAttrIndexes,
 		},
 	}
 
 	for name, tc := range testCases {
 		t.Logf("case: %s", name)
 		db.Wipe()
+
 		session := db.Session()
+
+		ctx := context.Background()
+		if tc.tenant != "" {
+			ctx = identity.WithContext(ctx, &identity.Identity{
+				Tenant: tc.tenant,
+			})
+		}
 
 		store := NewDataStoreMongoWithSession(session)
 
@@ -2185,21 +2548,77 @@ func TestMigrate(t *testing.T) {
 			store = store.WithAutomigrate()
 		}
 
-		err := store.Migrate(context.Background(), tc.version)
-		if tc.err == "" {
+		// prep input data
+		// input migrations
+		if tc.versionFrom != "" {
+			v, err := migrate.NewVersion(tc.versionFrom)
 			assert.NoError(t, err)
+
+			entry := migrate.MigrationEntry{
+				Version: *v,
+			}
+			assert.NoError(t, err)
+
+			err = session.
+				DB(mstore.DbFromContext(ctx, DbName)).
+				C(migrate.DbMigrationsColl).
+				Insert(entry)
+			assert.NoError(t, err)
+		}
+
+		// input devices
+		for _, d := range tc.inDevs {
+			err := session.
+				DB(mstore.DbFromContext(ctx, DbName)).
+				C(DbDevicesColl).
+				Insert(d)
+			assert.NoError(t, err)
+		}
+
+		err := store.Migrate(ctx, DbVersion)
+		if tc.err == nil {
+			assert.NoError(t, err)
+
+			// verify migration entries
 			var out []migrate.MigrationEntry
-			session.DB(DbName).C(migrate.DbMigrationsColl).Find(nil).All(&out)
-			assert.Len(t, out, 1)
-			v, _ := migrate.NewVersion(tc.version)
-			assert.Equal(t, *v, out[0].Version)
+			session.
+				DB(mstore.DbFromContext(ctx, DbName)).
+				C(migrate.DbMigrationsColl).
+				Find(nil).
+				All(&out)
+
+			assert.Equal(t, len(tc.outVers), len(out))
+			for i, v := range tc.outVers {
+				assert.Equal(t, v, out[i].Version.String())
+			}
+
+			// verify created indexes
+			indexes, err := session.
+				DB(mstore.DbFromContext(ctx, DbName)).
+				C(DbDevicesColl).
+				Indexes()
+
+			// collection might not exist - ok, but that's a mgo error, so swallow it
+			if err != nil {
+				assert.EqualError(t, err, "Collection inventory.devices doesn't exist")
+			} else {
+				// +1 index for _id
+				assert.Equal(t, len(indexes), len(tc.outIndexes)+1)
+
+				for _, inIdx := range tc.outIndexes {
+					idx := sort.Search(len(indexes), func(i int) bool {
+						return string(indexes[i].Name) == inIdx
+					})
+					assert.Greater(t, idx, -1)
+				}
+			}
+
 		} else {
-			assert.EqualError(t, err, tc.err)
+			assert.EqualError(t, err, tc.err.Error())
 		}
 
 		session.Close()
 	}
-
 }
 
 // test funcs
@@ -2288,5 +2707,5 @@ func TestWithAutomigrate(t *testing.T) {
 
 	newStore := store.WithAutomigrate()
 
-	assert.NotEqual(t, unsafe.Pointer(store), unsafe.Pointer(newStore))
+	assert.NotEqual(t, store, newStore)
 }
