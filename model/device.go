@@ -34,7 +34,7 @@ type DeviceAttribute struct {
 func (da DeviceAttribute) Validate() error {
 	return validation.ValidateStruct(&da,
 		validation.Field(&da.Name, validation.Required, validation.Length(1, 1024)),
-		validation.Field(&da.Value, validation.Required, validation.By(validateDeviceAttrVal)),
+		validation.Field(&da.Value, validation.By(validateDeviceAttrVal)),
 	)
 }
 

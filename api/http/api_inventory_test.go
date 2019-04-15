@@ -686,6 +686,26 @@ func TestApiInventoryUpsertAttributes(t *testing.T) {
 			},
 		},
 
+		"body formatted ok, attribute value missing": {
+			inReq: test.MakeSimpleRequest("PATCH",
+				"http://1.2.3.4/api/0.1.0/attributes",
+				[]model.DeviceAttribute{
+					{
+						Name:        "name1",
+						Description: strPtr("descr1"),
+					},
+				},
+			),
+			inHdrs: map[string]string{
+				"Authorization": makeDeviceAuthHeader(`{"sub": "fakeid"}`),
+			},
+			inventoryErr: nil,
+			resp: utils.JSONResponseParams{
+				OutputStatus:     http.StatusBadRequest,
+				OutputBodyObject: RestError("value: supported types are string, float64, and arrays thereof."),
+			},
+		},
+
 		"body formatted ok, attributes ok (all fields)": {
 			inReq: test.MakeSimpleRequest("PATCH",
 				"http://1.2.3.4/api/0.1.0/attributes",
@@ -749,6 +769,30 @@ func TestApiInventoryUpsertAttributes(t *testing.T) {
 					{
 						Name:  "name2",
 						Value: 2,
+					},
+				},
+			),
+			inHdrs: map[string]string{
+				"Authorization": makeDeviceAuthHeader(`{"sub": "fakeid"}`),
+			},
+			inventoryErr: nil,
+			resp: utils.JSONResponseParams{
+				OutputStatus:     http.StatusOK,
+				OutputBodyObject: nil,
+			},
+		},
+
+		"body formatted ok, attributes ok, but values are empty": {
+			inReq: test.MakeSimpleRequest("PATCH",
+				"http://1.2.3.4/api/0.1.0/attributes",
+				[]model.DeviceAttribute{
+					{
+						Name:  "name1",
+						Value: "",
+					},
+					{
+						Name:  "name2",
+						Value: "",
 					},
 				},
 			),
