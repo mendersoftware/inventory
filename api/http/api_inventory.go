@@ -162,15 +162,12 @@ func parseFilterParams(r *rest.Request) ([]store.Filter, error) {
 			filter.Value = valueStr
 			filter.Operator = store.Eq
 		} else {
-			validOps := []string{"eq", "regex"}
+			validOps := []string{"eq"}
 			for _, o := range validOps {
 				if valueStr[:sepIdx] == o {
 					switch o {
 					case "eq":
 						filter.Operator = store.Eq
-						filter.Value = valueStr[sepIdx+1:]
-					case "regex":
-						filter.Operator = store.Regex
 						filter.Value = valueStr[sepIdx+1:]
 					}
 					break
@@ -183,19 +180,9 @@ func parseFilterParams(r *rest.Request) ([]store.Filter, error) {
 			}
 		}
 
-		// we have a short form of the regex op, so check if the
-		// value doesn't contain it
-		if strings.HasPrefix(filter.Value, "~") {
-			filter.Operator = store.Regex
-			filter.Value = filter.Value[1:]
-		}
-
-		// only parse floats if we're not in regex
-		if filter.Operator != store.Regex {
-			floatValue, err := strconv.ParseFloat(filter.Value, 64)
-			if err == nil {
-				filter.ValueFloat = &floatValue
-			}
+		floatValue, err := strconv.ParseFloat(filter.Value, 64)
+		if err == nil {
+			filter.ValueFloat = &floatValue
 		}
 
 		filters = append(filters, filter)
