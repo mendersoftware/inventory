@@ -17,7 +17,6 @@ import (
 	"context"
 	"fmt"
 	"reflect"
-	"sort"
 	"testing"
 	"time"
 
@@ -80,53 +79,6 @@ func TestMongoGetDevices(t *testing.T) {
 				"attrFloat":  {Name: "attrFloat", Value: 6.0, Description: strPtr("desc2")},
 			},
 		},
-		{
-			ID: model.DeviceID("8"),
-			Attributes: map[string]model.DeviceAttribute{
-				"attrString": {Name: "attrString", Value: "val8", Description: strPtr("desc1")},
-				"attrFloat":  {Name: "attrFloat", Value: 4.0, Description: strPtr("desc2")},
-			},
-			Group: model.GroupName("2"),
-		},
-		{
-			ID: model.DeviceID("9"),
-			Attributes: map[string]model.DeviceAttribute{
-				"attrString": {Name: "attrString", Value: "val8", Description: strPtr("desc1")},
-				"attrFloat":  {Name: "attrFloat", Value: 4.0, Description: strPtr("desc2")},
-			},
-			Group: model.GroupName("1"),
-		},
-		{
-			ID: model.DeviceID("10"),
-			Attributes: map[string]model.DeviceAttribute{
-				"attrString": {Name: "attrString", Value: "val3", Description: strPtr("desc1")},
-				"attrFloat":  {Name: "attrFloat", Value: 4.0, Description: strPtr("desc2")},
-			},
-			Group: model.GroupName("1"),
-		},
-		{
-			ID: model.DeviceID("11"),
-			Attributes: map[string]model.DeviceAttribute{
-				"attrList":  {Name: "attrList", Value: []interface{}{"val8", "foo", "bar"}, Description: strPtr("desc1")},
-				"attrFloat": {Name: "attrFloat", Value: 6.0, Description: strPtr("desc2")},
-			},
-			Group: model.GroupName("1"),
-		},
-		{
-			ID: model.DeviceID("12"),
-			Attributes: map[string]model.DeviceAttribute{
-				"attrList":  {Name: "attrList", Value: []interface{}{"val", "foo"}, Description: strPtr("desc1")},
-				"attrFloat": {Name: "attrFloat", Value: 6.0, Description: strPtr("desc2")},
-			},
-		},
-		{
-			ID: model.DeviceID("13"),
-			Attributes: map[string]model.DeviceAttribute{
-				"attrList":  {Name: "attrList", Value: []interface{}{"foo"}, Description: strPtr("desc1")},
-				"attrFloat": {Name: "attrFloat", Value: 8.0, Description: strPtr("desc2")},
-			},
-			Group: model.GroupName("2"),
-		},
 	}
 	floatVal4 := 4.0
 	floatVal5 := 5.0
@@ -142,9 +94,9 @@ func TestMongoGetDevices(t *testing.T) {
 		groupName string
 		tenant    string
 	}{
-		"get devices from group 1": {
-			expected:  []model.Device{inputDevs[1], inputDevs[9], inputDevs[10], inputDevs[10]},
-			devTotal:  4,
+		"get device from group 1": {
+			expected:  []model.Device{inputDevs[1]},
+			devTotal:  1,
 			skip:      0,
 			filters:   nil,
 			sort:      nil,
@@ -168,7 +120,7 @@ func TestMongoGetDevices(t *testing.T) {
 			tenant:   "foo",
 		},
 		"all devs, with skip": {
-			expected: inputDevs[4:],
+			expected: []model.Device{inputDevs[4], inputDevs[5], inputDevs[6], inputDevs[7]},
 			devTotal: len(inputDevs),
 			skip:     4,
 			limit:    20,
@@ -176,7 +128,7 @@ func TestMongoGetDevices(t *testing.T) {
 			sort:     nil,
 		},
 		"all devs, no skip, with limit": {
-			expected: inputDevs[0:3],
+			expected: []model.Device{inputDevs[0], inputDevs[1], inputDevs[2]},
 			devTotal: len(inputDevs),
 			skip:     0,
 			limit:    3,
@@ -184,7 +136,7 @@ func TestMongoGetDevices(t *testing.T) {
 			sort:     nil,
 		},
 		"skip + limit": {
-			expected: inputDevs[3:5],
+			expected: []model.Device{inputDevs[3], inputDevs[4]},
 			devTotal: len(inputDevs),
 			skip:     3,
 			limit:    2,
@@ -192,15 +144,14 @@ func TestMongoGetDevices(t *testing.T) {
 			sort:     nil,
 		},
 		"filter on attribute (equal attribute)": {
-			expected: []model.Device{inputDevs[3], inputDevs[10]},
-			devTotal: 2,
+			expected: []model.Device{inputDevs[3]},
+			devTotal: 1,
 			skip:     0,
 			limit:    20,
 			filters: []store.Filter{
 				{
 					AttrName: "attrString",
-					Value:    "val3",
-					Operator: store.Eq,
+					Value:    "val3", Operator: store.Eq,
 				},
 			},
 			sort: nil,
@@ -252,8 +203,8 @@ func TestMongoGetDevices(t *testing.T) {
 			},
 		},
 		"hasGroup = true": {
-			expected: []model.Device{inputDevs[1], inputDevs[2], inputDevs[5], inputDevs[8], inputDevs[9], inputDevs[10], inputDevs[11], inputDevs[13]},
-			devTotal: 8,
+			expected: []model.Device{inputDevs[1], inputDevs[2], inputDevs[5]},
+			devTotal: 3,
 			skip:     0,
 			limit:    20,
 			filters:  nil,
@@ -261,188 +212,13 @@ func TestMongoGetDevices(t *testing.T) {
 			hasGroup: boolPtr(true),
 		},
 		"hasGroup = false": {
-			expected: []model.Device{inputDevs[0], inputDevs[3], inputDevs[4], inputDevs[6], inputDevs[7], inputDevs[12]},
-			devTotal: 6,
+			expected: []model.Device{inputDevs[0], inputDevs[3], inputDevs[4], inputDevs[6], inputDevs[7]},
+			devTotal: 5,
 			skip:     0,
 			limit:    20,
 			filters:  nil,
 			sort:     nil,
 			hasGroup: boolPtr(false),
-		},
-		"filter regex, prefix": {
-			expected: inputDevs[3:11],
-			devTotal: 8,
-			skip:     0,
-			limit:    20,
-			filters: []store.Filter{
-				{
-					AttrName: "attrString",
-					Value:    "^val",
-					Operator: store.Regex,
-				},
-			},
-			sort: nil,
-		},
-		"filter regex, infix": {
-			expected: []model.Device{inputDevs[4], inputDevs[7]},
-			devTotal: 2,
-			skip:     0,
-			limit:    20,
-			filters: []store.Filter{
-				{
-					AttrName: "attrString",
-					Value:    "val4",
-					Operator: store.Regex,
-				},
-			},
-			sort: nil,
-		},
-		"filter regex + eq operator": {
-			expected: []model.Device{inputDevs[4], inputDevs[6], inputDevs[8], inputDevs[9], inputDevs[10]},
-			devTotal: 5,
-			skip:     0,
-			limit:    20,
-			filters: []store.Filter{
-				{
-					AttrName: "attrString",
-					Value:    "val",
-					Operator: store.Regex,
-				},
-				{
-					AttrName:   "attrFloat",
-					ValueFloat: &floatVal4,
-					Operator:   store.Eq,
-				},
-			},
-			sort: nil,
-		},
-		"2x filter regex": {
-			expected: []model.Device{inputDevs[6]},
-			devTotal: 1,
-			skip:     0,
-			limit:    20,
-			filters: []store.Filter{
-				{
-					AttrName: "attrString",
-					Value:    "val",
-					Operator: store.Regex,
-				},
-				{
-					AttrName: "attrString",
-					Value:    "6",
-					Operator: store.Regex,
-				},
-			},
-			sort: nil,
-		},
-		"regex in array": {
-			expected: inputDevs[11:],
-			devTotal: 3,
-			skip:     0,
-			limit:    20,
-			filters: []store.Filter{
-				{
-					AttrName: "attrList",
-					Value:    "foo",
-					Operator: store.Regex,
-				},
-			},
-			sort: nil,
-		},
-		"regex in array 2": {
-			expected: []model.Device{inputDevs[11]},
-			devTotal: 1,
-			skip:     0,
-			limit:    20,
-			filters: []store.Filter{
-				{
-					AttrName: "attrList",
-					Value:    "bar",
-					Operator: store.Regex,
-				},
-			},
-			sort: nil,
-		},
-		"filter regex + skip/limit": {
-			expected: inputDevs[6:9],
-			devTotal: 8,
-			skip:     3,
-			limit:    3,
-			filters: []store.Filter{
-				{
-					AttrName: "attrString",
-					Value:    "^val",
-					Operator: store.Regex,
-				},
-			},
-			sort: nil,
-		},
-		"filter regex + has_group": {
-			expected: []model.Device{inputDevs[5], inputDevs[8], inputDevs[9], inputDevs[10]},
-			devTotal: 4,
-			skip:     0,
-			limit:    20,
-			filters: []store.Filter{
-				{
-					AttrName: "attrString",
-					Value:    "^val",
-					Operator: store.Regex,
-				},
-			},
-
-			sort:     nil,
-			hasGroup: boolPtr(false),
-		},
-		"filter regex + group": {
-			expected: []model.Device{inputDevs[9], inputDevs[10]},
-			devTotal: 2,
-			skip:     0,
-			limit:    20,
-			filters: []store.Filter{
-				{
-					AttrName: "attrString",
-					Value:    "^val",
-					Operator: store.Regex,
-				},
-			},
-			sort:      nil,
-			groupName: "1",
-		},
-		"filter regex + group + skip/limit": {
-			expected: []model.Device{inputDevs[10]},
-			devTotal: 2,
-			skip:     1,
-			limit:    1,
-			filters: []store.Filter{
-				{
-					AttrName: "attrString",
-					Value:    "^val",
-					Operator: store.Regex,
-				},
-			},
-			sort:      nil,
-			groupName: "1",
-		},
-		"filter regex + filter eq + group + skip/limit": {
-			expected: inputDevs[10:11],
-			devTotal: 2,
-			skip:     1,
-			limit:    1,
-			filters: []store.Filter{
-				{
-					AttrName: "attrString",
-					Value:    "^val",
-					Operator: store.Regex,
-				},
-				{
-					AttrName:   "attrFloat",
-					Value:      "4.0",
-					ValueFloat: &floatVal4,
-					Operator:   store.Eq,
-				},
-			},
-			sort:      nil,
-			groupName: "1",
 		},
 	}
 
@@ -704,7 +480,6 @@ func TestMongoAddDevice(t *testing.T) {
 		OutputDevice *model.Device
 		tenant       string
 		OutputError  error
-		outIndexes   []string
 	}{
 		"valid device with one attribute, no error": {
 			InputDevice: &model.Device{
@@ -720,10 +495,6 @@ func TestMongoAddDevice(t *testing.T) {
 				},
 			},
 			OutputError: nil,
-			outIndexes: []string{
-				"attributes.mac.value",
-				"attributes.sn.value",
-			},
 		},
 		"valid device with one attribute, no error; with tenant": {
 			InputDevice: &model.Device{
@@ -740,10 +511,6 @@ func TestMongoAddDevice(t *testing.T) {
 			},
 			tenant:      "foo",
 			OutputError: nil,
-			outIndexes: []string{
-				"attributes.mac.value",
-				"attributes.sn.value",
-			},
 		},
 		"valid device with two attributes, no error": {
 			InputDevice: &model.Device{
@@ -761,10 +528,6 @@ func TestMongoAddDevice(t *testing.T) {
 				},
 			},
 			OutputError: nil,
-			outIndexes: []string{
-				"attributes.mac.value",
-				"attributes.sn.value",
-			},
 		},
 		"valid device with attribute without value, no error": {
 			InputDevice: &model.Device{
@@ -780,10 +543,6 @@ func TestMongoAddDevice(t *testing.T) {
 				},
 			},
 			OutputError: nil,
-			outIndexes: []string{
-				"attributes.mac.value",
-				"attributes.sn.value",
-			},
 		},
 		"valid device with array in attribute value, no error": {
 			InputDevice: &model.Device{
@@ -799,10 +558,6 @@ func TestMongoAddDevice(t *testing.T) {
 				},
 			},
 			OutputError: nil,
-			outIndexes: []string{
-				"attributes.mac.value",
-				"attributes.sn.value",
-			},
 		},
 		"valid device without attributes, no error": {
 			InputDevice: &model.Device{
@@ -820,11 +575,6 @@ func TestMongoAddDevice(t *testing.T) {
 				},
 			},
 			OutputError: nil,
-			outIndexes: []string{
-				"attributes.mac.value",
-				"attributes.sn.value",
-				"attributes.foo.value",
-			},
 		},
 		"valid device with upsert, all attrs updated, no error": {
 			InputDevice: &model.Device{
@@ -842,10 +592,6 @@ func TestMongoAddDevice(t *testing.T) {
 				},
 			},
 			OutputError: nil,
-			outIndexes: []string{
-				"attributes.mac.value",
-				"attributes.sn.value",
-			},
 		},
 		"valid device with upsert, one attr updated, no error": {
 			InputDevice: &model.Device{
@@ -862,10 +608,6 @@ func TestMongoAddDevice(t *testing.T) {
 				},
 			},
 			OutputError: nil,
-			outIndexes: []string{
-				"attributes.mac.value",
-				"attributes.sn.value",
-			},
 		},
 		"valid device with upsert, no attrs updated, new upserted, no error": {
 			InputDevice: &model.Device{
@@ -883,11 +625,6 @@ func TestMongoAddDevice(t *testing.T) {
 				},
 			},
 			OutputError: nil,
-			outIndexes: []string{
-				"attributes.mac.value",
-				"attributes.sn.value",
-				"attributes.other-param.value",
-			},
 		},
 		"valid device with upsert, no attrs updated, many new upserted, no error": {
 			InputDevice: &model.Device{
@@ -907,12 +644,6 @@ func TestMongoAddDevice(t *testing.T) {
 				},
 			},
 			OutputError: nil,
-			outIndexes: []string{
-				"attributes.mac.value",
-				"attributes.sn.value",
-				"attributes.other-param.value",
-				"attributes.other-param-2.value",
-			},
 		},
 	}
 
@@ -954,20 +685,6 @@ func TestMongoAddDevice(t *testing.T) {
 
 			compareDevsWithoutTimestamps(t, testCase.OutputDevice, dbdev)
 
-			//check indexes
-			indexes, err := session.
-				DB(mstore.DbFromContext(ctx, DbName)).
-				C(DbDevicesColl).
-				Indexes()
-			assert.Equal(t, len(indexes), len(testCase.outIndexes)+1)
-
-			for _, inIdx := range testCase.outIndexes {
-				idx := sort.Search(len(indexes), func(i int) bool {
-					return string(indexes[i].Name) == inIdx
-				})
-				assert.Greater(t, idx, -1)
-			}
-
 		}
 
 		// Need to close all sessions to be able to call wipe at next test case
@@ -1008,8 +725,7 @@ func TestMongoUpsertAttributes(t *testing.T) {
 
 		tenant string
 
-		outAttrs   model.DeviceAttributes
-		outIndexes []string
+		outAttrs model.DeviceAttributes
 	}{
 		"dev exists, attributes exist, update both attrs (descr + val)": {
 			devs: []model.Device{
@@ -1051,10 +767,6 @@ func TestMongoUpsertAttributes(t *testing.T) {
 					Description: strPtr("sn description"),
 					Value:       "0003-newsn",
 				},
-			},
-			outIndexes: []string{
-				"attributes.mac.value",
-				"attributes.sn.value",
 			},
 		},
 		"dev exists, attributes exist, update both attrs (descr + val); with tenant": {
@@ -1098,10 +810,6 @@ func TestMongoUpsertAttributes(t *testing.T) {
 					Value:       "0003-newsn",
 				},
 			},
-			outIndexes: []string{
-				"attributes.mac.value",
-				"attributes.sn.value",
-			},
 		},
 		"dev exists, attributes exist, update one attr (descr + val)": {
 			devs: []model.Device{
@@ -1139,10 +847,6 @@ func TestMongoUpsertAttributes(t *testing.T) {
 					Description: strPtr("sn description"),
 					Value:       "0003-newsn",
 				},
-			},
-			outIndexes: []string{
-				"attributes.mac.value",
-				"attributes.sn.value",
 			},
 		},
 
@@ -1182,10 +886,6 @@ func TestMongoUpsertAttributes(t *testing.T) {
 					Value:       "0003-sn",
 				},
 			},
-			outIndexes: []string{
-				"attributes.mac.value",
-				"attributes.sn.value",
-			},
 		},
 		"dev exists, attributes exist, update one attr (value only)": {
 			devs: []model.Device{
@@ -1222,10 +922,6 @@ func TestMongoUpsertAttributes(t *testing.T) {
 					Description: strPtr("descr"),
 					Value:       "0003-newsn",
 				},
-			},
-			outIndexes: []string{
-				"attributes.mac.value",
-				"attributes.sn.value",
 			},
 		},
 		"dev exists, attributes exist, update one attr (value only, change type)": {
@@ -1264,10 +960,6 @@ func TestMongoUpsertAttributes(t *testing.T) {
 					//[]interface{} instead of []string - otherwise DeepEquals fails where it really shouldn't
 					Value: []interface{}{"0003-sn-1", "0003-sn-2"},
 				},
-			},
-			outIndexes: []string{
-				"attributes.mac.value",
-				"attributes.sn.value",
 			},
 		},
 		"dev exists, attributes exist, add(merge) new attrs": {
@@ -1321,12 +1013,6 @@ func TestMongoUpsertAttributes(t *testing.T) {
 					Value:       "new-2-val",
 					Description: strPtr("foo"),
 				},
-			},
-			outIndexes: []string{
-				"attributes.mac.value",
-				"attributes.sn.value",
-				"attributes.new-1.value",
-				"attributes.new-2.value",
 			},
 		},
 		"dev exists, attributes exist, add(merge) new attrs + modify existing": {
@@ -1387,12 +1073,6 @@ func TestMongoUpsertAttributes(t *testing.T) {
 					Description: strPtr("foo"),
 				},
 			},
-			outIndexes: []string{
-				"attributes.mac.value",
-				"attributes.sn.value",
-				"attributes.new-1.value",
-				"attributes.new-2.value",
-			},
 		},
 		"dev exists, no attributes exist, upsert new attrs (val + descr)": {
 			devs: []model.Device{
@@ -1423,10 +1103,6 @@ func TestMongoUpsertAttributes(t *testing.T) {
 					Description: strPtr("mac addr"),
 				},
 			},
-			outIndexes: []string{
-				"attributes.mac.value",
-				"attributes.ip.value",
-			},
 		},
 		"dev doesn't exist, upsert new attr (descr + val)": {
 			devs:    []model.Device{},
@@ -1444,9 +1120,6 @@ func TestMongoUpsertAttributes(t *testing.T) {
 					Value:       []interface{}{"1.2.3.4", "1.2.3.5"},
 				},
 			},
-			outIndexes: []string{
-				"attributes.ip.value",
-			},
 		},
 		"dev doesn't exist, upsert new attr (val only)": {
 			devs:    []model.Device{},
@@ -1461,9 +1134,6 @@ func TestMongoUpsertAttributes(t *testing.T) {
 				"ip": {
 					Value: []interface{}{"1.2.3.4", "1.2.3.5"},
 				},
-			},
-			outIndexes: []string{
-				"attributes.ip.value",
 			},
 		},
 		"dev doesn't exist, upsert with new attrs (val + descr)": {
@@ -1488,10 +1158,6 @@ func TestMongoUpsertAttributes(t *testing.T) {
 					Value:       "0099-mac",
 					Description: strPtr("mac addr"),
 				},
-			},
-			outIndexes: []string{
-				"attributes.ip.value",
-				"attributes.mac.value",
 			},
 		},
 	}
@@ -1540,20 +1206,6 @@ func TestMongoUpsertAttributes(t *testing.T) {
 				return dev.UpdatedTs.After(dev.CreatedTs) ||
 					dev.UpdatedTs.Unix() == dev.CreatedTs.Unix()
 			})
-
-		//check indexes
-		indexes, err := s.
-			DB(mstore.DbFromContext(ctx, DbName)).
-			C(DbDevicesColl).
-			Indexes()
-		assert.Equal(t, len(indexes), len(tc.outIndexes)+1)
-
-		for _, inIdx := range tc.outIndexes {
-			idx := sort.Search(len(indexes), func(i int) bool {
-				return string(indexes[i].Name) == inIdx
-			})
-			assert.Greater(t, idx, -1)
-		}
 
 		s.Close()
 	}
@@ -2416,40 +2068,21 @@ func TestMigrate(t *testing.T) {
 		},
 	}
 
-	devMaxAttrs := model.Device{
-		ID:         model.DeviceID("3"),
-		Attributes: map[string]model.DeviceAttribute{},
-	}
-
-	devMaxAttrIndexes := []string{}
-
-	// max indexes is in fact 63, _id takes away 1
-	maxIndexes := 63
-
-	for i := 0; i < maxIndexes+1; i++ {
-		attr := fmt.Sprintf("attr%d", i)
-		devMaxAttrs.Attributes[attr] = model.DeviceAttribute{Name: attr, Value: attr}
-		if i < maxIndexes {
-			devMaxAttrIndexes = append(devMaxAttrIndexes, fmt.Sprintf("attributes.%s.value", attr))
-		}
-	}
-
 	testCases := map[string]struct {
 		versionFrom string
 		inDevs      []model.Device
 		automigrate bool
 		tenant      string
 
-		outVers    []string
-		outIndexes []string
-		err        error
+		outVers []string
+		err     error
 	}{
 		"from no version (fresh db)": {
 			versionFrom: "",
 			automigrate: true,
 
 			outVers: []string{
-				"0.2.0",
+				"0.1.0",
 			},
 		},
 		"from 0.1.0 (first, dummy migration)": {
@@ -2458,13 +2091,12 @@ func TestMigrate(t *testing.T) {
 
 			outVers: []string{
 				"0.1.0",
-				"0.2.0",
 			},
 		},
 		"from 0.1.0, no-automigrate": {
-			versionFrom: "0.1.0",
+			versionFrom: "0.0.0",
 
-			err: errors.New("failed to apply migrations: db needs migration: inventory has version 0.1.0, needs version 0.2.0"),
+			err: errors.New("failed to apply migrations: db needs migration: inventory has version 0.0.0, needs version 0.1.0"),
 		},
 		"with devices, from 0.1.0": {
 			versionFrom: "0.1.0",
@@ -2473,14 +2105,6 @@ func TestMigrate(t *testing.T) {
 
 			outVers: []string{
 				"0.1.0",
-				"0.2.0",
-			},
-			outIndexes: []string{
-				"attributes.mac.value",
-				"attributes.sn.value",
-				"attributes.foo.value",
-				"attributes.bar.value",
-				"attributes.baz.value",
 			},
 		},
 		"with devices, from 0.1.0, with tenant": {
@@ -2490,14 +2114,7 @@ func TestMigrate(t *testing.T) {
 			tenant:      "tenant",
 
 			outVers: []string{
-				"0.2.0",
-			},
-			outIndexes: []string{
-				"attributes.mac.value",
-				"attributes.sn.value",
-				"attributes.foo.value",
-				"attributes.bar.value",
-				"attributes.baz.value",
+				"0.1.0",
 			},
 		},
 		"with devices, from 0.1.0, with tenant, other devs": {
@@ -2508,24 +2125,7 @@ func TestMigrate(t *testing.T) {
 
 			outVers: []string{
 				"0.1.0",
-				"0.2.0",
 			},
-			outIndexes: []string{
-				"attributes.mac.value",
-				"attributes.sn.value",
-				"attributes.baz.value",
-			},
-		},
-		"with devices, from 0.1.0, exceed max num of indexes": {
-			versionFrom: "0.1.0",
-			inDevs:      []model.Device{devMaxAttrs},
-			automigrate: true,
-
-			outVers: []string{
-				"0.1.0",
-				"0.2.0",
-			},
-			outIndexes: devMaxAttrIndexes,
 		},
 	}
 
@@ -2591,28 +2191,6 @@ func TestMigrate(t *testing.T) {
 			for i, v := range tc.outVers {
 				assert.Equal(t, v, out[i].Version.String())
 			}
-
-			// verify created indexes
-			indexes, err := session.
-				DB(mstore.DbFromContext(ctx, DbName)).
-				C(DbDevicesColl).
-				Indexes()
-
-			// collection might not exist - ok, but that's a mgo error, so swallow it
-			if err != nil {
-				assert.EqualError(t, err, "Collection inventory.devices doesn't exist")
-			} else {
-				// +1 index for _id
-				assert.Equal(t, len(indexes), len(tc.outIndexes)+1)
-
-				for _, inIdx := range tc.outIndexes {
-					idx := sort.Search(len(indexes), func(i int) bool {
-						return string(indexes[i].Name) == inIdx
-					})
-					assert.Greater(t, idx, -1)
-				}
-			}
-
 		} else {
 			assert.EqualError(t, err, tc.err.Error())
 		}

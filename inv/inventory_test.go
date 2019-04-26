@@ -637,7 +637,7 @@ func TestUserAdmCreateTenant(t *testing.T) {
 			ctx := context.Background()
 
 			tenantDb := &mstore.DataStore{}
-			tenantDb.On("MigrateTenant", ctx, "0.2.0", tc.tenant).Return(tc.tenantErr)
+			tenantDb.On("MigrateTenant", ctx, "0.1.0", tc.tenant).Return(tc.tenantErr)
 			tenantDb.On("WithAutomigrate").Return(tenantDb)
 
 			useradm := NewInventory(tenantDb)

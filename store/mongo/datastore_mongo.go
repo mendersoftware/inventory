@@ -36,7 +36,7 @@ import (
 )
 
 const (
-	DbVersion = "0.2.0"
+	DbVersion = "0.1.0"
 
 	DbName        = "inventory"
 	DbDevicesColl = "devices"
@@ -353,8 +353,6 @@ func mongoOperator(co store.ComparisonOperator) string {
 	switch co {
 	case store.Eq:
 		return "$eq"
-	case store.Regex:
-		return "$regex"
 	}
 	return ""
 }
@@ -551,12 +549,7 @@ func (db *DataStoreMongo) MigrateTenant(ctx context.Context, version string, ten
 		Tenant: tenantId,
 	})
 
-	migrations := []migrate.Migration{
-		&migration_0_2_0{
-			ms:  db,
-			ctx: ctx,
-		},
-	}
+	migrations := []migrate.Migration{}
 
 	err = m.Apply(ctx, *ver, migrations)
 	if err != nil {

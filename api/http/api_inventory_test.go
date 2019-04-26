@@ -181,61 +181,6 @@ func TestApiParseFilterParams(t *testing.T) {
 				},
 			},
 		},
-		"regex - short form": {
-			inReq: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&attr_name1=~^abc[0-9].*$", nil),
-			filters: []store.Filter{
-				store.Filter{
-					AttrName: "attr_name1",
-					Value:    "^abc[0-9].*$",
-					Operator: store.Regex,
-				},
-			},
-		},
-		"regex - short form, colons": {
-			inReq: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&attr_name1=~^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$", nil),
-			filters: []store.Filter{
-				store.Filter{
-					AttrName: "attr_name1",
-					Value:    "^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$",
-					Operator: store.Regex,
-				},
-			},
-		},
-		"regex - long form": {
-			inReq: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&attr_name1=regex:^abc[0-9].*$", nil),
-			filters: []store.Filter{
-				store.Filter{
-					AttrName: "attr_name1",
-					Value:    "^abc[0-9].*$",
-					Operator: store.Regex,
-				},
-			},
-		},
-		"regex - long form, colons": {
-			inReq: test.MakeSimpleRequest("get", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&attr_name1=regex:^([0-9a-fa-f]{2}[:-]){5}([0-9a-fa-f]{2})$", nil),
-			filters: []store.Filter{
-				store.Filter{
-					AttrName: "attr_name1",
-					Value:    "^([0-9a-fa-f]{2}[:-]){5}([0-9a-fa-f]{2})$",
-					Operator: store.Regex,
-				},
-			},
-		},
-		"eq + regex- short form": {
-			inReq: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&attr_name1=A0001&attr_name2=~^asdf$", nil),
-			filters: []store.Filter{
-				store.Filter{
-					AttrName: "attr_name1",
-					Value:    "A0001",
-					Operator: store.Eq,
-				},
-				store.Filter{
-					AttrName: "attr_name2",
-					Value:    "^asdf$",
-					Operator: store.Regex,
-				},
-			},
-		},
 	}
 
 	for name, testCase := range testCases {
