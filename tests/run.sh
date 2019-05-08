@@ -16,7 +16,7 @@ HOST=${HOST="mender-inventory:8080"}
 }
 
 py.test-3 -s --tb=short --host $HOST \
-          --internal-spec $DIR/internal_api.yml \
+          --internal-spec $DIR/internal_api_v1.yml \
           --management-spec $DIR/management_api.yml \
           --verbose --junitxml=$DIR/results.xml \
           --inventory-items $DIR/inventory_items \
