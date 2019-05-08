@@ -1,12 +1,12 @@
 swagger: '2.0'
 info:
-  version: '2'
+  version: '1'
   title: Device inventory
   description: |
     An API for device attribute management and device grouping.
     Not exposed via the API Gateway - intended for internal use only.
 
-basePath: '/api/internal/v2/inventory'
+basePath: '/api/internal/v1/inventory'
 host: 'mender-inventory:8080'
 schemes:
   - http
@@ -57,78 +57,6 @@ paths:
               description: URI for the newly created 'Device' resource.
         400:
           description: Malformed request body. See error for details.
-          schema:
-            $ref: '#/definitions/Error'
-        500:
-          description: Internal server error.
-          schema:
-            $ref: '#/definitions/Error'
-
-  /devices/{id}:
-    patch:
-      summary: Upload a set of attributes for a device
-      description: |
-        Saves the provided attribute set for the device.
-        This method has upsert semantics:
-        * the values of existing attributes are overwritten
-        * attributes uploaded for the first time are automatically created and the device is also created
-      parameters:
-        - name: X-MEN-Source
-          in: header
-          required: true
-          type: string
-          description: |
-              Contains service name.
-              Inventory will use this information togather with 'X-MEN-Msg-Timestamp' to prevent overwriting attributes with older ones.
-        - name: X-MEN-Msg-Timestamp
-          in: header
-          required: true
-          type: integer
-          description: |
-              The UTC timestamp in milliseconds.
-              Inventory will use this information togather with 'X-MEN-Source' to prevent overwriting attributes with older ones.
-        - name: id
-          in: path
-          description: Device identifier.
-          required: true
-          type: string
-        - name: tenant_id
-          in: query
-          type: string
-          description: Tenant identifier.
-          required: false
-        - name: attributes
-          in: body
-          description: A list of attribute descriptors.
-          required: true
-          schema:
-            title: ListOfAttributes
-            type: array
-            items:
-              $ref: '#/definitions/Attribute'
-            example:
-              application/json:
-                - name: "ip_address"
-                  value: "1.2.3.4"
-                  description: "IP address"
-                  scope: "identity"
-                - name: "mac"
-                  value: "01:02:03:04:05:06"
-                  description: "MAC address"
-                  scope: "identity"
-                - name: "status"
-                  value: "accepted"
-                  description: "authorization status of the device"
-                  scope: "system"
-      responses:
-        200:
-          description: Attributes were uploaded successfully.
-        400:
-          description: Missing/malformed request parameters or body. See error for details.
-          schema:
-            $ref: '#/definitions/Error'
-        412:
-          description: Timestamp from 'X-MEN-Msg-Timestamp' header is older than the one present in the inventory service. See error for details.
           schema:
             $ref: '#/definitions/Error'
         500:
@@ -193,7 +121,6 @@ definitions:
     required:
       - name
       - value
-      - scope
     properties:
       name:
         type: string
@@ -210,19 +137,8 @@ definitions:
             Attribute type is implicit, inferred from the JSON type.
 
             Supported types: number, string, array of numbers, array of strings. Mixed arrays are not allowed.
-      scope:
-        type: string
-        enum:
-          - identity
-          - system
-        description: |
-            The scope of the attribute.
-            Each attribute has its scope.
-            It prevents overwriting attributes provided by different actors in the system and having the same name.
-            Backend services can provide attributes with scope 'system' or 'identity'.
     example:
       application/json:
-        name: "mac"
-        description: "MAC address"
-        value: "de:ad:be:ef:06:66"
-        scope: "identity"
+        name: "cpu_load"
+        description: "The current CPU load."
+        value: 42
