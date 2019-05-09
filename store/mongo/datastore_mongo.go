@@ -302,14 +302,6 @@ func (db *DataStoreMongo) UpsertAttributes(ctx context.Context, id model.DeviceI
 		"$setOnInsert": bson.M{"created_ts": now}}
 
 	_, err := c.UpsertId(id, update)
-	if err != nil {
-		return err
-	}
-
-	err = db.IndexAllAttrs(ctx, attrs)
-	if err != nil {
-		return err
-	}
 
 	return err
 }
@@ -591,19 +583,6 @@ func (db *DataStoreMongo) WithAutomigrate() store.DataStore {
 		session:     db.session,
 		automigrate: true,
 	}
-}
-
-func (db *DataStoreMongo) IndexAllAttrs(ctx context.Context, attrs model.DeviceAttributes) error {
-	s := db.session.Copy()
-	defer s.Close()
-
-	for a := range attrs {
-		err := indexAttr(s, ctx, a)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 func indexAttr(s *mgo.Session, ctx context.Context, attr string) error {

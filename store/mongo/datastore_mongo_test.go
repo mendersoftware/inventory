@@ -1177,11 +1177,9 @@ func TestMongoUpsertAttributes(t *testing.T) {
 		}
 
 		//test
-		d := NewDataStoreMongoWithSession(s).WithAutomigrate()
-		err := d.Migrate(ctx, DbVersion)
-		assert.NoError(t, err, "Migrate failed")
+		d := NewDataStoreMongoWithSession(s)
 
-		err = d.UpsertAttributes(ctx, tc.inDevId, tc.inAttrs)
+		err := d.UpsertAttributes(ctx, tc.inDevId, tc.inAttrs)
 		assert.NoError(t, err, "UpsertAttributes failed")
 
 		//get the device back
@@ -1200,7 +1198,6 @@ func TestMongoUpsertAttributes(t *testing.T) {
 				return dev.UpdatedTs.After(dev.CreatedTs) ||
 					dev.UpdatedTs.Unix() == dev.CreatedTs.Unix()
 			})
-
 		s.Close()
 	}
 
