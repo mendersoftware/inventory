@@ -563,15 +563,13 @@ func TestMongoAddDevice(t *testing.T) {
 			InputDevice: &model.Device{
 				ID: model.DeviceID("0007"),
 				Attributes: model.DeviceAttributes{
-					"mac": {Name: "mac", Value: "asdf"},
-					"foo": {Name: "foo", Value: "asdf"},
+					"mac": {Name: "mac"},
 				},
 			},
 			OutputDevice: &model.Device{
 				ID: model.DeviceID("0007"),
 				Attributes: model.DeviceAttributes{
-					"mac": {Name: "mac", Value: "asdf"},
-					"foo": {Name: "foo", Value: "asdf"},
+					"mac": {Name: "mac"},
 				},
 			},
 			OutputError: nil,
@@ -653,6 +651,9 @@ func TestMongoAddDevice(t *testing.T) {
 		// Make sure we start test with empty database
 		db.Wipe()
 
+		session := db.Session()
+		store := NewDataStoreMongoWithSession(session)
+
 		ctx := context.Background()
 		if testCase.tenant != "" {
 			ctx = identity.WithContext(ctx, &identity.Identity{
@@ -660,15 +661,9 @@ func TestMongoAddDevice(t *testing.T) {
 			})
 		}
 
-		session := db.Session()
-		store := NewDataStoreMongoWithSession(session).WithAutomigrate()
-
 		c := session.DB(mstore.DbFromContext(ctx, DbName)).C(DbDevicesColl)
 		err := c.Insert(existing...)
 		assert.NoError(t, err)
-
-		err = store.Migrate(ctx, DbVersion)
-		assert.NoError(t, err, "Migrate failed")
 
 		err = store.AddDevice(ctx, testCase.InputDevice)
 
@@ -684,7 +679,6 @@ func TestMongoAddDevice(t *testing.T) {
 			assert.NoError(t, err, "expected no error")
 
 			compareDevsWithoutTimestamps(t, testCase.OutputDevice, dbdev)
-
 		}
 
 		// Need to close all sessions to be able to call wipe at next test case
