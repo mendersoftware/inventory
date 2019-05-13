@@ -16,13 +16,13 @@ class TestInventorySorting:
 
         for n in numbers:
             it = list(inventory_attributes)
-            it.append(internal_client.Attribute(name="number", value=n))
+            it.append(internal_client.Attribute(name="number", value=n, scope="inventory"))
 
             did = "".join([ format(i, "02x") for i in os.urandom(128)])
             internal_client.create_device(did, it)
 
         t = []
-        r = management_client.getAllDevices(sort="number:asc")
+        r = management_client.getAllDevices(sort="inventory-number:asc")
         for deviceInventoryList in r:
             for i in deviceInventoryList.attributes:
                 if i.name == "number":
@@ -31,7 +31,7 @@ class TestInventorySorting:
         assert sorted(numbers) == t
 
         t = []
-        r, h = management_client.client.devices.get_devices(sort="number:desc",
+        r, h = management_client.client.devices.get_devices(sort="inventory-number:desc",
                                                             Authorization="foo").result()
         for deviceInventoryList in r:
             for i in deviceInventoryList.attributes:
