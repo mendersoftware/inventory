@@ -29,12 +29,14 @@ type DeviceAttribute struct {
 	Name        string      `json:"name" bson:",omitempty"`
 	Description *string     `json:"description,omitempty" bson:",omitempty"`
 	Value       interface{} `json:"value" bson:",omitempty"`
+	Scope       string      `json:"scope" bson:",omitempty"`
 }
 
 func (da DeviceAttribute) Validate() error {
 	return validation.ValidateStruct(&da,
 		validation.Field(&da.Name, validation.Required, validation.Length(1, 1024)),
 		validation.Field(&da.Value, validation.By(validateDeviceAttrVal)),
+		validation.Field(&da.Scope, validation.Required, validation.Length(1, 1024)),
 	)
 }
 
@@ -124,7 +126,9 @@ func (d DeviceAttributes) MarshalJSON() ([]byte, error) {
 
 	for a, v := range d {
 		nv := v
-		nv.Name = a
+		if len(nv.Name) == 0 {
+			nv.Name = a
+		}
 		attrsArray = append(attrsArray, nv)
 	}
 

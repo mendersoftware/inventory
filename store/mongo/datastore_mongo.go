@@ -45,6 +45,7 @@ const (
 	DbDevGroup           = "group"
 	DbDevAttributesDesc  = "description"
 	DbDevAttributesValue = "value"
+	DbDevAttributesScope = "scope"
 )
 
 var (
@@ -312,6 +313,15 @@ func makeAttrUpsert(attrs model.DeviceAttributes) map[string]interface{} {
 	upsert := map[string]interface{}{}
 
 	for name, a := range attrs {
+		if a.Scope != "" {
+			// prefix attribute name with a scope
+			name = fmt.Sprintf("%s-%s", a.Scope, name)
+
+			fieldName =
+				fmt.Sprintf("%s.%s.%s", DbDevAttributes, name, DbDevAttributesScope)
+			upsert[fieldName] = a.Scope
+		}
+
 		if a.Description != nil {
 			fieldName =
 				fmt.Sprintf("%s.%s.%s", DbDevAttributes, name, DbDevAttributesDesc)

@@ -432,9 +432,9 @@ func TestApiInventoryAddDevice(t *testing.T) {
 				map[string]interface{}{
 					"id": "id-0001",
 					"attributes": []map[string]interface{}{
-						{"name": "a1", "value": "00:00:00:01", "description": "ddd"},
-						{"name": "a2", "value": 123.2, "description": "ddd"},
-						{"name": "a3", "value": []interface{}{"00:00:00:01", "00"}, "description": "ddd"},
+						{"name": "a1", "value": "00:00:00:01", "description": "ddd", "scope": "system"},
+						{"name": "a2", "value": 123.2, "description": "ddd", "scope": "system"},
+						{"name": "a3", "value": []interface{}{"00:00:00:01", "00"}, "description": "ddd", "scope": "system"},
 					},
 				},
 			),
@@ -476,8 +476,8 @@ func TestApiInventoryAddDevice(t *testing.T) {
 				map[string]interface{}{
 					"id": "id-0001",
 					"attributes": []map[string]interface{}{
-						{"name": "asd", "value": []interface{}{"asd", 123}},
-						{"name": "asd2", "value": []interface{}{123, "asd"}},
+						{"name": "asd", "value": []interface{}{"asd", 123}, "scope": "system"},
+						{"name": "asd2", "value": []interface{}{123, "asd"}, "scope": "system"},
 					},
 				},
 			),
@@ -493,7 +493,7 @@ func TestApiInventoryAddDevice(t *testing.T) {
 				map[string]interface{}{
 					"id": "id-0001",
 					"attributes": []map[string]interface{}{
-						{"value": "23"},
+						{"value": "23", "scope": "system"},
 					},
 				},
 			),
@@ -501,6 +501,22 @@ func TestApiInventoryAddDevice(t *testing.T) {
 			JSONResponseParams: utils.JSONResponseParams{
 				OutputStatus:     http.StatusBadRequest,
 				OutputBodyObject: RestError("attributes: (: (name: cannot be blank.).)."),
+			},
+		},
+		"body formatted ok, attribute scope missing": {
+			inReq: test.MakeSimpleRequest("POST",
+				"http://1.2.3.4/api/internal/v1/inventory/devices",
+				map[string]interface{}{
+					"id": "id-0001",
+					"attributes": []map[string]interface{}{
+						{"name": "foo", "value": "23"},
+					},
+				},
+			),
+			inventoryErr: nil,
+			JSONResponseParams: utils.JSONResponseParams{
+				OutputStatus:     http.StatusBadRequest,
+				OutputBodyObject: RestError("attributes: (foo: (scope: cannot be blank.).)."),
 			},
 		},
 		"body formatted ok, inv error": {
@@ -512,6 +528,7 @@ func TestApiInventoryAddDevice(t *testing.T) {
 						{
 							"name":  "name1",
 							"value": "value4",
+							"scope": "system",
 						},
 					},
 				},
