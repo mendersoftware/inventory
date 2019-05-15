@@ -271,6 +271,20 @@ func (_m *DataStore) UpsertAttributes(ctx context.Context, id model.DeviceID, at
 	return r0
 }
 
+// UpsertAttributesWithSource provides a mock function with given fields: ctx, id, attrs, source
+func (_m *DataStore) UpsertAttributesWithSource(ctx context.Context, id model.DeviceID, attrs model.DeviceAttributes, source model.AttributeSource) error {
+	ret := _m.Called(ctx, id, attrs, source)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, model.DeviceID, model.DeviceAttributes, model.AttributeSource) error); ok {
+		r0 = rf(ctx, id, attrs, source)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // WithAutomigrate provides a mock function with given fields:
 func (_m *DataStore) WithAutomigrate() store.DataStore {
 	ret := _m.Called()

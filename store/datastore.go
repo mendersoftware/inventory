@@ -26,6 +26,9 @@ var (
 	ErrDevNotFound = errors.New("Device not found")
 
 	ErrGroupNotFound = errors.New("group not found")
+
+	// device attributes patch outdated
+	ErrAttrPatchOutdated = errors.New("Attributes patch outdated")
 )
 
 type DataStore interface {
@@ -49,6 +52,9 @@ type DataStore interface {
 	// Updates the device attributes in a differential manner.
 	// Nonexistent attributes are created, existing are overwritten; the device resource is also created if necessary.
 	UpsertAttributes(ctx context.Context, id model.DeviceID, attrs model.DeviceAttributes) error
+
+	// Nonexistent attributes are created, existing are overwritten; the device resource is also created if necessary.
+	UpsertAttributesWithSource(ctx context.Context, id model.DeviceID, attrs model.DeviceAttributes, source model.AttributeSource) error
 
 	// Unset group in device with `id`
 	UnsetDeviceGroup(ctx context.Context, id model.DeviceID, groupName model.GroupName) error

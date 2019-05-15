@@ -793,6 +793,7 @@ func TestMongoUpsertAttributes(t *testing.T) {
 					Value:       "0003-newsn",
 				},
 			},
+			tenant: "foo",
 
 			outAttrs: map[string]model.DeviceAttribute{
 				"mac": {
@@ -1184,11 +1185,520 @@ func TestMongoUpsertAttributes(t *testing.T) {
 
 		//get the device back
 		var dev model.Device
-		err = s.DB(DbName).C(DbDevicesColl).FindId(tc.inDevId).One(&dev)
+		err = s.DB(mstore.DbFromContext(ctx, DbName)).C(DbDevicesColl).FindId(tc.inDevId).One(&dev)
 		assert.NoError(t, err, "error getting device")
 
 		if !compare(dev.Attributes, tc.outAttrs) {
 			t.Errorf("attributes mismatch, have: %v\nwant: %v", dev.Attributes, tc.outAttrs)
+		}
+
+		//check timestamp validity
+		//note that mongo stores time with lower precision- custom comparison
+		assert.Condition(t,
+			func() bool {
+				return dev.UpdatedTs.After(dev.CreatedTs) ||
+					dev.UpdatedTs.Unix() == dev.CreatedTs.Unix()
+			})
+		s.Close()
+	}
+
+	//wipe(d)
+}
+
+func TestMongoUpsertAttributesWithSource(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping TestMongoUpsertAttributesWithSource in short mode.")
+	}
+
+	//single create timestamp for all inserted devs
+	createdTs := time.Now()
+
+	testCases := map[string]struct {
+		devs []model.Device
+
+		inDevId  model.DeviceID
+		inAttrs  model.DeviceAttributes
+		inSource model.AttributeSource
+
+		tenant string
+
+		outAttrs  model.DeviceAttributes
+		outSource model.AttributeSources
+		outErr    error
+	}{
+		"dev exists, attributes exist, update both attrs (descr + val)": {
+			devs: []model.Device{
+				{
+					ID: model.DeviceID("0003"),
+					Attributes: map[string]model.DeviceAttribute{
+						"mac": {
+							Name:        "mac",
+							Value:       "0003-mac",
+							Description: strPtr("descr"),
+						},
+						"sn": {
+							Name:        "sn",
+							Value:       "0003-sn",
+							Description: strPtr("descr"),
+						},
+					},
+					CreatedTs: createdTs,
+					UpdatedTs: createdTs,
+					Source: map[string]model.AttributeSource{
+						"deviceauth": {
+							Name:      "deviceauth",
+							Timestamp: 122,
+						},
+						"deployments": {
+							Name:      "deployments",
+							Timestamp: 124,
+						},
+					},
+				},
+			},
+			inDevId: model.DeviceID("0003"),
+			inAttrs: map[string]model.DeviceAttribute{
+				"mac": {
+					Description: strPtr("mac description"),
+					Value:       "0003-newmac",
+				},
+				"sn": {
+					Description: strPtr("sn description"),
+					Value:       "0003-newsn",
+				},
+			},
+			inSource: model.AttributeSource{
+				Name:      "deviceauth",
+				Timestamp: 123,
+			},
+
+			outAttrs: map[string]model.DeviceAttribute{
+				"mac": {
+					Description: strPtr("mac description"),
+					Value:       "0003-newmac",
+				},
+				"sn": {
+					Description: strPtr("sn description"),
+					Value:       "0003-newsn",
+				},
+			},
+			outSource: map[string]model.AttributeSource{
+				"deviceauth": {
+					Name:      "deviceauth",
+					Timestamp: 123,
+				},
+				"deployments": {
+					Name:      "deployments",
+					Timestamp: 124,
+				},
+			},
+		},
+		"dev exists, attributes exist, update both attrs (descr + val), outdated": {
+			devs: []model.Device{
+				{
+					ID: model.DeviceID("0003"),
+					Attributes: map[string]model.DeviceAttribute{
+						"mac": {
+							Name:        "mac",
+							Value:       "0003-mac",
+							Description: strPtr("descr"),
+						},
+						"sn": {
+							Name:        "sn",
+							Value:       "0003-sn",
+							Description: strPtr("descr"),
+						},
+					},
+					CreatedTs: createdTs,
+					UpdatedTs: createdTs,
+					Source: map[string]model.AttributeSource{
+						"deviceauth": {
+							Name:      "deviceauth",
+							Timestamp: 122,
+						},
+						"deployments": {
+							Name:      "deployments",
+							Timestamp: 124,
+						},
+					},
+				},
+			},
+			inDevId: model.DeviceID("0003"),
+			inAttrs: map[string]model.DeviceAttribute{
+				"mac": {
+					Description: strPtr("mac description"),
+					Value:       "0003-newmac",
+				},
+				"sn": {
+					Description: strPtr("sn description"),
+					Value:       "0003-newsn",
+				},
+			},
+			inSource: model.AttributeSource{
+				Name:      "deployments",
+				Timestamp: 123,
+			},
+
+			outAttrs: map[string]model.DeviceAttribute{
+				"mac": {
+					Description: strPtr("descr"),
+					Value:       "0003-mac",
+				},
+				"sn": {
+					Description: strPtr("descr"),
+					Value:       "0003-sn",
+				},
+			},
+			outSource: map[string]model.AttributeSource{
+				"deviceauth": {
+					Name:      "deviceauth",
+					Timestamp: 122,
+				},
+				"deployments": {
+					Name:      "deployments",
+					Timestamp: 124,
+				},
+			},
+			outErr: store.ErrAttrPatchOutdated,
+		},
+		"dev exists, attributes exist, update both attrs (descr + val); with tenant": {
+			devs: []model.Device{
+				{
+					ID: model.DeviceID("0003"),
+					Attributes: map[string]model.DeviceAttribute{
+						"mac": {
+							Name:        "mac",
+							Value:       "0003-mac",
+							Description: strPtr("descr"),
+						},
+						"sn": {
+							Name:        "sn",
+							Value:       "0003-sn",
+							Description: strPtr("descr"),
+						},
+					},
+					CreatedTs: createdTs,
+					UpdatedTs: createdTs,
+				},
+			},
+			inDevId: model.DeviceID("0003"),
+			inAttrs: map[string]model.DeviceAttribute{
+				"mac": {
+					Description: strPtr("mac description"),
+					Value:       "0003-newmac",
+				},
+				"sn": {
+					Description: strPtr("sn description"),
+					Value:       "0003-newsn",
+				},
+			},
+			inSource: model.AttributeSource{
+				Name:      "deployments",
+				Timestamp: 123,
+			},
+			tenant: "foo",
+
+			outAttrs: map[string]model.DeviceAttribute{
+				"mac": {
+					Description: strPtr("mac description"),
+					Value:       "0003-newmac",
+				},
+				"sn": {
+					Description: strPtr("sn description"),
+					Value:       "0003-newsn",
+				},
+			},
+			outSource: map[string]model.AttributeSource{
+				"deployments": {
+					Name:      "deployments",
+					Timestamp: 123,
+				},
+			},
+		},
+		"dev exists, attributes exist, update one attr (descr + val)": {
+			devs: []model.Device{
+				{
+					ID: model.DeviceID("0003"),
+					Attributes: map[string]model.DeviceAttribute{
+						"mac": {
+							Name:        "mac",
+							Value:       "0003-mac",
+							Description: strPtr("descr"),
+						},
+						"sn": {
+							Name:        "sn",
+							Value:       "0003-sn",
+							Description: strPtr("descr"),
+						},
+					},
+					CreatedTs: createdTs,
+				},
+			},
+			inDevId: model.DeviceID("0003"),
+			inAttrs: map[string]model.DeviceAttribute{
+				"sn": {
+					Description: strPtr("sn description"),
+					Value:       "0003-newsn",
+				},
+			},
+			inSource: model.AttributeSource{
+				Name:      "deviceauth",
+				Timestamp: 123,
+			},
+
+			outAttrs: map[string]model.DeviceAttribute{
+				"mac": {
+					Description: strPtr("descr"),
+					Value:       "0003-mac",
+				},
+				"sn": {
+					Description: strPtr("sn description"),
+					Value:       "0003-newsn",
+				},
+			},
+		},
+
+		"dev exists, attributes exist, add(merge) new attrs": {
+			devs: []model.Device{
+				{
+					ID: model.DeviceID("0003"),
+					Attributes: map[string]model.DeviceAttribute{
+						"mac": {
+							Name:        "mac",
+							Value:       "0003-mac",
+							Description: strPtr("descr"),
+						},
+						"sn": {
+							Name:        "sn",
+							Value:       "0003-sn",
+							Description: strPtr("descr"),
+						},
+					},
+					CreatedTs: createdTs,
+				},
+			},
+			inDevId: model.DeviceID("0003"),
+			inAttrs: map[string]model.DeviceAttribute{
+				"new-1": {
+					Name:  "new-1",
+					Value: []string{"new-1-0", "new-1-0"},
+				},
+				"new-2": {
+					Name:        "new-2",
+					Value:       "new-2-val",
+					Description: strPtr("foo"),
+				},
+			},
+			inSource: model.AttributeSource{
+				Name:      "deviceauth",
+				Timestamp: 123,
+			},
+
+			outAttrs: map[string]model.DeviceAttribute{
+				"mac": {
+					Description: strPtr("descr"),
+					Value:       "0003-mac",
+				},
+				"sn": {
+					Name:        "sn",
+					Value:       "0003-sn",
+					Description: strPtr("descr"),
+				},
+				"new-1": {
+					Name:  "new-1",
+					Value: []interface{}{"new-1-0", "new-1-0"},
+				},
+				"new-2": {
+					Name:        "new-2",
+					Value:       "new-2-val",
+					Description: strPtr("foo"),
+				},
+			},
+		},
+		"dev exists, attributes exist, add(merge) new attrs + modify existing": {
+			devs: []model.Device{
+				{
+					ID: model.DeviceID("0003"),
+					Attributes: map[string]model.DeviceAttribute{
+						"mac": {
+							Name:        "mac",
+							Value:       "0003-mac",
+							Description: strPtr("descr"),
+						},
+						"sn": {
+							Name:        "sn",
+							Value:       "0003-sn",
+							Description: strPtr("descr"),
+						},
+					},
+					CreatedTs: createdTs,
+				},
+			},
+			inDevId: model.DeviceID("0003"),
+			inAttrs: map[string]model.DeviceAttribute{
+				"mac": {
+					Name:        "mac",
+					Value:       "0003-mac-new",
+					Description: strPtr("descr-new"),
+				},
+				"new-1": {
+					Name:  "new-1",
+					Value: []string{"new-1-0", "new-1-0"},
+				},
+				"new-2": {
+					Name:        "new-2",
+					Value:       "new-2-val",
+					Description: strPtr("foo"),
+				},
+			},
+			inSource: model.AttributeSource{
+				Name:      "deviceauth",
+				Timestamp: 123,
+			},
+
+			outAttrs: map[string]model.DeviceAttribute{
+				"mac": {
+					Name:        "mac",
+					Value:       "0003-mac-new",
+					Description: strPtr("descr-new"),
+				},
+				"sn": {
+					Name:        "sn",
+					Value:       "0003-sn",
+					Description: strPtr("descr"),
+				},
+				"new-1": {
+					Name:  "new-1",
+					Value: []interface{}{"new-1-0", "new-1-0"},
+				},
+				"new-2": {
+					Name:        "new-2",
+					Value:       "new-2-val",
+					Description: strPtr("foo"),
+				},
+			},
+		},
+		"dev exists, no attributes exist, upsert new attrs (val + descr)": {
+			devs: []model.Device{
+				{
+					ID:        model.DeviceID("0003"),
+					CreatedTs: createdTs,
+				},
+			},
+			inDevId: model.DeviceID("0003"),
+			inAttrs: map[string]model.DeviceAttribute{
+				"ip": {
+					Value:       []string{"1.2.3.4", "1.2.3.5"},
+					Description: strPtr("ip addr array"),
+				},
+				"mac": {
+					Value:       "0006-mac",
+					Description: strPtr("mac addr"),
+				},
+			},
+			inSource: model.AttributeSource{
+				Name:      "deviceauth",
+				Timestamp: 123,
+			},
+
+			outAttrs: map[string]model.DeviceAttribute{
+				"ip": {
+					Value:       []interface{}{"1.2.3.4", "1.2.3.5"},
+					Description: strPtr("ip addr array"),
+				},
+				"mac": {
+					Value:       "0006-mac",
+					Description: strPtr("mac addr"),
+				},
+			},
+		},
+		"dev doesn't exist, upsert new attr (descr + val)": {
+			devs:    []model.Device{},
+			inDevId: model.DeviceID("0099"),
+			inAttrs: map[string]model.DeviceAttribute{
+				"ip": {
+					Description: strPtr("ip addr array"),
+					Value:       []string{"1.2.3.4", "1.2.3.5"},
+				},
+			},
+			inSource: model.AttributeSource{
+				Name:      "deviceauth",
+				Timestamp: 123,
+			},
+
+			outAttrs: map[string]model.DeviceAttribute{
+				"ip": {
+					Description: strPtr("ip addr array"),
+					Value:       []interface{}{"1.2.3.4", "1.2.3.5"},
+				},
+			},
+		},
+		"dev doesn't exist, upsert new attr (val only)": {
+			devs:    []model.Device{},
+			inDevId: model.DeviceID("0099"),
+			inAttrs: map[string]model.DeviceAttribute{
+				"ip": {
+					Value: []string{"1.2.3.4", "1.2.3.5"},
+				},
+			},
+			inSource: model.AttributeSource{
+				Name:      "deviceauth",
+				Timestamp: 123,
+			},
+
+			outAttrs: map[string]model.DeviceAttribute{
+				"ip": {
+					Value: []interface{}{"1.2.3.4", "1.2.3.5"},
+				},
+			},
+		},
+	}
+
+	for name, tc := range testCases {
+
+		t.Logf("%s", name)
+		//setup
+		db.Wipe()
+
+		s := db.Session()
+
+		ctx := context.Background()
+		if tc.tenant != "" {
+			ctx = identity.WithContext(ctx, &identity.Identity{
+				Tenant: tc.tenant,
+			})
+		}
+
+		for _, d := range tc.devs {
+			err := s.DB(mstore.DbFromContext(ctx, DbName)).C(DbDevicesColl).Insert(d)
+			assert.NoError(t, err, "failed to setup input data")
+		}
+
+		//test
+		d := NewDataStoreMongoWithSession(s)
+
+		err := d.UpsertAttributesWithSource(ctx, tc.inDevId, tc.inAttrs, tc.inSource)
+		if tc.outErr != nil {
+			assert.Error(t, err, tc.outErr.Error())
+		} else {
+			assert.NoError(t, err, "UpsertAttributesWithSource failed")
+		}
+
+		//get the device back
+		var dev model.Device
+		err = s.DB(mstore.DbFromContext(ctx, DbName)).C(DbDevicesColl).FindId(tc.inDevId).One(&dev)
+		assert.NoError(t, err, "error getting device")
+
+		if !compare(dev.Attributes, tc.outAttrs) {
+			t.Errorf("attributes mismatch, have: %v\nwant: %v", dev.Attributes, tc.outAttrs)
+		}
+
+		//compare attribute sources map
+		if len(tc.outSource) > 0 {
+			assert.Condition(t,
+				func() bool {
+					return reflect.DeepEqual(dev.Source, tc.outSource)
+				})
 		}
 
 		//check timestamp validity
