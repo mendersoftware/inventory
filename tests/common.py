@@ -55,7 +55,7 @@ def internal_client():
 
 
 @pytest.fixture(scope="session")
-def inventory_attributes(management_client):
+def inventory_attributes(internal_client):
     attributeList = []
 
     filename = pytest.config.getoption('--inventory-items')
@@ -63,11 +63,12 @@ def inventory_attributes(management_client):
     with open(filename) as inf:
         r = csv.reader(inf)
         for row in r:
-            n, v, d = row[0], row[1], row[2] if len(row) == 3 else None
+            n, v, s, d = row[0], row[1], row[2], row[3] if len(row) == 4 else None
             # does it matter if you pass a field name = None?
-            attr = management_client.inventoryAttribute(name=n,
-                                                        value=v,
-                                                        description=d)
+            attr = internal_client.Attribute(name=n,
+                                             value=v,
+                                             description=d,
+                                             scope=s)
             attributeList.append(attr)
 
     return attributeList

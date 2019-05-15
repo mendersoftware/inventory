@@ -52,11 +52,13 @@ class TestInternalApiDeviceCreate:
 
         r, _ = management_client.client.devices.get_devices_id(id=devid,
                                                                Authorization="foo").result()
+        print("request:\n", r)
 
         self._verify_inventory(inventory_attributes,
                               [internal_client.Attribute(name=attr.name,
                                                          value=attr.value,
-                                                         description=attr.description) for attr in r.attributes])
+                                                         description=attr.description,
+                                                         scope=attr.scope) for attr in r.attributes])
 
     def test_create_twice_ok(self, internal_client, management_client, clean_db, inventory_attributes):
         # insert first device
@@ -68,7 +70,8 @@ class TestInternalApiDeviceCreate:
         # add extra attribute, modify existing
         new_attr = internal_client.Attribute(name="new attr",
                                              value="new value",
-                                              description="desc")
+                                             description="desc",
+                                             scope="inventory")
 
         existing = inventory_attributes[0]
         existing.value = "newval"

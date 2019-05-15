@@ -1,4 +1,4 @@
-// Copyright 2017 Northern.tech AS
+// Copyright 2019 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -24,8 +24,8 @@ func TestDeviceAttributesUnmarshal(t *testing.T) {
 
 	var da DeviceAttributes
 	j := `[
-{"name": "foo", "value": "bar"},
-{"name": "baz", "value": "zen"}
+{"name": "foo", "value": "bar", "scope": "system"},
+{"name": "baz", "value": "zen", "scope": "system"}
 ]`
 	err := json.Unmarshal([]byte(j), &da)
 	assert.NoError(t, err)
@@ -34,10 +34,12 @@ func TestDeviceAttributesUnmarshal(t *testing.T) {
 		"foo": {
 			Name:  "foo",
 			Value: "bar",
+			Scope: "system",
 		},
 		"baz": {
 			Name:  "baz",
 			Value: "zen",
+			Scope: "System",
 		},
 	}
 
@@ -49,10 +51,12 @@ func TestDeviceAttributesMarshal(t *testing.T) {
 	da := DeviceAttributes{
 		"foo": {
 			Value: "bar",
+			Scope: "system",
 		},
 		"bar": {
 			Name:  "bar",
 			Value: []int{1, 2, 3},
+			Scope: "system",
 		},
 	}
 
@@ -64,8 +68,8 @@ func TestDeviceAttributesMarshal(t *testing.T) {
 	// assert.JSONEq(). Since we're interested in how the output JSON is
 	// formatted, use 2 possible variants and check that the output matches at
 	// least one.
-	exp1 := `[{"name":"foo","value":"bar"},{"name":"bar","value":[1,2,3]}]`
-	exp2 := `[{"name":"bar","value":[1,2,3]},{"name":"foo","value":"bar"}]`
+	exp1 := `[{"name":"foo","value":"bar","scope":"system"},{"name":"bar","value":[1,2,3],"scope":"system"}]`
+	exp2 := `[{"name":"bar","value":[1,2,3],"scope":"system"},{"name":"foo","value":"bar","scope":"system"}]`
 	if string(data) != exp1 && string(data) != exp2 {
 		assert.Fail(t, "unexpected JSON marshal output, got:", string(data))
 	}

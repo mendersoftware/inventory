@@ -457,6 +457,7 @@ func parseAttributes(r *rest.Request) (model.DeviceAttributes, error) {
 	}
 
 	for _, a := range attrs {
+		a.Scope = "inventory"
 		if err = a.Validate(); err != nil {
 			return nil, err
 		}
