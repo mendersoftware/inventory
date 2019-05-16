@@ -22,6 +22,7 @@ import (
 
 	"github.com/ant0ine/go-json-rest/rest"
 	"github.com/go-ozzo/ozzo-validation"
+	id "github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/log"
 	u "github.com/mendersoftware/go-lib-micro/rest_utils"
 	"github.com/pkg/errors"
@@ -44,6 +45,8 @@ const (
 
 	uriInternalTenants = "/api/internal/v1/inventory/tenants"
 	uriInternalDevices = "/api/internal/v1/inventory/devices"
+
+	uriInternalAttributes = "/api/internal/v2/inventory/devices/:id"
 )
 
 const (
@@ -93,6 +96,7 @@ func (i *inventoryHandlers) GetApp() (rest.App, error) {
 
 		rest.Post(uriInternalTenants, i.CreateTenantHandler),
 		rest.Post(uriInternalDevices, i.AddDeviceHandler),
+		rest.Patch(uriInternalAttributes, i.InternalPatchDeviceAttributesHandler),
 	}
 
 	routes = append(routes)
@@ -319,7 +323,7 @@ func (i *inventoryHandlers) PatchDeviceAttributesHandler(w rest.ResponseWriter, 
 	}
 
 	//extract attributes from body
-	attrs, err := parseAttributes(r)
+	attrs, err := parseDeviceAttributes(r)
 	if err != nil {
 		u.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
 		return
@@ -448,7 +452,7 @@ func parseDevice(r *rest.Request) (*model.Device, error) {
 	return &dev, nil
 }
 
-func parseAttributes(r *rest.Request) (model.DeviceAttributes, error) {
+func parseDeviceAttributes(r *rest.Request) (model.DeviceAttributes, error) {
 	var attrs model.DeviceAttributes
 
 	err := r.DecodeJsonPayload(&attrs)
@@ -458,6 +462,23 @@ func parseAttributes(r *rest.Request) (model.DeviceAttributes, error) {
 
 	for _, a := range attrs {
 		a.Scope = "inventory"
+		if err = a.Validate(); err != nil {
+			return nil, err
+		}
+	}
+
+	return attrs, nil
+}
+
+func parseAttributes(r *rest.Request) (model.DeviceAttributes, error) {
+	var attrs model.DeviceAttributes
+
+	err := r.DecodeJsonPayload(&attrs)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to decode request body")
+	}
+
+	for _, a := range attrs {
 		if err = a.Validate(); err != nil {
 			return nil, err
 		}
@@ -546,4 +567,75 @@ func (i *inventoryHandlers) CreateTenantHandler(w rest.ResponseWriter, r *rest.R
 	}
 
 	w.WriteHeader(http.StatusCreated)
+}
+
+func (i *inventoryHandlers) InternalPatchDeviceAttributesHandler(w rest.ResponseWriter, r *rest.Request) {
+	ctx := r.Context()
+
+	l := log.FromContext(ctx)
+
+	deviceId := r.PathParam("id")
+
+	tenant, err := utils.ParseQueryParmStr(r, "tenant_id", false, nil)
+	if err != nil {
+		u.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
+		return
+	}
+
+	if tenant != "" {
+		ctx = id.WithContext(ctx, &id.Identity{
+			Tenant: tenant,
+		})
+	}
+
+	timestamp, err := parseTimestampHeader(r.Header.Get("X-MEN-Msg-Timestamp"))
+	if err != nil {
+		u.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
+		return
+	}
+
+	serviceName := r.Header.Get("X-MEN-Source")
+	if len(serviceName) == 0 {
+		u.RestErrWithLog(w, r, l, errors.New("Required X-MEN-Source header is missing"), http.StatusBadRequest)
+		return
+	}
+
+	source := model.AttributeSource{
+		Name:      serviceName,
+		Timestamp: timestamp,
+	}
+
+	//extract attributes from body
+	attrs, err := parseAttributes(r)
+	if err != nil {
+		u.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
+		return
+	}
+
+	//upsert the attributes
+	err = i.inventory.UpsertAttributesWithSource(ctx, model.DeviceID(deviceId), attrs, source)
+	if err != nil {
+		if err == store.ErrAttrPatchOutdated {
+			u.RestErrWithLog(w, r, l, err, http.StatusPreconditionFailed)
+		} else {
+			u.RestErrWithLogInternal(w, r, l, err)
+		}
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+func parseTimestampHeader(header string) (uint64, error) {
+
+	if header == "" {
+		return 0, errors.New("Required X-MEN-Msg-Timestamp header missing")
+	}
+
+	uintVal, err := strconv.ParseUint(header, 10, 64)
+	if err != nil {
+		return 0, errors.New("X-MEN-Msg-Timestamp header invalid (UNIX timestamp with miliseconds expected).")
+	}
+
+	return uintVal, nil
 }

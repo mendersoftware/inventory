@@ -1441,3 +1441,279 @@ func makeReq(method, url, auth string, body interface{}) *http.Request {
 func restError(status string) map[string]interface{} {
 	return map[string]interface{}{"error": status, "request_id": "test"}
 }
+
+func TestApiInventoryPatchAttributes(t *testing.T) {
+	t.Parallel()
+
+	rest.ErrorFieldName = "error"
+
+	testCases := map[string]struct {
+		inReq  *http.Request
+		inHdrs map[string]string
+
+		inventoryErr error
+
+		resp utils.JSONResponseParams
+	}{
+		"X-MEN-Msg-Timestamp missing": {
+			inReq: test.MakeSimpleRequest("PATCH",
+				"http://1.2.3.4/api/internal/v2/inventory/devices/1",
+				nil),
+			inHdrs: map[string]string{
+				"X-MEN-Source": "deviceauth",
+			},
+			inventoryErr: nil,
+			resp: utils.JSONResponseParams{
+				OutputStatus:     http.StatusBadRequest,
+				OutputBodyObject: RestError("Required X-MEN-Msg-Timestamp header missing"),
+			},
+		},
+
+		"X-MEN-Msg-Timestamp invalid": {
+			inReq: test.MakeSimpleRequest("PATCH",
+				"http://1.2.3.4/api/internal/v2/inventory/devices/1",
+				nil),
+			inHdrs: map[string]string{
+				"X-MEN-Msg-Timestamp": "foo",
+				"X-MEN-Source":        "deviceauth",
+			},
+			inventoryErr: nil,
+			resp: utils.JSONResponseParams{
+				OutputStatus:     http.StatusBadRequest,
+				OutputBodyObject: RestError("X-MEN-Msg-Timestamp header invalid (UNIX timestamp with miliseconds expected)."),
+			},
+		},
+
+		"X-MEN-Source missing": {
+			inReq: test.MakeSimpleRequest("PATCH",
+				"http://1.2.3.4/api/internal/v2/inventory/devices/1",
+				nil),
+			inHdrs: map[string]string{
+				"X-MEN-Msg-Timestamp": "123",
+			},
+			inventoryErr: nil,
+			resp: utils.JSONResponseParams{
+				OutputStatus:     http.StatusBadRequest,
+				OutputBodyObject: RestError("Required X-MEN-Source header is missing"),
+			},
+		},
+
+		"empty body": {
+			inReq: test.MakeSimpleRequest("PATCH",
+				"http://1.2.3.4/api/internal/v2/inventory/devices/1",
+				nil),
+			inHdrs: map[string]string{
+				"X-MEN-Msg-Timestamp": "123",
+				"X-MEN-Source":        "deviceauth",
+			},
+			inventoryErr: nil,
+			resp: utils.JSONResponseParams{
+				OutputStatus:     http.StatusBadRequest,
+				OutputBodyObject: RestError("failed to decode request body: JSON payload is empty"),
+			},
+		},
+
+		"garbled body": {
+			inReq: test.MakeSimpleRequest("PATCH",
+				"http://1.2.3.4/api/internal/v2/inventory/devices/1",
+				"foo bar"),
+			inHdrs: map[string]string{
+				"X-MEN-Msg-Timestamp": "123",
+				"X-MEN-Source":        "deviceauth",
+			},
+			inventoryErr: nil,
+			resp: utils.JSONResponseParams{
+				OutputStatus:     http.StatusBadRequest,
+				OutputBodyObject: RestError("failed to decode request body: json: cannot unmarshal string into Go value of type []model.DeviceAttribute"),
+			},
+		},
+
+		"body formatted ok, attribute name missing": {
+			inReq: test.MakeSimpleRequest("PATCH",
+				"http://1.2.3.4/api/internal/v2/inventory/devices/1",
+				[]model.DeviceAttribute{
+					{
+						Name:        "name1",
+						Value:       "value1",
+						Scope:       "inventory",
+						Description: strPtr("descr1"),
+					},
+					{
+						Value:       2,
+						Scope:       "inventory",
+						Description: strPtr("descr2"),
+					},
+				},
+			),
+			inHdrs: map[string]string{
+				"X-MEN-Msg-Timestamp": "123",
+				"X-MEN-Source":        "deviceauth",
+			},
+			inventoryErr: nil,
+			resp: utils.JSONResponseParams{
+				OutputStatus:     http.StatusBadRequest,
+				OutputBodyObject: RestError("name: cannot be blank."),
+			},
+		},
+
+		"body formatted ok, attribute scope missing": {
+			inReq: test.MakeSimpleRequest("PATCH",
+				"http://1.2.3.4/api/internal/v2/inventory/devices/1",
+				[]model.DeviceAttribute{
+					{
+						Name:        "name1",
+						Value:       "value1",
+						Scope:       "inventory",
+						Description: strPtr("descr1"),
+					},
+					{
+						Name:        "name2",
+						Value:       2,
+						Description: strPtr("descr2"),
+					},
+				},
+			),
+			inHdrs: map[string]string{
+				"X-MEN-Msg-Timestamp": "123",
+				"X-MEN-Source":        "deviceauth",
+			},
+			inventoryErr: nil,
+			resp: utils.JSONResponseParams{
+				OutputStatus:     http.StatusBadRequest,
+				OutputBodyObject: RestError("scope: cannot be blank."),
+			},
+		},
+
+		"body formatted ok, attribute value missing": {
+			inReq: test.MakeSimpleRequest("PATCH",
+				"http://1.2.3.4/api/internal/v2/inventory/devices/1",
+				[]model.DeviceAttribute{
+					{
+						Name:        "name1",
+						Scope:       "inventory",
+						Description: strPtr("descr1"),
+					},
+				},
+			),
+			inHdrs: map[string]string{
+				"X-MEN-Msg-Timestamp": "123",
+				"X-MEN-Source":        "deviceauth",
+			},
+			inventoryErr: nil,
+			resp: utils.JSONResponseParams{
+				OutputStatus:     http.StatusBadRequest,
+				OutputBodyObject: RestError("value: supported types are string, float64, and arrays thereof."),
+			},
+		},
+
+		"body formatted ok, attributes ok (all fields)": {
+			inReq: test.MakeSimpleRequest("PATCH",
+				"http://1.2.3.4/api/internal/v2/inventory/devices/1",
+				[]model.DeviceAttribute{
+					{
+						Name:        "name1",
+						Value:       "value1",
+						Scope:       "inventory",
+						Description: strPtr("descr1"),
+					},
+					{
+						Name:        "name2",
+						Value:       2,
+						Scope:       "inventory",
+						Description: strPtr("descr2"),
+					},
+				},
+			),
+			inHdrs: map[string]string{
+				"X-MEN-Msg-Timestamp": "123",
+				"X-MEN-Source":        "deviceauth",
+			},
+			inventoryErr: nil,
+			resp: utils.JSONResponseParams{
+				OutputStatus:     http.StatusOK,
+				OutputBodyObject: nil,
+			},
+		},
+
+		"body formatted ok, attributes ok (all fields), patch outdated": {
+			inReq: test.MakeSimpleRequest("PATCH",
+				"http://1.2.3.4/api/internal/v2/inventory/devices/1",
+				[]model.DeviceAttribute{
+					{
+						Name:        "name1",
+						Value:       "value1",
+						Scope:       "inventory",
+						Description: strPtr("descr1"),
+					},
+					{
+						Name:        "name2",
+						Value:       2,
+						Scope:       "inventory",
+						Description: strPtr("descr2"),
+					},
+				},
+			),
+			inHdrs: map[string]string{
+				"X-MEN-Msg-Timestamp": "123",
+				"X-MEN-Source":        "deviceauth",
+			},
+			inventoryErr: store.ErrAttrPatchOutdated,
+			resp: utils.JSONResponseParams{
+				OutputStatus:     http.StatusPreconditionFailed,
+				OutputBodyObject: RestError("Attributes patch outdated"),
+			},
+		},
+
+		"body formatted ok, attributes ok (all fields), inventory err": {
+			inReq: test.MakeSimpleRequest("PATCH",
+				"http://1.2.3.4/api/internal/v2/inventory/devices/1",
+				[]model.DeviceAttribute{
+					{
+						Name:        "name1",
+						Value:       "value1",
+						Scope:       "inventory",
+						Description: strPtr("descr1"),
+					},
+					{
+						Name:        "name2",
+						Value:       2,
+						Scope:       "inventory",
+						Description: strPtr("descr2"),
+					},
+				},
+			),
+			inHdrs: map[string]string{
+				"X-MEN-Msg-Timestamp": "123",
+				"X-MEN-Source":        "deviceauth",
+			},
+			inventoryErr: errors.New("internal error"),
+			resp: utils.JSONResponseParams{
+				OutputStatus:     http.StatusInternalServerError,
+				OutputBodyObject: RestError("internal error"),
+			},
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Logf("test case: %s", name)
+		inv := minventory.InventoryApp{}
+
+		ctx := contextMatcher()
+
+		inv.On("UpsertAttributesWithSource",
+			ctx,
+			mock.AnythingOfType("model.DeviceID"),
+			mock.AnythingOfType("model.DeviceAttributes"),
+			mock.AnythingOfType("model.AttributeSource")).Return(tc.inventoryErr)
+
+		apih := makeMockApiHandler(t, &inv)
+
+		rest.ErrorFieldName = "error"
+
+		for k, v := range tc.inHdrs {
+			tc.inReq.Header.Set(k, v)
+		}
+
+		runTestRequest(t, apih, tc.inReq, tc.resp)
+	}
+}
