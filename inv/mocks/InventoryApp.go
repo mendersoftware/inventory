@@ -127,9 +127,7 @@ func (_m *InventoryApp) ListDevices(ctx context.Context, q store.ListQuery) ([]m
 	if rf, ok := ret.Get(1).(func(context.Context, store.ListQuery) int); ok {
 		r1 = rf(ctx, q)
 	} else {
-		if ret.Get(1) != nil {
-			r1 = ret.Get(1).(int)
-		}
+		r1 = ret.Get(1).(int)
 	}
 
 	var r2 error
@@ -159,9 +157,7 @@ func (_m *InventoryApp) ListDevicesByGroup(ctx context.Context, group model.Grou
 	if rf, ok := ret.Get(1).(func(context.Context, model.GroupName, int, int) int); ok {
 		r1 = rf(ctx, group, skip, limit)
 	} else {
-		if ret.Get(1) != nil {
-			r1 = ret.Get(1).(int)
-		}
+		r1 = ret.Get(1).(int)
 	}
 
 	var r2 error
@@ -232,6 +228,20 @@ func (_m *InventoryApp) UpsertAttributes(ctx context.Context, id model.DeviceID,
 	var r0 error
 	if rf, ok := ret.Get(0).(func(context.Context, model.DeviceID, model.DeviceAttributes) error); ok {
 		r0 = rf(ctx, id, attrs)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// UpsertAttributesWithSource provides a mock function with given fields: ctx, id, attrs, source
+func (_m *InventoryApp) UpsertAttributesWithSource(ctx context.Context, id model.DeviceID, attrs model.DeviceAttributes, source model.AttributeSource) error {
+	ret := _m.Called(ctx, id, attrs, source)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, model.DeviceID, model.DeviceAttributes, model.AttributeSource) error); ok {
+		r0 = rf(ctx, id, attrs, source)
 	} else {
 		r0 = ret.Error(0)
 	}
