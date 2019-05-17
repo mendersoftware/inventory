@@ -2135,7 +2135,7 @@ func TestMigrate(t *testing.T) {
 		store := NewDataStoreMongoWithSession(session)
 
 		if tc.automigrate {
-			store = store.WithAutomigrate()
+			store = store.WithAutomigrate().(*DataStoreMongo)
 		}
 
 		// prep input data

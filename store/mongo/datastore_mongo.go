@@ -75,11 +75,11 @@ type DataStoreMongo struct {
 	automigrate bool
 }
 
-func NewDataStoreMongoWithSession(session *mgo.Session) store.DataStore {
+func NewDataStoreMongoWithSession(session *mgo.Session) *DataStoreMongo {
 	return &DataStoreMongo{session: session}
 }
 
-func NewDataStoreMongo(config DataStoreMongoConfig) (store.DataStore, error) {
+func NewDataStoreMongo(config DataStoreMongoConfig) (*DataStoreMongo, error) {
 	//init master session
 	var err error
 	once.Do(func() {
