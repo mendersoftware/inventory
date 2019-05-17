@@ -36,7 +36,7 @@ import (
 )
 
 const (
-	DbVersion = "0.1.0"
+	DbVersion = "0.2.0"
 
 	DbName        = "inventory"
 	DbDevicesColl = "devices"
@@ -46,6 +46,8 @@ const (
 	DbDevAttributesDesc  = "description"
 	DbDevAttributesValue = "value"
 	DbDevAttributesScope = "scope"
+
+	DbScopeInventory = "inventory"
 )
 
 var (
@@ -545,7 +547,12 @@ func (db *DataStoreMongo) MigrateTenant(ctx context.Context, version string, ten
 		Tenant: tenantId,
 	})
 
-	migrations := []migrate.Migration{}
+	migrations := []migrate.Migration{
+		&migration_0_2_0{
+			ms:  db,
+			ctx: ctx,
+		},
+	}
 
 	err = m.Apply(ctx, *ver, migrations)
 	if err != nil {

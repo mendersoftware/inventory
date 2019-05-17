@@ -687,7 +687,9 @@ func TestMongoAddDevice(t *testing.T) {
 
 func compareDevsWithoutTimestamps(t *testing.T, expected, actual *model.Device) {
 	assert.Equal(t, expected.ID, actual.ID)
-	assert.Equal(t, expected.Attributes, actual.Attributes)
+	if !reflect.DeepEqual(expected.Attributes, actual.Attributes) {
+		assert.FailNow(t, "", "attributes not equal: %v \n%v\n", expected, actual)
+	}
 	assert.Equal(t, expected.Group, actual.Group)
 }
 
@@ -2072,7 +2074,7 @@ func TestMigrate(t *testing.T) {
 			automigrate: true,
 
 			outVers: []string{
-				"0.1.0",
+				"0.2.0",
 			},
 		},
 		"from 0.1.0 (first, dummy migration)": {
@@ -2081,12 +2083,13 @@ func TestMigrate(t *testing.T) {
 
 			outVers: []string{
 				"0.1.0",
+				"0.2.0",
 			},
 		},
 		"from 0.1.0, no-automigrate": {
-			versionFrom: "0.0.0",
+			versionFrom: "0.1.0",
 
-			err: errors.New("failed to apply migrations: db needs migration: inventory has version 0.0.0, needs version 0.1.0"),
+			err: errors.New("failed to apply migrations: db needs migration: inventory has version 0.1.0, needs version 0.2.0"),
 		},
 		"with devices, from 0.1.0": {
 			versionFrom: "0.1.0",
@@ -2095,16 +2098,18 @@ func TestMigrate(t *testing.T) {
 
 			outVers: []string{
 				"0.1.0",
+				"0.2.0",
 			},
 		},
 		"with devices, from 0.1.0, with tenant": {
-			versionFrom: "",
+			versionFrom: "0.1.0",
 			inDevs:      someDevs,
 			automigrate: true,
 			tenant:      "tenant",
 
 			outVers: []string{
 				"0.1.0",
+				"0.2.0",
 			},
 		},
 		"with devices, from 0.1.0, with tenant, other devs": {
@@ -2115,6 +2120,7 @@ func TestMigrate(t *testing.T) {
 
 			outVers: []string{
 				"0.1.0",
+				"0.2.0",
 			},
 		},
 	}

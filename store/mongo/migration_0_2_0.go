@@ -15,10 +15,12 @@ package mongo
 
 import (
 	"context"
+	"fmt"
 
-	"github.com/pkg/errors"
-
+	"github.com/globalsign/mgo/bson"
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
+	mstore "github.com/mendersoftware/go-lib-micro/store"
+	"github.com/pkg/errors"
 )
 
 type migration_0_2_0 struct {
@@ -29,6 +31,33 @@ type migration_0_2_0 struct {
 func (m *migration_0_2_0) Up(from migrate.Version) error {
 	s := m.ms.session.Copy()
 	defer s.Close()
+
+	// get all attribute names
+	names, err := m.ms.GetAllAttributeNames(m.ctx)
+	if err != nil {
+		return errors.Wrap(err, "failed to get attribute names")
+	}
+
+	// rename every attribute occurrence to scoped version, add scope field
+	// hacky - we're doing it in two runs, but dead simple
+	coll := s.DB(mstore.DbFromContext(m.ctx, DbName)).C(DbDevicesColl)
+	for _, n := range names {
+		nold := fmt.Sprintf("%s.%s", DbDevAttributes, n)
+		nnew := fmt.Sprintf("%s.%s-%s", DbDevAttributes, DbScopeInventory, n)
+
+		_, err := coll.UpdateAll(nil, bson.M{"$rename": bson.M{nold: nnew}})
+		if err != nil {
+			return errors.Wrapf(err, "failed to update attribute name %s to %s", nold, nnew)
+		}
+
+		// get all docs containing a given attribute
+
+		scope := fmt.Sprintf("%s.%s", nnew, DbDevAttributesScope)
+		_, err = coll.UpdateAll(bson.M{nnew: bson.M{"$exists": true}}, bson.M{"$set": bson.M{scope: DbScopeInventory}})
+		if err != nil {
+			return errors.Wrapf(err, "failed to update scope for attribute name %s", nold)
+		}
+	}
 
 	return nil
 }
