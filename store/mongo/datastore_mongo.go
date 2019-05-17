@@ -307,6 +307,38 @@ func (db *DataStoreMongo) UpsertAttributes(ctx context.Context, id model.DeviceI
 	return err
 }
 
+func (db *DataStoreMongo) UpsertAttributesWithSource(ctx context.Context, id model.DeviceID, attrs model.DeviceAttributes, source model.AttributeSource) error {
+	s := db.session.Copy()
+	defer s.Close()
+	c := s.DB(mstore.DbFromContext(ctx, DbName)).C(DbDevicesColl)
+	update := makeAttrUpsertWithSource(attrs, source)
+
+	fieldName := fmt.Sprintf("%s.%s.%s", "source", source.Name, "timestamp")
+	filter := bson.M{"$and": []bson.M{
+		bson.M{"$or": []bson.M{
+			{fieldName: bson.M{"$lt": source.Timestamp}},
+			{fieldName: nil},
+		}},
+		bson.M{"_id": id},
+	}}
+
+	//set update time and optionally created time
+	now := time.Now()
+	update["updated_ts"] = now
+	update = bson.M{"$set": update,
+		"$setOnInsert": bson.M{"created_ts": now}}
+
+	_, err := c.Upsert(filter, update)
+	// it's possible that the device exists but the update is outdated
+	// in that case mongo will try to insert device object and will fail
+	// with "1100 Duplicated" error
+	if mgo.IsDup(err) {
+		return store.ErrAttrPatchOutdated
+	}
+
+	return err
+}
+
 // prepare an attribute upsert doc based on DeviceAttributes map
 func makeAttrUpsert(attrs model.DeviceAttributes) map[string]interface{} {
 	var fieldName string
@@ -341,6 +373,17 @@ func makeAttrUpsert(attrs model.DeviceAttributes) map[string]interface{} {
 			upsert[fieldName] = a.Name
 		}
 	}
+
+	return upsert
+}
+
+// prepare an attribute upsert doc based on DeviceAttributes map
+func makeAttrUpsertWithSource(attrs model.DeviceAttributes, source model.AttributeSource) map[string]interface{} {
+	upsert := makeAttrUpsert(attrs)
+	fieldName := fmt.Sprintf("%s.%s.%s", "source", source.Name, "timestamp")
+	upsert[fieldName] = source.Timestamp
+	fieldName = fmt.Sprintf("%s.%s.%s", "source", source.Name, "name")
+	upsert[fieldName] = source.Name
 
 	return upsert
 }

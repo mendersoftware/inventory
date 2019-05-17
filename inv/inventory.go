@@ -30,6 +30,7 @@ type InventoryApp interface {
 	GetDevice(ctx context.Context, id model.DeviceID) (*model.Device, error)
 	AddDevice(ctx context.Context, d *model.Device) error
 	UpsertAttributes(ctx context.Context, id model.DeviceID, attrs model.DeviceAttributes) error
+	UpsertAttributesWithSource(ctx context.Context, id model.DeviceID, attrs model.DeviceAttributes, source model.AttributeSource) error
 	UnsetDeviceGroup(ctx context.Context, id model.DeviceID, groupName model.GroupName) error
 	UpdateDeviceGroup(ctx context.Context, id model.DeviceID, group model.GroupName) error
 	ListGroups(ctx context.Context) ([]model.GroupName, error)
@@ -94,6 +95,14 @@ func (i *inventory) DeleteDevice(ctx context.Context, id model.DeviceID) error {
 func (i *inventory) UpsertAttributes(ctx context.Context, id model.DeviceID, attrs model.DeviceAttributes) error {
 	if err := i.db.UpsertAttributes(ctx, id, attrs); err != nil {
 		return errors.Wrap(err, "failed to upsert attributes in db")
+	}
+
+	return nil
+}
+
+func (i *inventory) UpsertAttributesWithSource(ctx context.Context, id model.DeviceID, attrs model.DeviceAttributes, source model.AttributeSource) error {
+	if err := i.db.UpsertAttributesWithSource(ctx, id, attrs, source); err != nil {
+		return errors.Wrapf(err, "failed to upsert attributes provided by %s with timestamp: %d in db", source.Name, source.Timestamp)
 	}
 
 	return nil

@@ -40,6 +40,13 @@ func (da DeviceAttribute) Validate() error {
 	)
 }
 
+type AttributeSource struct {
+	Name      string `json:"name" bson:",omitempty"`
+	Timestamp uint64 `json:"timestamp,omitempty" bson:",omitempty"`
+}
+
+type AttributeSources map[string]AttributeSource
+
 func validateDeviceAttrVal(i interface{}) error {
 	switch v := i.(type) {
 	case float64, string:
@@ -85,6 +92,9 @@ type Device struct {
 	CreatedTs time.Time `json:"-" bson:"created_ts,omitempty"`
 	//Timestamp of the last attribute update.
 	UpdatedTs time.Time `json:"updated_ts" bson:"updated_ts,omitempty"`
+
+	//a map of attribute providers and timestamps of last updates
+	Source AttributeSources `json:"-" bson:",omitempty"`
 }
 
 func (d Device) Validate() error {
@@ -133,4 +143,31 @@ func (d DeviceAttributes) MarshalJSON() ([]byte, error) {
 	}
 
 	return json.Marshal(attrsArray)
+}
+
+func (s *AttributeSources) UnmarshalJSON(b []byte) error {
+	var sourcesArray []AttributeSource
+	err := json.Unmarshal(b, &sourcesArray)
+	if err != nil {
+		return err
+	}
+	if len(sourcesArray) > 0 {
+		*s = AttributeSources{}
+		for _, source := range sourcesArray {
+			(*s)[source.Name] = source
+		}
+	}
+
+	return nil
+}
+
+func (s AttributeSources) MarshalJSON() ([]byte, error) {
+	sourcesArray := make([]AttributeSource, 0, len(s))
+
+	for _, v := range s {
+		nv := v
+		sourcesArray = append(sourcesArray, nv)
+	}
+
+	return json.Marshal(sourcesArray)
 }
