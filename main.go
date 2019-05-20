@@ -1,4 +1,4 @@
-// Copyright 2017 Northern.tech AS
+// Copyright 2019 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -133,7 +133,7 @@ func cmdServer(args *cli.Context) error {
 	}
 
 	if args.Bool("automigrate") {
-		db = db.WithAutomigrate()
+		db = db.WithAutomigrate().(*mongo.DataStoreMongo)
 	}
 
 	ctx := context.Background()
@@ -178,7 +178,7 @@ func cmdMigrate(args *cli.Context) error {
 	}
 
 	// we want to apply migrations
-	db = db.WithAutomigrate()
+	db = db.WithAutomigrate().(*mongo.DataStoreMongo)
 
 	ctx := context.Background()
 
