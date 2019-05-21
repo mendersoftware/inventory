@@ -104,7 +104,39 @@ func makeMockApiHandler(t *testing.T, i inventory.InventoryApp) http.Handler {
 func mockListDevices(num int) []model.Device {
 	var devs []model.Device
 	for i := 0; i < num; i++ {
-		devs = append(devs, model.Device{ID: model.DeviceID(strconv.Itoa(i))})
+		devs = append(devs, model.Device{
+			ID: model.DeviceID(strconv.Itoa(i)),
+			Attributes: model.DeviceAttributes{
+				"foo": model.DeviceAttribute{
+					Name:  "foo",
+					Value: "bar",
+					Scope: "inventory",
+				},
+				"bar": model.DeviceAttribute{
+					Name:  "bar",
+					Value: "baz",
+					Scope: "system",
+				},
+			},
+		})
+	}
+	return devs
+}
+
+// devices with "inventory" attributes only
+func mockListDevicesV1(num int) []model.Device {
+	var devs []model.Device
+	for i := 0; i < num; i++ {
+		devs = append(devs, model.Device{
+			ID: model.DeviceID(strconv.Itoa(i)),
+			Attributes: model.DeviceAttributes{
+				"foo": model.DeviceAttribute{
+					Name:  "foo",
+					Value: "bar",
+					Scope: "inventory",
+				},
+			},
+		})
 	}
 	return devs
 }
@@ -218,7 +250,7 @@ func TestApiInventoryGetDevices(t *testing.T) {
 			inReq:           test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=4&per_page=5&group=foo", nil),
 			resp: utils.JSONResponseParams{
 				OutputStatus:     200,
-				OutputBodyObject: mockListDevices(3),
+				OutputBodyObject: mockListDevicesV1(3),
 				OutputHeaders: map[string][]string{
 					"Link": {
 						fmt.Sprintf(utils.LinkTmpl, "devices", "group=foo&page=3&per_page=5", "prev"),
@@ -235,7 +267,7 @@ func TestApiInventoryGetDevices(t *testing.T) {
 			inReq:           test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=4&per_page=5", nil),
 			resp: utils.JSONResponseParams{
 				OutputStatus:     200,
-				OutputBodyObject: mockListDevices(5),
+				OutputBodyObject: mockListDevicesV1(5),
 				OutputHeaders: map[string][]string{
 					"Link": {
 						fmt.Sprintf(utils.LinkTmpl, "devices", "page=3&per_page=5", "prev"),
@@ -252,7 +284,7 @@ func TestApiInventoryGetDevices(t *testing.T) {
 			inReq:           test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=4&per_page=5", nil),
 			resp: utils.JSONResponseParams{
 				OutputStatus:     200,
-				OutputBodyObject: mockListDevices(5),
+				OutputBodyObject: mockListDevicesV1(5),
 				OutputHeaders: map[string][]string{
 					"Link": {
 						fmt.Sprintf(utils.LinkTmpl, "devices", "page=3&per_page=5", "prev"),
@@ -302,7 +334,7 @@ func TestApiInventoryGetDevices(t *testing.T) {
 			inReq:           test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&attr_name1=qe:123:123:123", nil),
 			resp: utils.JSONResponseParams{
 				OutputStatus:     200,
-				OutputBodyObject: mockListDevices(5),
+				OutputBodyObject: mockListDevicesV1(5),
 				OutputHeaders: map[string][]string{
 					"Link": {
 						fmt.Sprintf(utils.LinkTmpl, "devices", "attr_name1=qe%3A123%3A123%3A123&page=1&per_page=5", "first"),
@@ -318,7 +350,7 @@ func TestApiInventoryGetDevices(t *testing.T) {
 			inReq:           test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?sort=attr_name1:asc&page=1&per_page=5", nil),
 			resp: utils.JSONResponseParams{
 				OutputStatus:     200,
-				OutputBodyObject: mockListDevices(5),
+				OutputBodyObject: mockListDevicesV1(5),
 				OutputHeaders: map[string][]string{
 					"Link": {
 						fmt.Sprintf(utils.LinkTmpl, "devices", "page=1&per_page=5&sort=attr_name1%3Aasc", "first"),
@@ -345,7 +377,7 @@ func TestApiInventoryGetDevices(t *testing.T) {
 			inReq:           test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?has_group=true&page=1&per_page=5", nil),
 			resp: utils.JSONResponseParams{
 				OutputStatus:     200,
-				OutputBodyObject: mockListDevices(5),
+				OutputBodyObject: mockListDevicesV1(5),
 				OutputHeaders: map[string][]string{
 					"Link": {
 						fmt.Sprintf(utils.LinkTmpl, "devices", "has_group=true&page=1&per_page=5", "first"),
@@ -1055,12 +1087,31 @@ func TestApiGetDevice(t *testing.T) {
 			outputDevice: &model.Device{
 				ID:    model.DeviceID("2"),
 				Group: model.GroupName("foo"),
+				Attributes: model.DeviceAttributes{
+					"foo": model.DeviceAttribute{
+						Name:  "foo",
+						Value: "bar",
+						Scope: "inventory",
+					},
+					"bar": model.DeviceAttribute{
+						Name:  "bar",
+						Value: "baz",
+						Scope: "system",
+					},
+				},
 			},
 			JSONResponseParams: utils.JSONResponseParams{
 				OutputStatus: http.StatusOK,
 				OutputBodyObject: model.Device{
 					ID:    model.DeviceID("2"),
 					Group: model.GroupName("foo"),
+					Attributes: model.DeviceAttributes{
+						"foo": model.DeviceAttribute{
+							Name:  "foo",
+							Value: "bar",
+							Scope: "inventory",
+						},
+					},
 				},
 			},
 		},

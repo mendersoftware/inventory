@@ -21,6 +21,11 @@ import (
 	"github.com/go-ozzo/ozzo-validation"
 )
 
+const (
+	AttrScopeInventory = "inventory"
+	AttrScopeSystem    = "system"
+)
+
 type DeviceID string
 
 type GroupName string
