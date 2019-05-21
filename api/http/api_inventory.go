@@ -15,6 +15,7 @@
 package http
 
 import (
+	"fmt"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -84,8 +85,8 @@ func NewInventoryApiHandlers(i inventory.InventoryApp) ApiHandler {
 
 func (i *inventoryHandlers) GetApp() (rest.App, error) {
 	routes := []*rest.Route{
-		rest.Get(uriDevices, i.GetDevicesHandler),
-		rest.Get(uriDevice, i.GetDeviceHandler),
+		rest.Get(uriDevices, i.GetDevicesV1Handler),
+		rest.Get(uriDevice, i.GetDeviceV1Handler),
 		rest.Delete(uriDevice, i.DeleteDeviceHandler),
 		rest.Delete(uriDeviceGroup, i.DeleteDeviceGroupHandler),
 		rest.Patch(uriAttributes, i.PatchDeviceAttributesHandler),
@@ -194,7 +195,7 @@ func parseFilterParams(r *rest.Request) ([]store.Filter, error) {
 	return filters, nil
 }
 
-func (i *inventoryHandlers) GetDevicesHandler(w rest.ResponseWriter, r *rest.Request) {
+func (i *inventoryHandlers) GetDevicesV1Handler(w rest.ResponseWriter, r *rest.Request) {
 	ctx := r.Context()
 
 	l := log.FromContext(ctx)
@@ -237,6 +238,7 @@ func (i *inventoryHandlers) GetDevicesHandler(w rest.ResponseWriter, r *rest.Req
 		GroupName: groupName}
 
 	devs, totalCount, err := i.inventory.ListDevices(ctx, ld)
+	limitDevicesAttrs(devs, model.AttrScopeInventory)
 
 	if err != nil {
 		u.RestErrWithLogInternal(w, r, l, err)
@@ -253,7 +255,7 @@ func (i *inventoryHandlers) GetDevicesHandler(w rest.ResponseWriter, r *rest.Req
 	w.WriteJson(devs)
 }
 
-func (i *inventoryHandlers) GetDeviceHandler(w rest.ResponseWriter, r *rest.Request) {
+func (i *inventoryHandlers) GetDeviceV1Handler(w rest.ResponseWriter, r *rest.Request) {
 	ctx := r.Context()
 
 	l := log.FromContext(ctx)
@@ -269,6 +271,7 @@ func (i *inventoryHandlers) GetDeviceHandler(w rest.ResponseWriter, r *rest.Requ
 		u.RestErrWithLog(w, r, l, store.ErrDevNotFound, http.StatusNotFound)
 		return
 	}
+	limitDeviceAttrs(dev, model.AttrScopeInventory)
 
 	w.WriteJson(dev)
 }
@@ -461,7 +464,7 @@ func parseDeviceAttributes(r *rest.Request) (model.DeviceAttributes, error) {
 	}
 
 	for _, a := range attrs {
-		a.Scope = "inventory"
+		a.Scope = model.AttrScopeInventory
 		if err = a.Validate(); err != nil {
 			return nil, err
 		}
@@ -638,4 +641,108 @@ func parseTimestampHeader(header string) (uint64, error) {
 	}
 
 	return uintVal, nil
+}
+
+// method to
+
+// `sort` paramater value is an attribute name with optional direction (desc or asc)
+// separated by colon (:)
+//
+// eg. `sort=attr_name1` or `sort=attr_name1:asd`
+// V1 version of parseSortParam method is using inventory attributes only
+func parseSortParamV1(r *rest.Request) (*store.Sort, error) {
+	sortStr, err := utils.ParseQueryParmStr(r, queryParamSort, false, nil)
+	if err != nil {
+		return nil, err
+	}
+	if sortStr == "" {
+		return nil, nil
+	}
+	sortValArray := strings.Split(sortStr, queryParamValueSeparator)
+	name := fmt.Sprintf("%s-%s", model.AttrScopeInventory, sortValArray[sortAttributeNameIdx])
+	sort := store.Sort{AttrName: name}
+	if len(sortValArray) == 2 {
+		sortOrder := sortValArray[sortOrderIdx]
+		if sortOrder != sortOrderAsc && sortOrder != sortOrderDesc {
+			return nil, errors.New("invalid sort order")
+		}
+		sort.Ascending = sortOrder == sortOrderAsc
+	}
+	return &sort, nil
+}
+
+// Filter paramaters name are attributes name. Value can be prefixed
+// with equality operator code (`eq` for =), separated from value by colon (:).
+// Equality operator default value is `eq`
+//
+// eg. `attr_name1=value1` or `attr_name1=eq:value1`
+// V1 version of parseSortParam method is using inventory attributes only
+func parseFilterParamsV1(r *rest.Request) ([]store.Filter, error) {
+	knownParams := []string{utils.PageName, utils.PerPageName, queryParamSort, queryParamHasGroup, queryParamGroup}
+	filters := make([]store.Filter, 0)
+	var filter store.Filter
+	for name := range r.URL.Query() {
+		if utils.ContainsString(name, knownParams) {
+			continue
+		}
+		valueStr, err := utils.ParseQueryParmStr(r, name, false, nil)
+		if err != nil {
+			return nil, err
+		}
+
+		name = fmt.Sprintf("%s-%s", model.AttrScopeInventory, name)
+		filter = store.Filter{AttrName: name}
+
+		// make sure we parse ':'s in value, it's either:
+		// not there
+		// after a valid operator specifier
+		// or/and inside the value itself(mac, etc), in which case leave it alone
+		sepIdx := strings.Index(valueStr, ":")
+		if sepIdx == -1 {
+			filter.Value = valueStr
+			filter.Operator = store.Eq
+		} else {
+			validOps := []string{"eq"}
+			for _, o := range validOps {
+				if valueStr[:sepIdx] == o {
+					switch o {
+					case "eq":
+						filter.Operator = store.Eq
+						filter.Value = valueStr[sepIdx+1:]
+					}
+					break
+				}
+			}
+
+			if filter.Value == "" {
+				filter.Value = valueStr
+				filter.Operator = store.Eq
+			}
+		}
+
+		floatValue, err := strconv.ParseFloat(filter.Value, 64)
+		if err == nil {
+			filter.ValueFloat = &floatValue
+		}
+
+		filters = append(filters, filter)
+	}
+	return filters, nil
+}
+
+// remove attributes with scope different than "inventory"
+func limitDeviceAttrs(dev *model.Device, scope string) {
+	for k, a := range dev.Attributes {
+		if a.Scope != model.AttrScopeInventory {
+			delete(dev.Attributes, k)
+		}
+	}
+	return
+}
+
+func limitDevicesAttrs(devs []model.Device, scope string) {
+	for _, dev := range devs {
+		limitDeviceAttrs(&dev, scope)
+	}
+	return
 }
