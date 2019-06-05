@@ -24,7 +24,6 @@ stages:
   - test
   - build
   - publish
-  - integration
 
 before_script:
   - mkdir -p /go/src/github.com/mendersoftware /go/src/_/builds
@@ -194,10 +193,3 @@ publish:build:master:
   tags:
     - docker
 
-integration:
-  stage: integration
-  variables:
-    DOWNSTREAM_GUI_VERSION: $DOCKER_TAG
-  trigger:
-    project: mzedel/mender-qa
-    branch: test
