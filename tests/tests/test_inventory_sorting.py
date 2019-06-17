@@ -22,7 +22,7 @@ class TestInventorySorting:
             internal_client.create_device(did, it)
 
         t = []
-        r = management_client.getAllDevices(sort="inventory-number:asc")
+        r = management_client.getAllDevices(sort="number:asc")
         for deviceInventoryList in r:
             for i in deviceInventoryList.attributes:
                 if i.name == "number":
@@ -31,7 +31,7 @@ class TestInventorySorting:
         assert sorted(numbers) == t
 
         t = []
-        r, h = management_client.client.devices.get_devices(sort="inventory-number:desc",
+        r, h = management_client.client.devices.get_devices(sort="number:desc",
                                                             Authorization="foo").result()
         for deviceInventoryList in r:
             for i in deviceInventoryList.attributes:
