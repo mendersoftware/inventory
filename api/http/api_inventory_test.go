@@ -153,7 +153,7 @@ func floatPtr(f float64) *float64 {
 	ret := f
 	return &ret
 }
-func TestApiParseFilterParams(t *testing.T) {
+func TestApiParseFilterParamsV1(t *testing.T) {
 	t.Parallel()
 
 	testCases := map[string]struct {
@@ -166,7 +166,7 @@ func TestApiParseFilterParams(t *testing.T) {
 			inReq: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&attr_name1=A0001", nil),
 			filters: []store.Filter{
 				store.Filter{
-					AttrName: "attr_name1",
+					AttrName: "inventory-attr_name1",
 					Value:    "A0001",
 					Operator: store.Eq,
 				},
@@ -176,7 +176,7 @@ func TestApiParseFilterParams(t *testing.T) {
 			inReq: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&attr_name1=qe:123:123:123", nil),
 			filters: []store.Filter{
 				store.Filter{
-					AttrName: "attr_name1",
+					AttrName: "inventory-attr_name1",
 					Value:    "qe:123:123:123",
 					Operator: store.Eq,
 				},
@@ -186,7 +186,7 @@ func TestApiParseFilterParams(t *testing.T) {
 			inReq: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&attr_name1=3.14", nil),
 			filters: []store.Filter{
 				store.Filter{
-					AttrName:   "attr_name1",
+					AttrName:   "inventory-attr_name1",
 					Value:      "3.14",
 					ValueFloat: floatPtr(3.14),
 					Operator:   store.Eq,
@@ -197,7 +197,7 @@ func TestApiParseFilterParams(t *testing.T) {
 			inReq: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&attr_name1=eq:A0001", nil),
 			filters: []store.Filter{
 				store.Filter{
-					AttrName: "attr_name1",
+					AttrName: "inventory-attr_name1",
 					Value:    "A0001",
 					Operator: store.Eq,
 				},
@@ -207,7 +207,7 @@ func TestApiParseFilterParams(t *testing.T) {
 			inReq: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&attr_name1=eq:qe:123:123:123", nil),
 			filters: []store.Filter{
 				store.Filter{
-					AttrName: "attr_name1",
+					AttrName: "inventory-attr_name1",
 					Value:    "qe:123:123:123",
 					Operator: store.Eq,
 				},
@@ -218,7 +218,7 @@ func TestApiParseFilterParams(t *testing.T) {
 	for name, testCase := range testCases {
 		t.Run(fmt.Sprintf("tc %s", name), func(t *testing.T) {
 			req := rest.Request{Request: testCase.inReq}
-			filters, err := parseFilterParams(&req)
+			filters, err := parseFilterParamsV1(&req)
 			if testCase.err != nil {
 				assert.Error(t, testCase.err, err.Error())
 			} else {
@@ -232,7 +232,7 @@ func TestApiParseFilterParams(t *testing.T) {
 	}
 }
 
-func TestApiInventoryGetDevices(t *testing.T) {
+func TestApiInventoryGetDevicesV1(t *testing.T) {
 	t.Parallel()
 	rest.ErrorFieldName = "error"
 

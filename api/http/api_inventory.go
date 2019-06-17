@@ -218,13 +218,13 @@ func (i *inventoryHandlers) GetDevicesV1Handler(w rest.ResponseWriter, r *rest.R
 		return
 	}
 
-	sort, err := parseSortParam(r)
+	sort, err := parseSortParamV1(r)
 	if err != nil {
 		u.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
 		return
 	}
 
-	filters, err := parseFilterParams(r)
+	filters, err := parseFilterParamsV1(r)
 	if err != nil {
 		u.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
 		return
