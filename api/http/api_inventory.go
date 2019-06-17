@@ -36,7 +36,8 @@ import (
 )
 
 const (
-	uriDevices       = "/api/0.1.0/devices"
+	uriDevices       = "/api/management/v2/inventory/devices"
+	uriDevicesV1     = "/api/0.1.0/devices"
 	uriDevice        = "/api/0.1.0/devices/:id"
 	uriDeviceGroups  = "/api/0.1.0/devices/:id/group"
 	uriDeviceGroup   = "/api/0.1.0/devices/:id/group/:name"
@@ -89,7 +90,8 @@ func NewInventoryApiHandlers(i inventory.InventoryApp) ApiHandler {
 
 func (i *inventoryHandlers) GetApp() (rest.App, error) {
 	routes := []*rest.Route{
-		rest.Get(uriDevices, i.GetDevicesV1Handler),
+		rest.Get(uriDevices, i.GetDevicesHandler),
+		rest.Get(uriDevicesV1, i.GetDevicesV1Handler),
 		rest.Get(uriDevice, i.GetDeviceV1Handler),
 		rest.Delete(uriDevice, i.DeleteDeviceHandler),
 		rest.Delete(uriDeviceGroup, i.DeleteDeviceGroupHandler),
@@ -672,6 +674,72 @@ func parseTimestampHeader(header string) (uint64, error) {
 	}
 
 	return uintVal, nil
+}
+
+func (i *inventoryHandlers) GetDevicesHandler(w rest.ResponseWriter, r *rest.Request) {
+	ctx := r.Context()
+
+	l := log.FromContext(ctx)
+
+	page, perPage, err := utils.ParsePagination(r)
+	if err != nil {
+		u.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
+		return
+	}
+
+	hasGroup, err := utils.ParseQueryParmBool(r, queryParamHasGroup, false, nil)
+	if err != nil {
+		u.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
+		return
+	}
+
+	groupName, err := utils.ParseQueryParmStr(r, "group", false, nil)
+	if err != nil {
+		u.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
+		return
+	}
+
+	sort, err := parseSortParam(r)
+	if err != nil {
+		u.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
+		return
+	}
+
+	filters, err := parseFilterParams(r)
+	if err != nil {
+		u.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
+		return
+	}
+
+	ld := store.ListQuery{Skip: int((page - 1) * perPage),
+		Limit:     int(perPage),
+		Filters:   filters,
+		Sort:      sort,
+		HasGroup:  hasGroup,
+		GroupName: groupName}
+
+	devs, totalCount, err := i.inventory.ListDevices(ctx, ld)
+
+	if err != nil {
+		u.RestErrWithLogInternal(w, r, l, err)
+		return
+	}
+
+	hasNext := totalCount > int(page*perPage)
+	links := utils.MakePageLinkHdrs(r, page, perPage, hasNext)
+	for _, l := range links {
+		w.Header().Add("Link", l)
+	}
+	// the response writer will ensure the header name is in Kebab-Pascal-Case
+	w.Header().Add("X-Total-Count", strconv.Itoa(totalCount))
+
+	// transform devices to DTOs
+	out := make([]*DeviceDto, len(devs), len(devs))
+	for i, d := range devs {
+		out[i] = NewDeviceDto(&d)
+	}
+
+	w.WriteJson(out)
 }
 
 // method to
