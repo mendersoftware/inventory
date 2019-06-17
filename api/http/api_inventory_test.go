@@ -323,6 +323,77 @@ func TestApiParseFilterParams(t *testing.T) {
 	}
 }
 
+func TestApiParseSortParam(t *testing.T) {
+	t.Parallel()
+
+	testCases := map[string]struct {
+		inReq *http.Request
+		sort  store.Sort
+		err   error
+	}{
+
+		"only sort - implicit": {
+			inReq: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?sort=identity:mac", nil),
+			sort: store.Sort{
+				AttrName:  "identity-mac",
+				Ascending: false,
+			},
+		},
+
+		"sort + other args": {
+			inReq: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&identity:attr_name1=A0001&sort=identity:mac", nil),
+			sort: store.Sort{
+				AttrName:  "identity-mac",
+				Ascending: false,
+			},
+		},
+
+		"only sort - ascending": {
+			inReq: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?sort=identity:foo:asc", nil),
+			sort: store.Sort{
+				AttrName:  "identity-foo",
+				Ascending: true,
+			},
+		},
+
+		"only sort - descending": {
+			inReq: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?sort=identity:foo:desc", nil),
+			sort: store.Sort{
+				AttrName:  "identity-foo",
+				Ascending: false,
+			},
+		},
+
+		"only sort - invalid direction": {
+			inReq: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?sort=identity:foo:bar", nil),
+			err:   errors.New("invalid sort order"),
+		},
+
+		"only sort - no scope": {
+			inReq: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?sort=mac", nil),
+			err:   errors.New("invalid sort 'mac': must include at minimum scope and name (e.g. 'identity:mac')"),
+		},
+
+		"only sort - no scope, some direction": {
+			inReq: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?sort=mac:asc", nil),
+			err:   errors.New("supported attribute scopes: [ identity ]"),
+		},
+	}
+
+	for name, testCase := range testCases {
+		t.Run(fmt.Sprintf("tc %s", name), func(t *testing.T) {
+			req := rest.Request{Request: testCase.inReq}
+			sort, err := parseSortParam(&req)
+			if testCase.err != nil {
+				assert.EqualError(t, testCase.err, err.Error())
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, testCase.sort, *sort)
+			}
+		})
+	}
+}
+
 func TestApiInventoryGetDevicesV1(t *testing.T) {
 	t.Parallel()
 	rest.ErrorFieldName = "error"

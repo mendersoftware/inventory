@@ -58,8 +58,11 @@ const (
 	queryParamScopeSeparator = ":"
 	sortOrderAsc             = "asc"
 	sortOrderDesc            = "desc"
-	sortAttributeNameIdx     = 0
-	sortOrderIdx             = 1
+	sortScopeIdx             = 0
+	sortAttributeNameIdx     = 1
+	sortOrderIdx             = 2
+	sortAttributeNameIdxV1   = 0
+	sortOrderIdxV1           = 1
 )
 
 // model of device's group name response at /devices/:id/group endpoint
@@ -115,10 +118,9 @@ func (i *inventoryHandlers) GetApp() (rest.App, error) {
 
 }
 
-// `sort` paramater value is an attribute name with optional direction (desc or asc)
-// separated by colon (:)
-//
-// eg. `sort=attr_name1` or `sort=attr_name1:asd`
+// parseSortParam parses the v2 version of Sort, e.g.
+// `sort=identity:attr_name1`
+// `sort=identity:attr_name1:asc`
 func parseSortParam(r *rest.Request) (*store.Sort, error) {
 	sortStr, err := utils.ParseQueryParmStr(r, queryParamSort, false, nil)
 	if err != nil {
@@ -127,15 +129,31 @@ func parseSortParam(r *rest.Request) (*store.Sort, error) {
 	if sortStr == "" {
 		return nil, nil
 	}
+
 	sortValArray := strings.Split(sortStr, queryParamValueSeparator)
-	sort := store.Sort{AttrName: sortValArray[sortAttributeNameIdx]}
-	if len(sortValArray) == 2 {
+	if len(sortValArray) < 2 {
+		return nil, fmt.Errorf("invalid sort '%s': must include at minimum scope and name (e.g. 'identity:mac')", sortStr)
+	}
+
+	sort := store.Sort{}
+
+	scope := sortValArray[sortScopeIdx]
+	if scope != model.AttrScopeIdentity {
+		return nil, errors.New("supported attribute scopes: [ identity ]")
+	}
+	name := sortValArray[sortAttributeNameIdx]
+
+	sort.AttrName = fmt.Sprintf("%s-%s", scope, name)
+
+	// 3 elems - scope:name:dir
+	if len(sortValArray) == 3 {
 		sortOrder := sortValArray[sortOrderIdx]
 		if sortOrder != sortOrderAsc && sortOrder != sortOrderDesc {
 			return nil, errors.New("invalid sort order")
 		}
 		sort.Ascending = sortOrder == sortOrderAsc
 	}
+
 	return &sort, nil
 }
 
@@ -672,10 +690,10 @@ func parseSortParamV1(r *rest.Request) (*store.Sort, error) {
 		return nil, nil
 	}
 	sortValArray := strings.Split(sortStr, queryParamValueSeparator)
-	name := fmt.Sprintf("%s-%s", model.AttrScopeInventory, sortValArray[sortAttributeNameIdx])
+	name := fmt.Sprintf("%s-%s", model.AttrScopeInventory, sortValArray[sortAttributeNameIdxV1])
 	sort := store.Sort{AttrName: name}
 	if len(sortValArray) == 2 {
-		sortOrder := sortValArray[sortOrderIdx]
+		sortOrder := sortValArray[sortOrderIdxV1]
 		if sortOrder != sortOrderAsc && sortOrder != sortOrderDesc {
 			return nil, errors.New("invalid sort order")
 		}
