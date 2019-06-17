@@ -24,6 +24,7 @@ import (
 const (
 	AttrScopeInventory = "inventory"
 	AttrScopeSystem    = "system"
+	AttrScopeIdentity  = "identity"
 )
 
 type DeviceID string

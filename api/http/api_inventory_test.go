@@ -232,6 +232,97 @@ func TestApiParseFilterParamsV1(t *testing.T) {
 	}
 }
 
+func TestApiParseFilterParams(t *testing.T) {
+	t.Parallel()
+
+	testCases := map[string]struct {
+		inReq   *http.Request
+		filters []store.Filter
+		err     error
+	}{
+
+		"eq - short form(implicit)": {
+			inReq: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&identity:attr_name1=A0001", nil),
+			filters: []store.Filter{
+				store.Filter{
+					AttrName: "identity-attr_name1",
+					Value:    "A0001",
+					Operator: store.Eq,
+				},
+			},
+		},
+		"eq - short form(implicit), colons": {
+			inReq: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&identity:attr_name1=qe:123:123:123", nil),
+			filters: []store.Filter{
+				store.Filter{
+					AttrName: "identity-attr_name1",
+					Value:    "qe:123:123:123",
+					Operator: store.Eq,
+				},
+			},
+		},
+		"eq - short form(implicit), float": {
+			inReq: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&identity:attr_name1=3.14", nil),
+			filters: []store.Filter{
+				store.Filter{
+					AttrName:   "identity-attr_name1",
+					Value:      "3.14",
+					ValueFloat: floatPtr(3.14),
+					Operator:   store.Eq,
+				},
+			},
+		},
+		"eq - long form": {
+			inReq: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&identity:attr_name1=eq:A0001", nil),
+			filters: []store.Filter{
+				store.Filter{
+					AttrName: "identity-attr_name1",
+					Value:    "A0001",
+					Operator: store.Eq,
+				},
+			},
+		},
+		"eq - long form, colons": {
+			inReq: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&identity:attr_name1=eq:qe:123:123:123", nil),
+			filters: []store.Filter{
+				store.Filter{
+					AttrName: "identity-attr_name1",
+					Value:    "qe:123:123:123",
+					Operator: store.Eq,
+				},
+			},
+		},
+		"eq - short form(implicit), missing scope": {
+			inReq: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&attr_name1=A0001", nil),
+			err:   errors.New("invalid filter 'attr_name1': must include scope and name (e.g. 'identity:mac')"),
+		},
+		"eq - short form(implicit), missing scope in some": {
+			inReq: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&identity:attr_name1=A0001&attr_name2=foo", nil),
+			err:   errors.New("invalid filter 'attr_name2': must include scope and name (e.g. 'identity:mac')"),
+		},
+		"eq - long form, colons, missing scope": {
+			inReq: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&attr_name1=eq:qe:123:123:123", nil),
+			err:   errors.New("invalid filter 'attr_name1': must include scope and name (e.g. 'identity:mac')"),
+		},
+	}
+
+	for name, testCase := range testCases {
+		t.Run(fmt.Sprintf("tc %s", name), func(t *testing.T) {
+			req := rest.Request{Request: testCase.inReq}
+			filters, err := parseFilterParams(&req)
+			if testCase.err != nil {
+				assert.EqualError(t, testCase.err, err.Error())
+			} else {
+				assert.NoError(t, err)
+				assert.NotNil(t, filters)
+				assert.NotEmpty(t, filters)
+
+				assert.ElementsMatch(t, testCase.filters, filters)
+			}
+		})
+	}
+}
+
 func TestApiInventoryGetDevicesV1(t *testing.T) {
 	t.Parallel()
 	rest.ErrorFieldName = "error"

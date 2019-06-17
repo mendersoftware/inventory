@@ -55,6 +55,7 @@ const (
 	queryParamSort           = "sort"
 	queryParamHasGroup       = "has_group"
 	queryParamValueSeparator = ":"
+	queryParamScopeSeparator = ":"
 	sortOrderAsc             = "asc"
 	sortOrderDesc            = "desc"
 	sortAttributeNameIdx     = 0
@@ -138,11 +139,9 @@ func parseSortParam(r *rest.Request) (*store.Sort, error) {
 	return &sort, nil
 }
 
-// Filter paramaters name are attributes name. Value can be prefixed
-// with equality operator code (`eq` for =), separated from value by colon (:).
-// Equality operator default value is `eq`
-//
-// eg. `attr_name1=value1` or `attr_name1=eq:value1`
+// parseFilterParams parses the v2 version of filter descriptor, e.g.:
+// `scope:attr_name1=value1`
+// `scope:attr_name1=eq:value1`
 func parseFilterParams(r *rest.Request) ([]store.Filter, error) {
 	knownParams := []string{utils.PageName, utils.PerPageName, queryParamSort, queryParamHasGroup, queryParamGroup}
 	filters := make([]store.Filter, 0)
@@ -151,12 +150,26 @@ func parseFilterParams(r *rest.Request) ([]store.Filter, error) {
 		if utils.ContainsString(name, knownParams) {
 			continue
 		}
+		// name is 'scope:attr_name'
+		nameArr := strings.Split(name, queryParamValueSeparator)
+		if len(nameArr) != 2 {
+			return nil, fmt.Errorf("invalid filter '%s': must include scope and name (e.g. 'identity:mac')", name)
+		}
+		scope := nameArr[0]
+		if scope != model.AttrScopeIdentity {
+			return nil, errors.New("supported attribute scopes: [ identity ]")
+		}
+
+		attr := nameArr[1]
+
 		valueStr, err := utils.ParseQueryParmStr(r, name, false, nil)
 		if err != nil {
 			return nil, err
 		}
 
-		filter = store.Filter{AttrName: name}
+		filter = store.Filter{
+			AttrName: fmt.Sprintf("%s-%s", scope, attr),
+		}
 
 		// make sure we parse ':'s in value, it's either:
 		// not there
