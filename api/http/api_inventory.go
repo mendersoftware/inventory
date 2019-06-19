@@ -496,8 +496,10 @@ func parseDeviceAttributes(r *rest.Request) (model.DeviceAttributes, error) {
 		return nil, errors.Wrap(err, "failed to decode request body")
 	}
 
-	for _, a := range attrs {
+	for i := range attrs {
+		a := attrs[i]
 		a.Scope = model.AttrScopeInventory
+		attrs[i] = a
 		if err = a.Validate(); err != nil {
 			return nil, err
 		}
