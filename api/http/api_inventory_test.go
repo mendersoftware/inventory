@@ -153,7 +153,7 @@ func floatPtr(f float64) *float64 {
 	ret := f
 	return &ret
 }
-func TestApiParseFilterParams(t *testing.T) {
+func TestApiParseFilterParamsV1(t *testing.T) {
 	t.Parallel()
 
 	testCases := map[string]struct {
@@ -166,7 +166,7 @@ func TestApiParseFilterParams(t *testing.T) {
 			inReq: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&attr_name1=A0001", nil),
 			filters: []store.Filter{
 				store.Filter{
-					AttrName: "attr_name1",
+					AttrName: "inventory-attr_name1",
 					Value:    "A0001",
 					Operator: store.Eq,
 				},
@@ -176,7 +176,7 @@ func TestApiParseFilterParams(t *testing.T) {
 			inReq: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&attr_name1=qe:123:123:123", nil),
 			filters: []store.Filter{
 				store.Filter{
-					AttrName: "attr_name1",
+					AttrName: "inventory-attr_name1",
 					Value:    "qe:123:123:123",
 					Operator: store.Eq,
 				},
@@ -186,7 +186,7 @@ func TestApiParseFilterParams(t *testing.T) {
 			inReq: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&attr_name1=3.14", nil),
 			filters: []store.Filter{
 				store.Filter{
-					AttrName:   "attr_name1",
+					AttrName:   "inventory-attr_name1",
 					Value:      "3.14",
 					ValueFloat: floatPtr(3.14),
 					Operator:   store.Eq,
@@ -197,7 +197,7 @@ func TestApiParseFilterParams(t *testing.T) {
 			inReq: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&attr_name1=eq:A0001", nil),
 			filters: []store.Filter{
 				store.Filter{
-					AttrName: "attr_name1",
+					AttrName: "inventory-attr_name1",
 					Value:    "A0001",
 					Operator: store.Eq,
 				},
@@ -207,7 +207,7 @@ func TestApiParseFilterParams(t *testing.T) {
 			inReq: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&attr_name1=eq:qe:123:123:123", nil),
 			filters: []store.Filter{
 				store.Filter{
-					AttrName: "attr_name1",
+					AttrName: "inventory-attr_name1",
 					Value:    "qe:123:123:123",
 					Operator: store.Eq,
 				},
@@ -218,7 +218,7 @@ func TestApiParseFilterParams(t *testing.T) {
 	for name, testCase := range testCases {
 		t.Run(fmt.Sprintf("tc %s", name), func(t *testing.T) {
 			req := rest.Request{Request: testCase.inReq}
-			filters, err := parseFilterParams(&req)
+			filters, err := parseFilterParamsV1(&req)
 			if testCase.err != nil {
 				assert.Error(t, testCase.err, err.Error())
 			} else {
@@ -232,7 +232,580 @@ func TestApiParseFilterParams(t *testing.T) {
 	}
 }
 
+func TestApiParseFilterParams(t *testing.T) {
+	t.Parallel()
+
+	testCases := map[string]struct {
+		inReq   *http.Request
+		filters []store.Filter
+		err     error
+	}{
+
+		"eq - short form(implicit)": {
+			inReq: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&identity:attr_name1=A0001", nil),
+			filters: []store.Filter{
+				store.Filter{
+					AttrName: "identity-attr_name1",
+					Value:    "A0001",
+					Operator: store.Eq,
+				},
+			},
+		},
+		"eq - short form(implicit), colons": {
+			inReq: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&identity:attr_name1=qe:123:123:123", nil),
+			filters: []store.Filter{
+				store.Filter{
+					AttrName: "identity-attr_name1",
+					Value:    "qe:123:123:123",
+					Operator: store.Eq,
+				},
+			},
+		},
+		"eq - short form(implicit), float": {
+			inReq: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&identity:attr_name1=3.14", nil),
+			filters: []store.Filter{
+				store.Filter{
+					AttrName:   "identity-attr_name1",
+					Value:      "3.14",
+					ValueFloat: floatPtr(3.14),
+					Operator:   store.Eq,
+				},
+			},
+		},
+		"eq - long form": {
+			inReq: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&identity:attr_name1=eq:A0001", nil),
+			filters: []store.Filter{
+				store.Filter{
+					AttrName: "identity-attr_name1",
+					Value:    "A0001",
+					Operator: store.Eq,
+				},
+			},
+		},
+		"eq - long form, colons": {
+			inReq: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&identity:attr_name1=eq:qe:123:123:123", nil),
+			filters: []store.Filter{
+				store.Filter{
+					AttrName: "identity-attr_name1",
+					Value:    "qe:123:123:123",
+					Operator: store.Eq,
+				},
+			},
+		},
+		"eq - short form(implicit), missing scope": {
+			inReq: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&attr_name1=A0001", nil),
+			err:   errors.New("invalid filter 'attr_name1': must include scope and name (e.g. 'identity:mac')"),
+		},
+		"eq - short form(implicit), missing scope in some": {
+			inReq: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&identity:attr_name1=A0001&attr_name2=foo", nil),
+			err:   errors.New("invalid filter 'attr_name2': must include scope and name (e.g. 'identity:mac')"),
+		},
+		"eq - long form, colons, missing scope": {
+			inReq: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&attr_name1=eq:qe:123:123:123", nil),
+			err:   errors.New("invalid filter 'attr_name1': must include scope and name (e.g. 'identity:mac')"),
+		},
+	}
+
+	for name, testCase := range testCases {
+		t.Run(fmt.Sprintf("tc %s", name), func(t *testing.T) {
+			req := rest.Request{Request: testCase.inReq}
+			filters, err := parseFilterParams(&req)
+			if testCase.err != nil {
+				assert.EqualError(t, testCase.err, err.Error())
+			} else {
+				assert.NoError(t, err)
+				assert.NotNil(t, filters)
+				assert.NotEmpty(t, filters)
+
+				assert.ElementsMatch(t, testCase.filters, filters)
+			}
+		})
+	}
+}
+
+func TestApiParseSortParam(t *testing.T) {
+	t.Parallel()
+
+	testCases := map[string]struct {
+		inReq *http.Request
+		sort  store.Sort
+		err   error
+	}{
+
+		"only sort - implicit": {
+			inReq: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?sort=identity:mac", nil),
+			sort: store.Sort{
+				AttrName:  "identity-mac",
+				Ascending: false,
+			},
+		},
+
+		"sort + other args": {
+			inReq: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&identity:attr_name1=A0001&sort=identity:mac", nil),
+			sort: store.Sort{
+				AttrName:  "identity-mac",
+				Ascending: false,
+			},
+		},
+
+		"only sort - ascending": {
+			inReq: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?sort=identity:foo:asc", nil),
+			sort: store.Sort{
+				AttrName:  "identity-foo",
+				Ascending: true,
+			},
+		},
+
+		"only sort - descending": {
+			inReq: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?sort=identity:foo:desc", nil),
+			sort: store.Sort{
+				AttrName:  "identity-foo",
+				Ascending: false,
+			},
+		},
+
+		"only sort - invalid direction": {
+			inReq: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?sort=identity:foo:bar", nil),
+			err:   errors.New("invalid sort order"),
+		},
+
+		"only sort - no scope": {
+			inReq: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?sort=mac", nil),
+			err:   errors.New("invalid sort 'mac': must include at minimum scope and name (e.g. 'identity:mac')"),
+		},
+
+		"only sort - no scope, some direction": {
+			inReq: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?sort=mac:asc", nil),
+			err:   errors.New("supported attribute scopes: [ identity ]"),
+		},
+	}
+
+	for name, testCase := range testCases {
+		t.Run(fmt.Sprintf("tc %s", name), func(t *testing.T) {
+			req := rest.Request{Request: testCase.inReq}
+			sort, err := parseSortParam(&req)
+			if testCase.err != nil {
+				assert.EqualError(t, testCase.err, err.Error())
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, testCase.sort, *sort)
+			}
+		})
+	}
+}
+
 func TestApiInventoryGetDevices(t *testing.T) {
+	t.Parallel()
+	rest.ErrorFieldName = "error"
+
+	inDevs := []model.Device{
+		{
+			ID: model.DeviceID("1"),
+			Attributes: model.DeviceAttributes{
+				"foo": model.DeviceAttribute{
+					Name:  "foo",
+					Value: []interface{}{"foo", "bar"},
+					Scope: "system",
+				},
+			},
+		},
+		{
+			ID: model.DeviceID("2"),
+			Attributes: model.DeviceAttributes{
+				"foo": model.DeviceAttribute{
+					Name:  "foo",
+					Value: "bar",
+					Scope: "inventory",
+				},
+			},
+		},
+		{
+			ID: model.DeviceID("3"),
+			Attributes: model.DeviceAttributes{
+				"bar": model.DeviceAttribute{
+					Name:  "bar",
+					Value: "bar",
+					Scope: "identity",
+				},
+				"baz": model.DeviceAttribute{
+					Name:  "baz",
+					Value: "baz",
+					Scope: "identity",
+				},
+			},
+		},
+		{
+			ID: model.DeviceID("4"),
+			Attributes: model.DeviceAttributes{
+				"foo-id": model.DeviceAttribute{
+					Name:  "foo",
+					Value: []interface{}{"foo", "bar"},
+					Scope: "identity",
+				},
+				"bar-id": model.DeviceAttribute{
+					Name:  "bar",
+					Value: []interface{}{1.2, 3.4},
+					Scope: "identity",
+				},
+				"foo-sys": model.DeviceAttribute{
+					Name:  "foo",
+					Value: "val",
+					Scope: "system",
+				},
+				"bar-sys": model.DeviceAttribute{
+					Name:  "bar",
+					Value: 123,
+					Scope: "system",
+				},
+				"baz-inv": model.DeviceAttribute{
+					Name:  "baz",
+					Value: []interface{}{"baz"},
+					Scope: "inventory",
+				},
+			},
+		},
+		{
+			ID: model.DeviceID("5"),
+			Attributes: model.DeviceAttributes{
+				"foo-sys": model.DeviceAttribute{
+					Name:  "foo",
+					Value: 123,
+					Scope: "system",
+				},
+			},
+		},
+	}
+
+	outDevs := []DeviceDto{
+		{
+			ID: "1",
+			Attributes: map[string][]model.DeviceAttribute{
+				"system": []model.DeviceAttribute{
+					{
+						Name:  "foo",
+						Value: []interface{}{"foo", "bar"},
+						Scope: "system",
+					},
+				},
+				"identity":  []model.DeviceAttribute{},
+				"custom":    []model.DeviceAttribute{},
+				"inventory": []model.DeviceAttribute{},
+			},
+		},
+		{
+			ID: "2",
+			Attributes: map[string][]model.DeviceAttribute{
+				"inventory": []model.DeviceAttribute{
+					{
+						Name:  "foo",
+						Value: "bar",
+						Scope: "inventory",
+					},
+				},
+				"identity": []model.DeviceAttribute{},
+				"custom":   []model.DeviceAttribute{},
+				"system":   []model.DeviceAttribute{},
+			},
+		},
+		{
+			ID: "3",
+			Attributes: map[string][]model.DeviceAttribute{
+				"identity": []model.DeviceAttribute{
+					{
+						Name:  "bar",
+						Value: "bar",
+						Scope: "identity",
+					},
+					{
+						Name:  "baz",
+						Value: "baz",
+						Scope: "identity",
+					},
+				},
+				"system":    []model.DeviceAttribute{},
+				"inventory": []model.DeviceAttribute{},
+				"custom":    []model.DeviceAttribute{},
+			},
+		},
+		{
+			ID: "4",
+			Attributes: map[string][]model.DeviceAttribute{
+				"identity": []model.DeviceAttribute{
+					{
+						Name:  "bar",
+						Value: []interface{}{1.2, 3.4},
+						Scope: "identity",
+					},
+					{
+						Name:  "foo",
+						Value: []interface{}{"foo", "bar"},
+						Scope: "identity",
+					},
+				},
+				"system": []model.DeviceAttribute{
+					{
+						Name:  "bar",
+						Value: 123,
+						Scope: "system",
+					},
+					{
+						Name:  "foo",
+						Value: "val",
+						Scope: "system",
+					},
+				},
+				"inventory": []model.DeviceAttribute{
+					{
+						Name:  "baz",
+						Value: []interface{}{"baz"},
+						Scope: "inventory",
+					},
+				},
+				"custom": []model.DeviceAttribute{},
+			},
+		},
+		{
+			ID: "5",
+			Attributes: map[string][]model.DeviceAttribute{
+				"system": {
+					model.DeviceAttribute{
+						Name:  "foo",
+						Value: 123,
+						Scope: "system",
+					},
+				},
+				"inventory": []model.DeviceAttribute{},
+				"identity":  []model.DeviceAttribute{},
+				"custom":    []model.DeviceAttribute{},
+			},
+		},
+	}
+
+	testCases := map[string]struct {
+		devs  []model.Device
+		total int
+		err   error
+
+		req  *http.Request
+		resp utils.JSONResponseParams
+	}{
+		"get all devices in group": {
+			devs:  inDevs,
+			total: 18,
+			req:   test.MakeSimpleRequest("GET", "http://1.2.3.4/api/management/v2/inventory/devices?page=4&per_page=5&group=foo", nil),
+			resp: utils.JSONResponseParams{
+				OutputStatus:     200,
+				OutputBodyObject: outDevs,
+				OutputHeaders: map[string][]string{
+					"Link": {
+						fmt.Sprintf(utils.LinkTmpl, "devices", "group=foo&page=3&per_page=5", "prev"),
+						fmt.Sprintf(utils.LinkTmpl, "devices", "group=foo&page=1&per_page=5", "first"),
+					},
+					"X-Total-Count": {"18"},
+				},
+			},
+		},
+		"valid pagination, no next page": {
+			devs:  inDevs,
+			total: 20,
+			req:   test.MakeSimpleRequest("GET", "http://1.2.3.4/api/management/v2/inventory/devices?page=4&per_page=5", nil),
+			resp: utils.JSONResponseParams{
+				OutputStatus:     200,
+				OutputBodyObject: outDevs,
+				OutputHeaders: map[string][]string{
+					"Link": {
+						fmt.Sprintf(utils.LinkTmpl, "devices", "page=3&per_page=5", "prev"),
+						fmt.Sprintf(utils.LinkTmpl, "devices", "page=1&per_page=5", "first"),
+					},
+					"X-Total-Count": {"20"},
+				},
+			},
+		},
+		"valid pagination, with next page": {
+			devs:  inDevs,
+			total: 21,
+			req:   test.MakeSimpleRequest("GET", "http://1.2.3.4/api/management/v2/inventory/devices?page=4&per_page=5", nil),
+			resp: utils.JSONResponseParams{
+				OutputStatus:     200,
+				OutputBodyObject: outDevs,
+				OutputHeaders: map[string][]string{
+					"Link": {
+						fmt.Sprintf(utils.LinkTmpl, "devices", "page=3&per_page=5", "prev"),
+						fmt.Sprintf(utils.LinkTmpl, "devices", "page=1&per_page=5", "first"),
+					},
+					"X-Total-Count": {"21"},
+				},
+			},
+		},
+		"invalid pagination - page format": {
+			devs:  inDevs,
+			total: 5,
+
+			req: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/management/v2/inventory/devices?page=foo&per_page=5", nil),
+			resp: utils.JSONResponseParams{
+				OutputStatus:     400,
+				OutputBodyObject: RestError(utils.MsgQueryParmInvalid("page")),
+				OutputHeaders:    nil,
+			},
+		},
+		"invalid pagination - per_page format": {
+			devs:  inDevs,
+			total: 5,
+
+			req: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/management/v2/inventory/devices?page=1&per_page=foo", nil),
+			resp: utils.JSONResponseParams{
+				OutputStatus:     400,
+				OutputBodyObject: RestError(utils.MsgQueryParmInvalid("per_page")),
+				OutputHeaders:    nil,
+			},
+		},
+		"invalid pagination - bounds": {
+			devs:  inDevs,
+			total: 5,
+
+			req: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/management/v2/inventory/devices?page=0&per_page=5", nil),
+			resp: utils.JSONResponseParams{
+				OutputStatus:     400,
+				OutputBodyObject: RestError(utils.MsgQueryParmLimit("page")),
+				OutputHeaders:    nil,
+			},
+		},
+		"valid attribute filter": {
+			devs:  inDevs[2:],
+			total: 3,
+
+			req: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/management/v2/inventory/devices?page=1&per_page=5&identity:attr_name1=qe:123:123:123", nil),
+			resp: utils.JSONResponseParams{
+				OutputStatus:     200,
+				OutputBodyObject: outDevs[2:],
+				OutputHeaders: map[string][]string{
+					"Link": {
+						fmt.Sprintf(utils.LinkTmpl, "devices", "identity%3Aattr_name1=qe%3A123%3A123%3A123&page=1&per_page=5", "first"),
+					},
+					"X-Total-Count": {"3"},
+				},
+			},
+		},
+		"invalid attribute filter: no scope": {
+			devs:  inDevs,
+			total: 5,
+
+			req: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/management/v2/inventory/devices?page=1&per_page=5&attr_name1=qe:123:123:123", nil),
+			resp: utils.JSONResponseParams{
+				OutputStatus:     400,
+				OutputBodyObject: RestError("invalid filter 'attr_name1': must include scope and name (e.g. 'identity:mac')"),
+				OutputHeaders:    nil,
+			},
+		},
+		"invalid attribute filter: forbidden scope": {
+			devs:  inDevs,
+			total: 5,
+
+			req: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/management/v2/inventory/devices?page=1&per_page=5&system:attr_name1=qe:123:123:123", nil),
+			resp: utils.JSONResponseParams{
+				OutputStatus:     400,
+				OutputBodyObject: RestError("supported attribute scopes: [ identity ]"),
+				OutputHeaders:    nil,
+			},
+		},
+		"valid sort order value": {
+			devs:  inDevs[1:],
+			total: 4,
+
+			req: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/management/v2/inventory/devices?sort=identity:attr_name1:asc&page=1&per_page=5", nil),
+			resp: utils.JSONResponseParams{
+				OutputStatus:     200,
+				OutputBodyObject: outDevs[1:],
+				OutputHeaders: map[string][]string{
+					"Link": {
+						fmt.Sprintf(utils.LinkTmpl, "devices", "page=1&per_page=5&sort=identity%3Aattr_name1%3Aasc", "first"),
+					},
+					"X-Total-Count": {"4"},
+				},
+			},
+		},
+		"invalid sort order: value": {
+			req: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/management/v2/inventory/devices?page=1&per_page=5&sort=identity:attr_name1:gte", nil),
+			resp: utils.JSONResponseParams{
+				OutputStatus:     400,
+				OutputBodyObject: RestError("invalid sort order"),
+				OutputHeaders:    nil,
+			},
+		},
+		"invalid sort order: no scope": {
+			req: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/management/v2/inventory/devices?page=1&per_page=5&sort=attr_name1", nil),
+			resp: utils.JSONResponseParams{
+				OutputStatus:     400,
+				OutputBodyObject: RestError("invalid sort 'attr_name1': must include at minimum scope and name (e.g. 'identity:mac')"),
+				OutputHeaders:    nil,
+			},
+		},
+		"invalid sort order: forbidden scope": {
+			req: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/management/v2/inventory/devices?page=1&per_page=5&sort=attr_name1", nil),
+			resp: utils.JSONResponseParams{
+				OutputStatus:     400,
+				OutputBodyObject: RestError("invalid sort 'attr_name1': must include at minimum scope and name (e.g. 'identity:mac')"),
+				OutputHeaders:    nil,
+			},
+		},
+		"valid has_group": {
+			devs:  inDevs,
+			total: 5,
+
+			req: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/management/v2/inventory/devices?has_group=true&page=1&per_page=5", nil),
+			resp: utils.JSONResponseParams{
+				OutputStatus:     200,
+				OutputBodyObject: outDevs,
+				OutputHeaders: map[string][]string{
+					"Link": {
+						fmt.Sprintf(utils.LinkTmpl, "devices", "has_group=true&page=1&per_page=5", "first"),
+					},
+					"X-Total-Count": {"5"},
+				},
+			},
+		},
+		"invalid has_group": {
+			devs:  inDevs,
+			total: 5,
+
+			req: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/management/v2/inventory/devices?page=1&per_page=5&has_group=asd", nil),
+			resp: utils.JSONResponseParams{
+				OutputStatus:     400,
+				OutputBodyObject: RestError(utils.MsgQueryParmInvalid("has_group")),
+				OutputHeaders:    nil,
+			},
+		},
+		"inv.ListDevices error": {
+			err: errors.New("inventory error"),
+			req: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/management/v2/inventory/devices?page=4&per_page=5", nil),
+			resp: utils.JSONResponseParams{
+				OutputStatus:     500,
+				OutputBodyObject: RestError("internal error"),
+				OutputHeaders:    nil,
+			},
+		},
+	}
+
+	for name := range testCases {
+		n := name
+		t.Run(fmt.Sprintf("tc %s", n), func(t *testing.T) {
+			tc := testCases[n]
+			inv := minventory.InventoryApp{}
+			ctx := contextMatcher()
+
+			inv.On("ListDevices",
+				ctx,
+				mock.AnythingOfType("store.ListQuery"),
+			).Return(tc.devs, tc.total, tc.err)
+
+			apih := makeMockApiHandler(t, &inv)
+
+			runTestRequest(t, apih, tc.req, tc.resp)
+		})
+	}
+}
+
+func TestApiInventoryGetDevicesV1(t *testing.T) {
 	t.Parallel()
 	rest.ErrorFieldName = "error"
 

@@ -25,11 +25,11 @@ class TestInventorySearching:
             internal_client.create_device(did, it)
 
         r = requests.get(management_client.client.swagger_spec.api_url + "/devices",
-                         params=({"inventory-users_logged_in": 100}),
+                         params=({"users_logged_in": 100}),
                          verify=False)
         assert len(r.json()) == 1
 
         r = requests.get(management_client.client.swagger_spec.api_url + "/devices",
-                         params=({"inventory-open_connections": 1231}),
+                         params=({"open_connections": 1231}),
                          verify=False)
         assert len(r.json()) == 1
