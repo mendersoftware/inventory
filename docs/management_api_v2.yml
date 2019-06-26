@@ -1,0 +1,276 @@
+swagger: '2.0'
+info:
+  version: '1'
+  title: Device inventory
+  description: |
+    An API for device attribute management and device grouping. Intended for use by the web GUI.
+
+    Devices can upload vendor-specific attributes (software/hardware info, health checks, metrics, etc.) of various data types to the backend.
+
+    This API enables the user to:
+    * list devices with their attributes
+    * search devices by attribute value
+    * use the results to create and manage device groups for the purpose of deployment scheduling
+
+basePath: '/api/management/v2/inventory'
+host: 'docker.mender.io'
+schemes:
+  - https
+
+paths:
+  /devices:
+    get:
+      summary: List devices
+      description:  |
+        Returns a paged collection of devices and their attributes.
+        Accepts optional search and sort parameters.
+
+        **Searching**
+        To search devices by attribute values, append attribute name/value pairs
+        to the query string.
+        Each attribute name must be prepended by its scope, e.g.:
+
+        ```
+        GET /devices?identity:attr_name_1=foo&
+                     identity:attr_name_2=100&
+                     ...
+        ```
+        Currently the only supported scope for searching is the 'identity' scope.
+
+        **Sorting**
+        To sort the device list by an attribute value, use the 'sort' parameter with an attribute name.
+        Each attribute name must be accompanied by its scope, e.g.:
+
+        ```
+        GET /devices?sort=identity:attr_name_1
+        ```
+
+        Optionally you can provide the sort direction - 'desc' (default) or 'asc', e.g.:
+
+        ```
+        GET /devices?sort=identity:attr_name_1:asc
+        ```
+
+        Sort can be combined with search.
+
+        Currently the only supported scope for sorting is the 'identity' scope.
+
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          type: string
+          format: Bearer [token]
+          description: Contains the JWT token issued by the User Administration and Authentication Service.
+        - name: page
+          in: query
+          description: Starting page.
+          required: false
+          type: number
+          format: integer
+          default: 1
+        - name: per_page
+          in: query
+          description: Number of results per page.
+          required: false
+          type: number
+          format: integer
+          default: 10
+        - name: sort
+          in: query
+          description: |
+            Supports sorting the device list by attribute values.
+
+            The parameter is formatted as attribute scope/name and optional sort direction, e.g.:
+
+            '?sort=identity:attr1:asc'
+
+            will sort by 'attr1' (in scope 'identity'), in ascending order. 'desc' is the default value.
+
+          required: false
+          type: string
+        - name: has_group
+          in: query
+          description: If present, limits the results only to devices assigned/not assigned to a group.
+          required: false
+          type: boolean
+        - name: group
+          in: query
+          description: If present, limits the results only to devices belonging to the given group.
+          required: false
+          type: string
+
+      responses:
+        200:
+          description: Successful response.
+          headers:
+            Link:
+              type: string
+              description: |
+                Standard header, used for page navigation.
+
+                Supported relation types are 'first', 'next' and 'prev'.
+            X-Total-Count:
+              type: string
+              description: Custom header indicating the total number of devices for the given query parameters
+          schema:
+            title: ListOfDevices
+            type: array
+            items:
+              $ref: '#/definitions/DeviceWithGroupedAttributes'
+          examples:
+            application/json:
+              - id: "291ae0e5956c69c2267489213df4459d19ed48a806603def19d417d004a4b67e"
+                attributes:
+                  identity:
+                    - name: "ip_addr"
+                      value: "1.2.3.4"
+                      description: "IP address"
+                      scope: "identity"
+                    - name: "mac_addr"
+                      value: "00.01:02:03:04:05"
+                      description: "MAC address"
+                      scope: "identity"
+                  inventory:
+                    - name: "ports"
+                      value:
+                        - "8080"
+                        - "8081"
+                      description: "Open ports"
+                      scope: "inventory"
+                  system: []
+                  custom: []
+                updated_ts: "2016-10-03T16:58:51.639Z"
+              - id: "76f40e5956c699e327489213df4459d1923e1a806603def19d417d004a4a3ef"
+                attributes:
+                  identity: 
+                    - name: "mac"
+                      value: "00:01:02:03:04:05"
+                      description: "MAC address"
+                      scope: "identity"
+                  inventory: []
+                  system: []
+                  custom: []
+                updated_ts: "2016-10-04T18:24:21.432Z"
+        400:
+          description: Missing or malformed request parameters. See error for details.
+          schema:
+            $ref: '#/definitions/Error'
+        500:
+          description: Internal error.
+          schema:
+            $ref: '#/definitions/Error'
+
+definitions:
+  DeviceWithGroupedAttributes:
+    description: | 
+      Device object with attributes grouped by scopes.
+    type: object
+    properties:
+      id:
+        type: string
+        description: Mender-assigned unique ID.
+      updated_ts:
+        type: string
+        description: Timestamp of the most recent attribute update.
+      attributes:
+        $ref: '#/definitions/ScopedAttributes'
+        description: Attribute descriptors grouped by scope.
+
+  ScopedAttributes:
+    description: | 
+      Attributes grouped by scope.
+      Scope is one of:
+        - identity
+        - inventory
+        - custom
+        - system
+    type: object
+    properties:
+      identity:
+          type: array
+          items:
+            $ref: '#/definitions/Attribute'
+      inventory:
+          type: array
+          items:
+            $ref: '#/definitions/Attribute'
+      custom:
+          type: array
+          items:
+            $ref: '#/definitions/Attribute'
+      system:
+          type: array
+          items:
+            $ref: '#/definitions/Attribute'
+    example:
+      application/json:
+         identity:
+           - name: "ip_addr"
+             value: "1.2.3.4"
+             description: "IP address"
+             scope: "identity"
+           - name: "mac_addr"
+             value: "00.01:02:03:04:05"
+             description: "MAC address"
+             scope: "identity"
+         inventory:
+           - name: "ports"
+             value:
+               - "8080"
+               - "8081"
+             description: "Open ports"
+             scope: "inventory"
+         system: []
+         custom: []
+
+  Attribute:
+    description: Attribute descriptor.
+    type: object
+    properties:
+      name:
+        type: string
+        description: |
+            A human readable, unique attribute ID, e.g. 'device_type', 'ip_addr', 'cpu_load', etc.
+      description:
+        type: string
+        description: Attribute description.
+      value:
+        type: string
+        description: |
+            The current value of the attribute.
+
+            Attribute type is implicit, inferred from the JSON type.
+
+            Supported types: number, string, array of numbers, array of strings. Mixed arrays are not allowed.
+      scope:
+        type: string
+        enum:
+          - identity
+          - inventory
+          - custom
+          - system
+        description: |
+            The scope of the attribute.
+            Each attribute has its scope.
+            It prevents overwriting attributes provided by different actors in the system and having the same name.
+    example:
+      application/json:
+        name: "cpu_load"
+        description: "The current CPU load."
+        value: 42
+
+  Error:
+    description: Error descriptor.
+    type: object
+    properties:
+      error:
+        description: Description of the error.
+        type: string
+      request_id:
+        description: Request ID (same as in X-MEN-RequestID header).
+        type: string
+    example:
+      application/json:
+          error: "failed to decode device group data: JSON payload is empty"
+          request_id: "f7881e82-0492-49fb-b459-795654e7188a"

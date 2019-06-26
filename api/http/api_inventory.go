@@ -36,7 +36,8 @@ import (
 )
 
 const (
-	uriDevices       = "/api/0.1.0/devices"
+	uriDevices       = "/api/management/v2/inventory/devices"
+	uriDevicesV1     = "/api/0.1.0/devices"
 	uriDevice        = "/api/0.1.0/devices/:id"
 	uriDeviceGroups  = "/api/0.1.0/devices/:id/group"
 	uriDeviceGroup   = "/api/0.1.0/devices/:id/group/:name"
@@ -55,10 +56,14 @@ const (
 	queryParamSort           = "sort"
 	queryParamHasGroup       = "has_group"
 	queryParamValueSeparator = ":"
+	queryParamScopeSeparator = ":"
 	sortOrderAsc             = "asc"
 	sortOrderDesc            = "desc"
-	sortAttributeNameIdx     = 0
-	sortOrderIdx             = 1
+	sortScopeIdx             = 0
+	sortAttributeNameIdx     = 1
+	sortOrderIdx             = 2
+	sortAttributeNameIdxV1   = 0
+	sortOrderIdxV1           = 1
 )
 
 // model of device's group name response at /devices/:id/group endpoint
@@ -85,7 +90,8 @@ func NewInventoryApiHandlers(i inventory.InventoryApp) ApiHandler {
 
 func (i *inventoryHandlers) GetApp() (rest.App, error) {
 	routes := []*rest.Route{
-		rest.Get(uriDevices, i.GetDevicesV1Handler),
+		rest.Get(uriDevices, i.GetDevicesHandler),
+		rest.Get(uriDevicesV1, i.GetDevicesV1Handler),
 		rest.Get(uriDevice, i.GetDeviceV1Handler),
 		rest.Delete(uriDevice, i.DeleteDeviceHandler),
 		rest.Delete(uriDeviceGroup, i.DeleteDeviceGroupHandler),
@@ -114,10 +120,9 @@ func (i *inventoryHandlers) GetApp() (rest.App, error) {
 
 }
 
-// `sort` paramater value is an attribute name with optional direction (desc or asc)
-// separated by colon (:)
-//
-// eg. `sort=attr_name1` or `sort=attr_name1:asd`
+// parseSortParam parses the v2 version of Sort, e.g.
+// `sort=identity:attr_name1`
+// `sort=identity:attr_name1:asc`
 func parseSortParam(r *rest.Request) (*store.Sort, error) {
 	sortStr, err := utils.ParseQueryParmStr(r, queryParamSort, false, nil)
 	if err != nil {
@@ -126,23 +131,37 @@ func parseSortParam(r *rest.Request) (*store.Sort, error) {
 	if sortStr == "" {
 		return nil, nil
 	}
+
 	sortValArray := strings.Split(sortStr, queryParamValueSeparator)
-	sort := store.Sort{AttrName: sortValArray[sortAttributeNameIdx]}
-	if len(sortValArray) == 2 {
+	if len(sortValArray) < 2 {
+		return nil, fmt.Errorf("invalid sort '%s': must include at minimum scope and name (e.g. 'identity:mac')", sortStr)
+	}
+
+	sort := store.Sort{}
+
+	scope := sortValArray[sortScopeIdx]
+	if scope != model.AttrScopeIdentity {
+		return nil, errors.New("supported attribute scopes: [ identity ]")
+	}
+	name := sortValArray[sortAttributeNameIdx]
+
+	sort.AttrName = fmt.Sprintf("%s-%s", scope, name)
+
+	// 3 elems - scope:name:dir
+	if len(sortValArray) == 3 {
 		sortOrder := sortValArray[sortOrderIdx]
 		if sortOrder != sortOrderAsc && sortOrder != sortOrderDesc {
 			return nil, errors.New("invalid sort order")
 		}
 		sort.Ascending = sortOrder == sortOrderAsc
 	}
+
 	return &sort, nil
 }
 
-// Filter paramaters name are attributes name. Value can be prefixed
-// with equality operator code (`eq` for =), separated from value by colon (:).
-// Equality operator default value is `eq`
-//
-// eg. `attr_name1=value1` or `attr_name1=eq:value1`
+// parseFilterParams parses the v2 version of filter descriptor, e.g.:
+// `scope:attr_name1=value1`
+// `scope:attr_name1=eq:value1`
 func parseFilterParams(r *rest.Request) ([]store.Filter, error) {
 	knownParams := []string{utils.PageName, utils.PerPageName, queryParamSort, queryParamHasGroup, queryParamGroup}
 	filters := make([]store.Filter, 0)
@@ -151,12 +170,26 @@ func parseFilterParams(r *rest.Request) ([]store.Filter, error) {
 		if utils.ContainsString(name, knownParams) {
 			continue
 		}
+		// name is 'scope:attr_name'
+		nameArr := strings.Split(name, queryParamValueSeparator)
+		if len(nameArr) != 2 {
+			return nil, fmt.Errorf("invalid filter '%s': must include scope and name (e.g. 'identity:mac')", name)
+		}
+		scope := nameArr[0]
+		if scope != model.AttrScopeIdentity {
+			return nil, errors.New("supported attribute scopes: [ identity ]")
+		}
+
+		attr := nameArr[1]
+
 		valueStr, err := utils.ParseQueryParmStr(r, name, false, nil)
 		if err != nil {
 			return nil, err
 		}
 
-		filter = store.Filter{AttrName: name}
+		filter = store.Filter{
+			AttrName: fmt.Sprintf("%s-%s", scope, attr),
+		}
 
 		// make sure we parse ':'s in value, it's either:
 		// not there
@@ -218,13 +251,13 @@ func (i *inventoryHandlers) GetDevicesV1Handler(w rest.ResponseWriter, r *rest.R
 		return
 	}
 
-	sort, err := parseSortParam(r)
+	sort, err := parseSortParamV1(r)
 	if err != nil {
 		u.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
 		return
 	}
 
-	filters, err := parseFilterParams(r)
+	filters, err := parseFilterParamsV1(r)
 	if err != nil {
 		u.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
 		return
@@ -463,8 +496,10 @@ func parseDeviceAttributes(r *rest.Request) (model.DeviceAttributes, error) {
 		return nil, errors.Wrap(err, "failed to decode request body")
 	}
 
-	for _, a := range attrs {
+	for i := range attrs {
+		a := attrs[i]
 		a.Scope = model.AttrScopeInventory
+		attrs[i] = a
 		if err = a.Validate(); err != nil {
 			return nil, err
 		}
@@ -643,6 +678,72 @@ func parseTimestampHeader(header string) (uint64, error) {
 	return uintVal, nil
 }
 
+func (i *inventoryHandlers) GetDevicesHandler(w rest.ResponseWriter, r *rest.Request) {
+	ctx := r.Context()
+
+	l := log.FromContext(ctx)
+
+	page, perPage, err := utils.ParsePagination(r)
+	if err != nil {
+		u.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
+		return
+	}
+
+	hasGroup, err := utils.ParseQueryParmBool(r, queryParamHasGroup, false, nil)
+	if err != nil {
+		u.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
+		return
+	}
+
+	groupName, err := utils.ParseQueryParmStr(r, "group", false, nil)
+	if err != nil {
+		u.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
+		return
+	}
+
+	sort, err := parseSortParam(r)
+	if err != nil {
+		u.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
+		return
+	}
+
+	filters, err := parseFilterParams(r)
+	if err != nil {
+		u.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
+		return
+	}
+
+	ld := store.ListQuery{Skip: int((page - 1) * perPage),
+		Limit:     int(perPage),
+		Filters:   filters,
+		Sort:      sort,
+		HasGroup:  hasGroup,
+		GroupName: groupName}
+
+	devs, totalCount, err := i.inventory.ListDevices(ctx, ld)
+
+	if err != nil {
+		u.RestErrWithLogInternal(w, r, l, err)
+		return
+	}
+
+	hasNext := totalCount > int(page*perPage)
+	links := utils.MakePageLinkHdrs(r, page, perPage, hasNext)
+	for _, l := range links {
+		w.Header().Add("Link", l)
+	}
+	// the response writer will ensure the header name is in Kebab-Pascal-Case
+	w.Header().Add("X-Total-Count", strconv.Itoa(totalCount))
+
+	// transform devices to DTOs
+	out := make([]*DeviceDto, len(devs), len(devs))
+	for i, d := range devs {
+		out[i] = NewDeviceDto(&d)
+	}
+
+	w.WriteJson(out)
+}
+
 // method to
 
 // `sort` paramater value is an attribute name with optional direction (desc or asc)
@@ -659,10 +760,10 @@ func parseSortParamV1(r *rest.Request) (*store.Sort, error) {
 		return nil, nil
 	}
 	sortValArray := strings.Split(sortStr, queryParamValueSeparator)
-	name := fmt.Sprintf("%s-%s", model.AttrScopeInventory, sortValArray[sortAttributeNameIdx])
+	name := fmt.Sprintf("%s-%s", model.AttrScopeInventory, sortValArray[sortAttributeNameIdxV1])
 	sort := store.Sort{AttrName: name}
 	if len(sortValArray) == 2 {
-		sortOrder := sortValArray[sortOrderIdx]
+		sortOrder := sortValArray[sortOrderIdxV1]
 		if sortOrder != sortOrderAsc && sortOrder != sortOrderDesc {
 			return nil, errors.New("invalid sort order")
 		}

@@ -24,7 +24,16 @@ import (
 const (
 	AttrScopeInventory = "inventory"
 	AttrScopeSystem    = "system"
+	AttrScopeIdentity  = "identity"
+	AttrScopeCustom    = "custom"
 )
+
+var AllScopes = []string{
+	AttrScopeInventory,
+	AttrScopeSystem,
+	AttrScopeIdentity,
+	AttrScopeCustom,
+}
 
 type DeviceID string
 
