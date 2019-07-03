@@ -1,6 +1,6 @@
 FROM python:3
 
-RUN pip3 install --quiet bravado crypto pytest twisted requests pyyaml pymongo tz
+RUN pip3 install --quiet bravado==9.2.2 crypto pytest==2.8.7 twisted requests pyyaml pymongo tz
 
 RUN mkdir -p /testing
 
