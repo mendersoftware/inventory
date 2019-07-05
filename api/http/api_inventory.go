@@ -653,7 +653,8 @@ func (i *inventoryHandlers) InternalPatchDeviceAttributesHandler(w rest.Response
 	//upsert the attributes
 	err = i.inventory.UpsertAttributesWithSource(ctx, model.DeviceID(deviceId), attrs, source)
 	if err != nil {
-		if err == store.ErrAttrPatchOutdated {
+		if errors.Cause(err) == store.ErrAttrPatchOutdated {
+
 			u.RestErrWithLog(w, r, l, err, http.StatusPreconditionFailed)
 		} else {
 			u.RestErrWithLogInternal(w, r, l, err)
