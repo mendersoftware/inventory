@@ -62,7 +62,7 @@ test:prepare_acceptance:
       - /go/src/github.com/mendersoftware/inventory/inventory-test
     policy: pull
   artifacts:
-    expire_in: 30min
+    expire_in: 2w
     paths:
       - tests_image.tar
       - acceptance_testing_image.tar
@@ -86,7 +86,7 @@ test:acceptance_tests:
     - docker load -i acceptance_testing_image.tar
     - TESTS_DIR=$(pwd)/tests $(pwd)/tests/run-test-environment acceptance $(pwd)/integration $(pwd)/tests/docker-compose.yml ;
   artifacts:
-    expire_in: 30min
+    expire_in: 2w
     paths:
       - tests/coverage-acceptance.txt
   tags:
@@ -143,7 +143,7 @@ test:unit:
     - mkdir -p tests/unit-coverage && find . -name 'coverage.txt' -exec cp --parents {} ./tests/unit-coverage \;
     - tar -cvf $CI_PROJECT_DIR/unit-coverage.tar tests/unit-coverage
   artifacts:
-    expire_in: 30min
+    expire_in: 2w
     paths:
       - unit-coverage.tar
 
@@ -154,7 +154,7 @@ build:
     - docker build -t $SERVICE_IMAGE .
     - docker save $SERVICE_IMAGE > image.tar
   artifacts:
-    expire_in: 1h
+    expire_in: 2w
     paths:
       - image.tar
   tags:
