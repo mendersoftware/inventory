@@ -18,13 +18,17 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
-	"net"
+	"io"
+
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/globalsign/mgo"
-	"github.com/globalsign/mgo/bson"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
+
 	"github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/log"
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
@@ -41,6 +45,7 @@ const (
 	DbName        = "inventory"
 	DbDevicesColl = "devices"
 
+	DbDevId              = "_id"
 	DbDevAttributes      = "attributes"
 	DbDevGroup           = "group"
 	DbDevAttributesDesc  = "description"
@@ -48,16 +53,17 @@ const (
 )
 
 var (
-	// masterSession is a master session to be copied on demand
-	// This is the preferred pattern with mgo (for common conn pool management, etc.)
-	masterSession *mgo.Session
+	//with offcial mongodb supported driver we keep client
+	clientGlobal *mongo.Client
 
-	// once ensures mgoMaster is created only once
+	// once ensures client is created only once
 	once sync.Once
+
+	ErrNotFound = errors.New("mongo: no documents in result")
 )
 
 type DataStoreMongoConfig struct {
-	// MGO connection string
+	// connection string
 	ConnectionString string
 
 	// SSL support
@@ -70,77 +76,74 @@ type DataStoreMongoConfig struct {
 }
 
 type DataStoreMongo struct {
-	session     *mgo.Session
+	client      *mongo.Client
 	automigrate bool
 }
 
-func NewDataStoreMongoWithSession(session *mgo.Session) store.DataStore {
-	return &DataStoreMongo{session: session}
+func NewDataStoreMongoWithSession(client *mongo.Client) store.DataStore {
+	return &DataStoreMongo{client: client}
 }
 
+//config.ConnectionString must contain a valid
 func NewDataStoreMongo(config DataStoreMongoConfig) (store.DataStore, error) {
 	//init master session
 	var err error
 	once.Do(func() {
-
-		var dialInfo *mgo.DialInfo
-		dialInfo, err = mgo.ParseURL(config.ConnectionString)
-		if err != nil {
-			return
+		if !strings.Contains(config.ConnectionString, "://") {
+			config.ConnectionString = "mongodb://" + config.ConnectionString
 		}
-
-		// Set 10s timeout - same as set by Dial
-		dialInfo.Timeout = 10 * time.Second
+		clientOptions := options.Client().ApplyURI(config.ConnectionString)
 
 		if config.Username != "" {
-			dialInfo.Username = config.Username
-		}
-		if config.Password != "" {
-			dialInfo.Password = config.Password
+			clientOptions.SetAuth(options.Credential{
+				Username: config.Username,
+				Password: config.Password,
+			})
 		}
 
 		if config.SSL {
-			dialInfo.DialServer = func(addr *mgo.ServerAddr) (net.Conn, error) {
-
-				// Setup TLS
-				tlsConfig := &tls.Config{}
-				tlsConfig.InsecureSkipVerify = config.SSLSkipVerify
-
-				conn, err := tls.Dial("tcp", addr.String(), tlsConfig)
-				return conn, err
-			}
+			tlsConfig := &tls.Config{}
+			tlsConfig.InsecureSkipVerify = config.SSLSkipVerify
+			clientOptions.SetTLSConfig(tlsConfig)
 		}
 
-		masterSession, err = mgo.DialWithInfo(dialInfo)
+		ctx := context.Background()
+		l := log.FromContext(ctx)
+		clientGlobal, err = mongo.Connect(ctx, clientOptions)
 		if err != nil {
+			l.Errorf("mongo: error connecting to mongo '%s'", err.Error())
 			return
 		}
-
-		// Validate connection
-		if err = masterSession.Ping(); err != nil {
+		if clientGlobal == nil {
+			l.Errorf("mongo: client is nil. wow.")
 			return
 		}
-
-		// force write ack with immediate journal file fsync
-		masterSession.SetSafe(&mgo.Safe{
-			W: 1,
-			J: true,
-		})
+		// from: https://www.mongodb.com/blog/post/mongodb-go-driver-tutorial
+		/*
+			It is best practice to keep a client that is connected to MongoDB around so that the application can make use of connection pooling - you don't want to open and close a connection for each query. However, if your application no longer requires a connection, the connection can be closed with client.Disconnect() like so:
+		*/
+		err = clientGlobal.Ping(ctx, nil)
+		if err != nil {
+			clientGlobal = nil
+			l.Errorf("mongo: error pinging mongo '%s'", err.Error())
+			return
+		}
+		if clientGlobal == nil {
+			l.Errorf("mongo: global instance of client is nil.")
+			return
+		}
 	})
 
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to open mgo session")
+	if clientGlobal == nil {
+		return nil, errors.New("failed to open mongo-driver session")
 	}
-
-	db := &DataStoreMongo{session: masterSession}
+	db := &DataStoreMongo{client: clientGlobal}
 
 	return db, nil
 }
 
 func (db *DataStoreMongo) GetDevices(ctx context.Context, q store.ListQuery) ([]model.Device, int, error) {
-	s := db.session.Copy()
-	defer s.Close()
-	c := s.DB(mstore.DbFromContext(ctx, DbName)).C(DbDevicesColl)
+	c := db.client.Database(mstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
 
 	queryFilters := make([]bson.M, 0)
 	for _, filter := range q.Filters {
@@ -222,88 +225,98 @@ func (db *DataStoreMongo) GetDevices(ctx context.Context, q store.ListQuery) ([]
 			},
 		},
 	}
-	// filter devices - skip, limit + get count afterwards
-	// followed by pretty printing
-	pipe := c.Pipe([]bson.M{
+
+	cursor, err := c.Aggregate(ctx, []bson.M{
 		filter,
 		combinedQuery,
 		resultMap,
 	})
+	defer cursor.Close(ctx)
 
-	var res bson.M
-	err := pipe.One(&res)
-	if err != nil {
+	cursor.Next(ctx)
+	elem := &bson.D{}
+	if err = cursor.Decode(elem); err != nil {
 		return nil, -1, errors.Wrap(err, "failed to fetch device list")
 	}
-	count := res["totalCount"].(int)
-	results := res["results"].([]interface{})
+	m := elem.Map()
+	count := m["totalCount"].(int32)
+	results := m["results"].(primitive.A)
 	devices := make([]model.Device, len(results))
 	for i, d := range results {
 		var device model.Device
-		bsonBytes, e := bson.Marshal(d.(bson.M))
+		bsonBytes, e := bson.Marshal(d.(bson.D))
 		if e != nil {
-			return nil, count, errors.Wrap(e, "failed to parse device in device list")
+			return nil, int(count), errors.Wrap(e, "failed to parse device in device list")
 		}
 		bson.Unmarshal(bsonBytes, &device)
 		devices[i] = device
 	}
-	return devices, count, nil
+
+	return devices, int(count), nil
 }
 
 func (db *DataStoreMongo) GetDevice(ctx context.Context, id model.DeviceID) (*model.Device, error) {
-	s := db.session.Copy()
-	defer s.Close()
-	c := s.DB(mstore.DbFromContext(ctx, DbName)).C(DbDevicesColl)
+	c := db.client.Database(mstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
 
-	res := model.Device{}
+	l := log.FromContext(ctx)
+	var res model.Device
 
-	err := c.FindId(id).One(&res)
-
+	if id == model.NilDeviceID {
+		return nil, nil
+	}
+	cursor, err := c.Find(ctx, bson.M{DbDevId: id})
 	if err != nil {
-		if err == mgo.ErrNotFound {
+		l.Errorf("GetDevice returns '%s'", err.Error())
+		return nil, err
+	}
+
+	cursor.Next(ctx)
+	err = cursor.Decode(&res)
+	if err != nil {
+		if err == io.EOF {
+			l.Errorf("GetDevice returns nil,nil")
 			return nil, nil
 		} else {
+			l.Errorf("GetDevice returns nil,'%v' 'failed to fetch device'", err)
 			return nil, errors.Wrap(err, "failed to fetch device")
 		}
 	}
-
 	return &res, nil
 }
 
 func (db *DataStoreMongo) AddDevice(ctx context.Context, dev *model.Device) error {
-	s := db.session.Copy()
-	defer s.Close()
-	c := s.DB(mstore.DbFromContext(ctx, DbName)).C(DbDevicesColl)
-
+	c := db.client.Database(mstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
+	filter := bson.M{"_id": dev.ID}
 	update := makeAttrUpsert(dev.Attributes)
 	now := time.Now()
 	update["updated_ts"] = now
 	update = bson.M{"$set": update,
 		"$setOnInsert": bson.M{"created_ts": now}}
-
-	_, err := c.UpsertId(dev.ID, update)
+	l := log.FromContext(ctx)
+	l.Debugf("upserting: '%s'->'%s'.", filter, update)
+	res, err := c.UpdateOne(ctx, filter, update, options.Update().SetUpsert(true)) //this does not insert anything else than ID from model.Device
 	if err != nil {
 		return errors.Wrap(err, "failed to store device")
 	}
+	if res.ModifiedCount < 1 {
+		return errors.Wrap(err, "failed to store device")
+	} // to check the update count
 	return nil
 }
 
 func (db *DataStoreMongo) UpsertAttributes(ctx context.Context, id model.DeviceID, attrs model.DeviceAttributes) error {
-	s := db.session.Copy()
-	defer s.Close()
-	c := s.DB(mstore.DbFromContext(ctx, DbName)).C(DbDevicesColl)
-
+	c := db.client.Database(mstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
+	filter := bson.M{"_id": id} // idDev}
 	update := makeAttrUpsert(attrs)
-
-	//set update time and optionally created time
 	now := time.Now()
 	update["updated_ts"] = now
 	update = bson.M{"$set": update,
 		"$setOnInsert": bson.M{"created_ts": now}}
-
-	_, err := c.UpsertId(id, update)
-
-	return err
+	_, err := c.UpdateOne(ctx, filter, update, options.Update().SetUpsert(true))
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // prepare an attribute upsert doc based on DeviceAttributes map
@@ -344,73 +357,80 @@ func mongoOperator(co store.ComparisonOperator) string {
 }
 
 func (db *DataStoreMongo) UnsetDeviceGroup(ctx context.Context, id model.DeviceID, groupName model.GroupName) error {
-	s := db.session.Copy()
-	defer s.Close()
+	c := db.client.Database(mstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
 
-	query := bson.M{
+	filter := bson.M{
 		"_id":   id,
 		"group": groupName,
 	}
-	update := mgo.Change{
-		Update: bson.M{
-			"$unset": bson.M{
-				"group": 1,
-			},
+	update := bson.M{
+		"$unset": bson.M{
+			"group": 1,
 		},
 	}
-	if _, err := s.DB(mstore.DbFromContext(ctx, DbName)).C(DbDevicesColl).Find(query).Apply(update, nil); err != nil {
-		if err.Error() == mgo.ErrNotFound.Error() {
-			return store.ErrDevNotFound
-		}
+
+	res, err := c.UpdateMany(ctx, filter, update) //Update one or update many?
+	if err != nil {
 		return err
 	}
-	return nil
+	if res.ModifiedCount > 0 {
+		return nil
+	} else {
+		return store.ErrDevNotFound
+	} // to check the update count
 }
 
 func (db *DataStoreMongo) UpdateDeviceGroup(ctx context.Context, devId model.DeviceID, newGroup model.GroupName) error {
-	s := db.session.Copy()
-	defer s.Close()
-	c := s.DB(mstore.DbFromContext(ctx, DbName)).C(DbDevicesColl)
+	c := db.client.Database(mstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
 
-	err := c.UpdateId(devId, bson.M{"$set": &model.Device{Group: newGroup}})
-	if err != nil {
-		if err == mgo.ErrNotFound {
-			return store.ErrDevNotFound
-		}
-		return errors.Wrap(err, "failed to update device group")
+	filter := bson.M{
+		"_id": devId,
 	}
-	return nil
+	update := bson.M{
+		"$set": &model.Device{Group: newGroup},
+	}
+
+	res, err := c.UpdateOne(ctx, filter, update)
+	if err != nil {
+		return err
+	}
+
+	if res.ModifiedCount > 0 {
+		return nil
+	} else {
+		return store.ErrDevNotFound
+	} // to check the update count
 }
 
 func (db *DataStoreMongo) ListGroups(ctx context.Context) ([]model.GroupName, error) {
-	s := db.session.Copy()
-	defer s.Close()
-	c := s.DB(mstore.DbFromContext(ctx, DbName)).C(DbDevicesColl)
+	c := db.client.Database(mstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
 
-	var groups []model.GroupName
-	err := c.Find(bson.M{}).Distinct("group", &groups)
+	filter := bson.M{}
+	results, err := c.Distinct(ctx, "group", filter)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to list device groups")
+		return nil, err
+	}
+
+	groups := make([]model.GroupName, len(results))
+	for i, d := range results {
+		groups[i] = model.GroupName(d.(string))
 	}
 	return groups, nil
 }
 
 func (db *DataStoreMongo) GetDevicesByGroup(ctx context.Context, group model.GroupName, skip, limit int) ([]model.DeviceID, int, error) {
-	s := db.session.Copy()
-	defer s.Close()
-	// compose aggregation pipeline
-	c := s.DB(mstore.DbFromContext(ctx, DbName)).C(DbDevicesColl)
+	c := db.client.Database(mstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
 
-	//first, find if the group exists at all, i.e. if any dev is assigned
-	var dev model.Device
 	filter := bson.M{DbDevGroup: group}
-	err := c.Find(filter).One(&dev)
+	result := c.FindOne(ctx, filter)
+	if result == nil {
+		return nil, -1, store.ErrGroupNotFound
+	}
+
+	var dev model.Device
+	err := result.Decode(&dev)
 	if err != nil {
-		if err == mgo.ErrNotFound {
-			return nil, -1, store.ErrGroupNotFound
-		} else {
-			return nil, -1, errors.Wrap(err, "failed to get a single device for group")
-		}
+		return nil, -1, store.ErrGroupNotFound
 	}
 
 	hasGroup := group != ""
@@ -434,41 +454,34 @@ func (db *DataStoreMongo) GetDevicesByGroup(ctx context.Context, group model.Gro
 }
 
 func (db *DataStoreMongo) GetDeviceGroup(ctx context.Context, id model.DeviceID) (model.GroupName, error) {
-	s := db.session.Copy()
-	defer s.Close()
-	c := s.DB(mstore.DbFromContext(ctx, DbName)).C(DbDevicesColl)
-
-	var dev model.Device
-
-	err := c.FindId(id).Select(bson.M{"group": 1}).One(&dev)
-	if err != nil {
-		if err == mgo.ErrNotFound {
-			return "", store.ErrDevNotFound
-		} else {
-			return "", errors.Wrap(err, "failed to get device")
-		}
+	dev, err := db.GetDevice(ctx, id)
+	if err != nil || dev == nil {
+		return "", store.ErrDevNotFound
+	}
+	if err != nil || dev == nil {
+		return "", errors.Wrap(err, "failed to get device")
 	}
 
 	return dev.Group, nil
 }
 
 func (db *DataStoreMongo) DeleteDevice(ctx context.Context, id model.DeviceID) error {
-	s := db.session.Copy()
-	defer s.Close()
+	c := db.client.Database(mstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
 
-	if err := s.DB(mstore.DbFromContext(ctx, DbName)).C(DbDevicesColl).RemoveId(id); err != nil {
-		if err.Error() == mgo.ErrNotFound.Error() {
-			return store.ErrDevNotFound
-		}
+	filter := bson.M{DbDevId: id}
+	result, err := c.DeleteOne(ctx, filter)
+	if err != nil {
 		return err
 	}
+	if result.DeletedCount < 1 {
+		return store.ErrDevNotFound
+	} // to check the delete count
 
 	return nil
 }
 
 func (db *DataStoreMongo) GetAllAttributeNames(ctx context.Context) ([]string, error) {
-	s := db.session.Copy()
-	defer s.Close()
+	c := db.client.Database(mstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
 
 	project := bson.M{
 		"$project": bson.M{
@@ -491,26 +504,33 @@ func (db *DataStoreMongo) GetAllAttributeNames(ctx context.Context) ([]string, e
 		},
 	}
 
-	c := s.DB(mstore.DbFromContext(ctx, DbName)).C(DbDevicesColl)
-	pipe := c.Pipe([]bson.M{
+	l := log.FromContext(ctx)
+	cursor, err := c.Aggregate(ctx, []bson.M{
 		project,
 		unwind,
 		group,
 	})
+	defer cursor.Close(ctx)
 
-	type Res struct {
-		AllKeys []string `bson:"allkeys"`
+	cursor.Next(ctx)
+	elem := &bson.D{}
+	err = cursor.Decode(elem)
+	if err != nil {
+		if err != io.EOF {
+			return nil, errors.Wrap(err, "failed to get attributes")
+		} else {
+			return make([]string, 0), nil
+		}
+	}
+	m := elem.Map()
+	results := m["allkeys"].(primitive.A)
+	attributeNames := make([]string, len(results))
+	for i, d := range results {
+		attributeNames[i] = d.(string)
+		l.Debugf("GetAllAttributeNames got: '%v'", d)
 	}
 
-	var res Res
-
-	err := pipe.One(&res)
-	switch err {
-	case nil, mgo.ErrNotFound:
-		return res.AllKeys, nil
-	default:
-		return nil, errors.Wrap(err, "failed to get attributes")
-	}
+	return attributeNames, nil
 }
 
 func (db *DataStoreMongo) MigrateTenant(ctx context.Context, version string, tenantId string) error {
@@ -521,7 +541,7 @@ func (db *DataStoreMongo) MigrateTenant(ctx context.Context, version string, ten
 	l.Infof("migrating %s", database)
 
 	m := migrate.SimpleMigrator{
-		Session:     db.session,
+		Session:     db.client,
 		Db:          database,
 		Automigrate: db.automigrate,
 	}
@@ -548,7 +568,7 @@ func (db *DataStoreMongo) MigrateTenant(ctx context.Context, version string, ten
 func (db *DataStoreMongo) Migrate(ctx context.Context, version string) error {
 	l := log.FromContext(ctx)
 
-	dbs, err := migrate.GetTenantDbs(db.session, mstore.IsTenantDb(DbName))
+	dbs, err := migrate.GetTenantDbs(ctx, db.client, mstore.IsTenantDb(DbName))
 	if err != nil {
 		return errors.Wrap(err, "failed go retrieve tenant DBs")
 	}
@@ -572,7 +592,6 @@ func (db *DataStoreMongo) Migrate(ctx context.Context, version string) error {
 			return err
 		}
 	}
-
 	return nil
 }
 
@@ -580,18 +599,18 @@ func (db *DataStoreMongo) Migrate(ctx context.Context, version string) error {
 // on current one
 func (db *DataStoreMongo) WithAutomigrate() store.DataStore {
 	return &DataStoreMongo{
-		session:     db.session,
+		client:      db.client,
 		automigrate: true,
 	}
 }
 
-func indexAttr(s *mgo.Session, ctx context.Context, attr string) error {
+func indexAttr(s *mongo.Client, ctx context.Context, attr string) error {
 	l := log.FromContext(ctx)
+	c := s.Database(mstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
+	indexField := fmt.Sprintf("attributes.%s.values", attr)
 
-	err := s.DB(mstore.DbFromContext(ctx, DbName)).
-		C(DbDevicesColl).EnsureIndex(mgo.Index{
-		Key: []string{fmt.Sprintf("attributes.%s.values", attr)},
-	})
+	indexView := c.Indexes()
+	_, err := indexView.CreateOne(ctx, mongo.IndexModel{Keys: bson.M{indexField: 1}, Options: nil})
 
 	if err != nil {
 		if isTooManyIndexes(err) {

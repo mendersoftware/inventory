@@ -11,39 +11,31 @@
 //    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
+
 package mongo
 
 import (
 	"context"
 
-	"github.com/pkg/errors"
+	"github.com/mendersoftware/inventory/model"
 
-	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
-type migration_0_2_0 struct {
-	ms  *DataStoreMongo
-	ctx context.Context
-}
-
-func (m *migration_0_2_0) Up(from migrate.Version) error {
-	c := m.ms.client
-
-	attrs, err := m.ms.GetAllAttributeNames(m.ctx)
+func DeviceFindById(ctx context.Context, c *mongo.Collection, id model.DeviceID, dst *model.Device) error {
+	cur, err := c.Find(ctx, bson.M{"_id": id})
 	if err != nil {
-		return errors.Wrap(err, "failed to apply migration 0.2.0")
+		return err
 	}
 
-	for _, a := range attrs {
-		err = indexAttr(c, m.ctx, a)
-		if err != nil {
-			return errors.Wrap(err, "failed to apply migration 0.2.0")
-		}
+	cur.Next(ctx)
+
+	// create a value into which the single document can be decoded
+	err = cur.Decode(dst)
+	if err != nil {
+		return err
 	}
 
 	return nil
-}
-
-func (m *migration_0_2_0) Version() migrate.Version {
-	return migrate.MakeVersion(0, 2, 0)
 }
