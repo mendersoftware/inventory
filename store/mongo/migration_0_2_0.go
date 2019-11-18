@@ -27,7 +27,8 @@ type migration_0_2_0 struct {
 }
 
 func (m *migration_0_2_0) Up(from migrate.Version) error {
-	c := m.ms.client
+	s := m.ms.session.Copy()
+	defer s.Close()
 
 	attrs, err := m.ms.GetAllAttributeNames(m.ctx)
 	if err != nil {
@@ -35,10 +36,11 @@ func (m *migration_0_2_0) Up(from migrate.Version) error {
 	}
 
 	for _, a := range attrs {
-		err = indexAttr(c, m.ctx, a)
+		err = indexAttr(s, m.ctx, a)
 		if err != nil {
 			return errors.Wrap(err, "failed to apply migration 0.2.0")
 		}
+
 	}
 
 	return nil

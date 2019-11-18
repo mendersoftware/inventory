@@ -3,14 +3,13 @@
 Go library for the [TOML](https://github.com/mojombo/toml) format.
 
 This library supports TOML version
-[v0.5.0](https://github.com/toml-lang/toml/blob/master/versions/en/toml-v0.5.0.md)
+[v0.4.0](https://github.com/toml-lang/toml/blob/master/versions/en/toml-v0.4.0.md)
 
 [![GoDoc](https://godoc.org/github.com/pelletier/go-toml?status.svg)](http://godoc.org/github.com/pelletier/go-toml)
 [![license](https://img.shields.io/github/license/pelletier/go-toml.svg)](https://github.com/pelletier/go-toml/blob/master/LICENSE)
-[![Build Status](https://dev.azure.com/pelletierthomas/go-toml-ci/_apis/build/status/pelletier.go-toml?branchName=master)](https://dev.azure.com/pelletierthomas/go-toml-ci/_build/latest?definitionId=1&branchName=master)
-[![codecov](https://codecov.io/gh/pelletier/go-toml/branch/master/graph/badge.svg)](https://codecov.io/gh/pelletier/go-toml)
+[![Build Status](https://travis-ci.org/pelletier/go-toml.svg?branch=master)](https://travis-ci.org/pelletier/go-toml)
+[![Coverage Status](https://coveralls.io/repos/github/pelletier/go-toml/badge.svg?branch=master)](https://coveralls.io/github/pelletier/go-toml?branch=master)
 [![Go Report Card](https://goreportcard.com/badge/github.com/pelletier/go-toml)](https://goreportcard.com/report/github.com/pelletier/go-toml)
-[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fpelletier%2Fgo-toml.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Fpelletier%2Fgo-toml?ref=badge_shield)
 
 ## Features
 
@@ -34,7 +33,7 @@ import "github.com/pelletier/go-toml"
 Read a TOML document:
 
 ```go
-config, _ := toml.Load(`
+config, _ := toml.LoadString(`
 [postgres]
 user = "pelletier"
 password = "mypassword"`)
@@ -43,7 +42,7 @@ user := config.Get("postgres.user").(string)
 
 // or using an intermediate object
 postgresConfig := config.Get("postgres").(*toml.Tree)
-password := postgresConfig.Get("password").(string)
+password = postgresConfig.Get("password").(string)
 ```
 
 Or use Unmarshal:
@@ -58,12 +57,12 @@ type Config struct {
 }
 
 doc := []byte(`
-[Postgres]
-User = "pelletier"
-Password = "mypassword"`)
+[postgres]
+user = "pelletier"
+password = "mypassword"`)
 
 config := Config{}
-toml.Unmarshal(doc, &config)
+Unmarshal(doc, &config)
 fmt.Println("user=", config.Postgres.User)
 ```
 
@@ -71,8 +70,7 @@ Or use a query:
 
 ```go
 // use a query to gather elements without walking the tree
-q, _ := query.Compile("$..[user,password]")
-results := q.Execute(config)
+results, _ := config.Query("$..[user,password]")
 for ii, item := range results.Values() {
     fmt.Println("Query result %d: %v", ii, item)
 }
@@ -99,30 +97,6 @@ Go-toml provides two handy command line tools:
     go install github.com/pelletier/go-toml/cmd/tomljson
     tomljson --help
     ```
-  
- * `jsontoml`: Reads a JSON file and outputs a TOML representation.
- 
-    ```
-    go install github.com/pelletier/go-toml/cmd/jsontoml
-    jsontoml --help
-    ```
-
-### Docker image
-
-Those tools are also availble as a Docker image from
-[dockerhub](https://hub.docker.com/r/pelletier/go-toml). For example, to
-use `tomljson`:
-
-```
-docker run -v $PWD:/workdir pelletier/go-toml tomljson /workdir/example.toml
-```
-
-Only master (`latest`) and tagged versions are published to dockerhub. You
-can build your own image as usual:
-
-```
-docker build -t go-toml .
-```
 
 ## Contribute
 
@@ -132,19 +106,12 @@ much appreciated!
 
 ### Run tests
 
-`go test ./...`
+You have to make sure two kind of tests run:
 
-### Fuzzing
+1. The Go unit tests
+2. The TOML examples base
 
-The script `./fuzz.sh` is available to
-run [go-fuzz](https://github.com/dvyukov/go-fuzz) on go-toml.
-
-## Versioning
-
-Go-toml follows [Semantic Versioning](http://semver.org/). The supported version
-of [TOML](https://github.com/toml-lang/toml) is indicated at the beginning of
-this document. The last two major versions of Go are supported
-(see [Go Release Policy](https://golang.org/doc/devel/release.html#policy)).
+You can run both of them using `./test.sh`.
 
 ## License
 

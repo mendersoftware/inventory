@@ -204,14 +204,6 @@ func (l *tomlLexer) lexRvalue() tomlLexStateFn {
 			return l.lexFalse
 		}
 
-		if l.follow("inf") {
-			return l.lexInf
-		}
-
-		if l.follow("nan") {
-			return l.lexNan
-		}
-
 		if isSpace(next) {
 			l.skip()
 			continue
@@ -223,12 +215,9 @@ func (l *tomlLexer) lexRvalue() tomlLexStateFn {
 		}
 
 		possibleDate := l.peekString(35)
-		dateSubmatches := dateRegexp.FindStringSubmatch(possibleDate)
-		if dateSubmatches != nil && dateSubmatches[0] != "" {
-			l.fastForward(len(dateSubmatches[0]))
-			if dateSubmatches[2] == "" { // no timezone information => local date
-				return l.lexLocalDate
-			}
+		dateMatch := dateRegexp.FindString(possibleDate)
+		if dateMatch != "" {
+			l.fastForward(len(dateMatch))
 			return l.lexDate
 		}
 
@@ -250,22 +239,17 @@ func (l *tomlLexer) lexRvalue() tomlLexStateFn {
 func (l *tomlLexer) lexLeftCurlyBrace() tomlLexStateFn {
 	l.next()
 	l.emit(tokenLeftCurlyBrace)
-	return l.lexVoid
+	return l.lexRvalue
 }
 
 func (l *tomlLexer) lexRightCurlyBrace() tomlLexStateFn {
 	l.next()
 	l.emit(tokenRightCurlyBrace)
-	return l.lexVoid
+	return l.lexRvalue
 }
 
 func (l *tomlLexer) lexDate() tomlLexStateFn {
 	l.emit(tokenDate)
-	return l.lexRvalue
-}
-
-func (l *tomlLexer) lexLocalDate() tomlLexStateFn {
-	l.emit(tokenLocalDate)
 	return l.lexRvalue
 }
 
@@ -281,18 +265,6 @@ func (l *tomlLexer) lexFalse() tomlLexStateFn {
 	return l.lexRvalue
 }
 
-func (l *tomlLexer) lexInf() tomlLexStateFn {
-	l.fastForward(3)
-	l.emit(tokenInf)
-	return l.lexRvalue
-}
-
-func (l *tomlLexer) lexNan() tomlLexStateFn {
-	l.fastForward(3)
-	l.emit(tokenNan)
-	return l.lexRvalue
-}
-
 func (l *tomlLexer) lexEqual() tomlLexStateFn {
 	l.next()
 	l.emit(tokenEqual)
@@ -305,8 +277,6 @@ func (l *tomlLexer) lexComma() tomlLexStateFn {
 	return l.lexRvalue
 }
 
-// Parse the key and emits its value without escape sequences.
-// bare keys, basic string keys and literal string keys are supported.
 func (l *tomlLexer) lexKey() tomlLexStateFn {
 	growingString := ""
 
@@ -317,24 +287,13 @@ func (l *tomlLexer) lexKey() tomlLexStateFn {
 			if err != nil {
 				return l.errorf(err.Error())
 			}
-			growingString += "\"" + str + "\""
-			l.next()
-			continue
-		} else if r == '\'' {
-			l.next()
-			str, err := l.lexLiteralStringAsString(`'`, false)
-			if err != nil {
-				return l.errorf(err.Error())
-			}
-			growingString += "'" + str + "'"
+			growingString += `"` + str + `"`
 			l.next()
 			continue
 		} else if r == '\n' {
 			return l.errorf("keys cannot contain new lines")
 		} else if isSpace(r) {
 			break
-		} else if r == '.' {
-			// skip
 		} else if !isValidBareChar(r) {
 			return l.errorf("keys cannot contain %c character", r)
 		}
@@ -568,7 +527,6 @@ func (l *tomlLexer) lexTableKey() tomlLexStateFn {
 	return l.lexInsideTableKey
 }
 
-// Parse the key till "]]", but only bare keys are supported
 func (l *tomlLexer) lexInsideTableArrayKey() tomlLexStateFn {
 	for r := l.peek(); r != eof; r = l.peek() {
 		switch r {
@@ -592,7 +550,6 @@ func (l *tomlLexer) lexInsideTableArrayKey() tomlLexStateFn {
 	return l.errorf("unclosed table array key")
 }
 
-// Parse the key till "]" but only bare keys are supported
 func (l *tomlLexer) lexInsideTableKey() tomlLexStateFn {
 	for r := l.peek(); r != eof; r = l.peek() {
 		switch r {
@@ -618,77 +575,11 @@ func (l *tomlLexer) lexRightBracket() tomlLexStateFn {
 	return l.lexRvalue
 }
 
-type validRuneFn func(r rune) bool
-
-func isValidHexRune(r rune) bool {
-	return r >= 'a' && r <= 'f' ||
-		r >= 'A' && r <= 'F' ||
-		r >= '0' && r <= '9' ||
-		r == '_'
-}
-
-func isValidOctalRune(r rune) bool {
-	return r >= '0' && r <= '7' || r == '_'
-}
-
-func isValidBinaryRune(r rune) bool {
-	return r == '0' || r == '1' || r == '_'
-}
-
 func (l *tomlLexer) lexNumber() tomlLexStateFn {
 	r := l.peek()
-
-	if r == '0' {
-		follow := l.peekString(2)
-		if len(follow) == 2 {
-			var isValidRune validRuneFn
-			switch follow[1] {
-			case 'x':
-				isValidRune = isValidHexRune
-			case 'o':
-				isValidRune = isValidOctalRune
-			case 'b':
-				isValidRune = isValidBinaryRune
-			default:
-				if follow[1] >= 'a' && follow[1] <= 'z' || follow[1] >= 'A' && follow[1] <= 'Z' {
-					return l.errorf("unknown number base: %s. possible options are x (hex) o (octal) b (binary)", string(follow[1]))
-				}
-			}
-
-			if isValidRune != nil {
-				l.next()
-				l.next()
-				digitSeen := false
-				for {
-					next := l.peek()
-					if !isValidRune(next) {
-						break
-					}
-					digitSeen = true
-					l.next()
-				}
-
-				if !digitSeen {
-					return l.errorf("number needs at least one digit")
-				}
-
-				l.emit(tokenInteger)
-
-				return l.lexRvalue
-			}
-		}
-	}
-
 	if r == '+' || r == '-' {
 		l.next()
-		if l.follow("inf") {
-			return l.lexInf
-		}
-		if l.follow("nan") {
-			return l.lexNan
-		}
 	}
-
 	pointSeen := false
 	expSeen := false
 	digitSeen := false
@@ -741,27 +632,7 @@ func (l *tomlLexer) run() {
 }
 
 func init() {
-	// Regexp for all date/time formats supported by TOML.
-	// Group 1: nano precision
-	// Group 2: timezone
-	//
-	// /!\ also matches the empty string
-	//
-	// Example matches:
-	//1979-05-27T07:32:00Z
-	//1979-05-27T00:32:00-07:00
-	//1979-05-27T00:32:00.999999-07:00
-	//1979-05-27 07:32:00Z
-	//1979-05-27 00:32:00-07:00
-	//1979-05-27 00:32:00.999999-07:00
-	//1979-05-27T07:32:00
-	//1979-05-27T00:32:00.999999
-	//1979-05-27 07:32:00
-	//1979-05-27 00:32:00.999999
-	//1979-05-27
-	//07:32:00
-	//00:32:00.999999
-	dateRegexp = regexp.MustCompile(`^(?:\d{1,4}-\d{2}-\d{2})?(?:[T ]?\d{2}:\d{2}:\d{2}(\.\d{1,9})?(Z|[+-]\d{2}:\d{2})?)?`)
+	dateRegexp = regexp.MustCompile(`^\d{1,4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,9})?(Z|[+-]\d{2}:\d{2})`)
 }
 
 // Entry point

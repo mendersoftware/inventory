@@ -2,6 +2,7 @@ package toml
 
 import (
 	"fmt"
+	"strconv"
 	"unicode"
 )
 
@@ -22,8 +23,6 @@ const (
 	tokenTrue
 	tokenFalse
 	tokenFloat
-	tokenInf
-	tokenNan
 	tokenEqual
 	tokenLeftBracket
 	tokenRightBracket
@@ -34,7 +33,6 @@ const (
 	tokenDoubleLeftBracket
 	tokenDoubleRightBracket
 	tokenDate
-	tokenLocalDate
 	tokenKeyGroup
 	tokenKeyGroupArray
 	tokenComma
@@ -57,8 +55,6 @@ var tokenTypeNames = []string{
 	"True",
 	"False",
 	"Float",
-	"Inf",
-	"NaN",
 	"=",
 	"[",
 	"]",
@@ -68,8 +64,7 @@ var tokenTypeNames = []string{
 	")",
 	"]]",
 	"[[",
-	"LocalDate",
-	"LocalDate",
+	"Date",
 	"KeyGroup",
 	"KeyGroupArray",
 	",",
@@ -94,6 +89,14 @@ func (tt tokenType) String() string {
 		return tokenTypeNames[idx]
 	}
 	return "Unknown"
+}
+
+func (t token) Int() int {
+	if result, err := strconv.Atoi(t.val); err != nil {
+		panic(err)
+	} else {
+		return result
+	}
 }
 
 func (t token) String() string {

@@ -23,8 +23,6 @@ import (
 
 type DeviceID string
 
-var NilDeviceID DeviceID //TODO: how to make it NilDeviceID:=DeviceID(primitive.NilObjectID)
-
 type GroupName string
 
 type DeviceAttribute struct {
@@ -77,7 +75,7 @@ type Device struct {
 	ID DeviceID `json:"id" bson:"_id,omitempty"`
 
 	//a map of attributes names and their values.
-	Attributes DeviceAttributes `json:"attributes,omitempty" bson:"attributes,omitempty"`
+	Attributes DeviceAttributes `json:"attributes,omitempty" bson:",omitempty"`
 
 	//device's group name
 	Group GroupName `json:"-" bson:"group,omitempty"`
