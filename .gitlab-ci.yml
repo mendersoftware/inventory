@@ -1,4 +1,6 @@
 stages:
+  - test_prep_build
+  - test_prep
   - test
   - build
   - publish
@@ -16,3 +18,77 @@ include:
 test:unit:
   image: golang:1.11.4
 
+test:build_acceptance:
+  stage: test_prep_build
+  image: golang:1.11
+  before_script:
+    # Prepare GOPATH for the build
+    - mkdir -p /go/src/github.com/mendersoftware
+    - cp -r ${CI_PROJECT_DIR} /go/src/github.com/mendersoftware/${CI_PROJECT_NAME}
+    - cd /go/src/github.com/mendersoftware/${CI_PROJECT_NAME}
+  script:
+    - CGO_ENABLED=0 go test -c -o ${CI_PROJECT_NAME}-test -coverpkg $(go list ./... | grep -v vendor | grep -v mock | grep -v test | tr  '\n' ,)
+    - cp ${CI_PROJECT_NAME}-test ${CI_PROJECT_DIR}
+  artifacts:
+    untracked: true
+    paths:
+      - ${CI_PROJECT_NAME}-test
+
+test:prepare_acceptance:
+  stage: test_prep
+  image: docker
+  services:
+    - docker:dind
+  dependencies:
+    - test:build_acceptance
+  before_script:
+    - export DOCKER_REPOSITORY="mendersoftware/${CI_PROJECT_NAME}"
+    - export DOCKER_TAG=${CI_COMMIT_REF_SLUG:-master}
+    - export SERVICE_IMAGE="$DOCKER_REPOSITORY:$DOCKER_TAG"
+    - export COMMIT_TAG="$CI_COMMIT_REF_SLUG_$CI_COMMIT_SHA"
+  script:
+    - docker build -f Dockerfile.acceptance-testing -t $DOCKER_REPOSITORY:prtest .
+    - docker save $DOCKER_REPOSITORY:prtest > tests_image.tar
+    - docker build -t $DOCKER_REPOSITORY:pr .
+    - docker build -t testing -f tests/Dockerfile tests
+    - docker save testing > acceptance_testing_image.tar
+  artifacts:
+    expire_in: 2w
+    paths:
+      - tests_image.tar
+      - acceptance_testing_image.tar
+      - ${CI_PROJECT_NAME}
+
+test:acceptance_tests:
+  stage: test
+  tags:
+    - docker
+  image: tiangolo/docker-with-compose
+  services:
+    - docker:dind
+  dependencies:
+    - test:build_acceptance
+    - test:prepare_acceptance
+  before_script:
+    - apk add git bash
+    - git clone https://github.com/mendersoftware/integration.git
+    - mv integration/extra/travis-testing/* tests/
+    - mv docs/* tests/
+    - docker load -i tests_image.tar
+    - docker load -i acceptance_testing_image.tar
+  script:
+    - TESTS_DIR=$(pwd)/tests $(pwd)/tests/run-test-environment acceptance $(pwd)/integration $(pwd)/tests/docker-compose.yml
+  artifacts:
+    expire_in: 2w
+    paths:
+      - tests/coverage-acceptance.txt
+
+publish:acceptance:
+  stage: publish
+  image: alpine
+  dependencies:
+    - test:acceptance_tests
+  before_script:
+    - apk add --no-cache bash curl findutils git
+  script:
+    - bash -c "bash <(curl -s https://codecov.io/bash) -Z -F acceptance -f ./tests/coverage-acceptance.txt"
