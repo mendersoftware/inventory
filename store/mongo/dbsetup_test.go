@@ -1,4 +1,4 @@
-// Copyright 2019 Northern.tech AS
+// Copyright 2020 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -11,43 +11,25 @@
 //    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
-
-package mongo_test
+package mongo
 
 import (
-	"io/ioutil"
 	"os"
 	"testing"
 
-	"log"
-
-	"github.com/mendersoftware/go-lib-micro/mongo/dbtest"
+	mtesting "github.com/mendersoftware/go-lib-micro/mongo/testing"
 )
 
-var db *dbtest.DBServer
+var db mtesting.TestDBRunner
 
 // Overwrites test execution and allows for test database setup
 func TestMain(m *testing.M) {
-	dbdir, _ := ioutil.TempDir("/tmp", "dbsetup-test")
-	// os.Exit would ignore defers, workaround
-	status := func() int {
-		// Start test database server
-		if !testing.Short() {
-			db = &dbtest.DBServer{}
-			db.SetPath(dbdir)
-			db.SetTimeout(64)
-			_ = db.Session()
-			// Tear down databaser server
-			// Note:
-			// if test panics, it will require manual database tier down
-			// testing package executes tests in goroutines therefore
-			// we can't catch panics issued in tests.
-			log.Printf("mongo: started mock mongo (mgo/dbtest)")
-			defer os.RemoveAll(dbdir)
-			defer db.Stop()
-		}
+
+	status := mtesting.WithDB(func(d mtesting.TestDBRunner) int {
+		db = d
+		defer db.Client().Disconnect(db.CTX())
 		return m.Run()
-	}()
+	})
 
 	os.Exit(status)
 }

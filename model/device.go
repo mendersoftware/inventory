@@ -1,4 +1,4 @@
-// Copyright 2019 Northern.tech AS
+// Copyright 2020 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -21,6 +21,10 @@ import (
 	"github.com/go-ozzo/ozzo-validation"
 )
 
+const (
+	AttrScopeInventory = "inventory"
+)
+
 type DeviceID string
 
 var NilDeviceID DeviceID //TODO: how to make it NilDeviceID:=DeviceID(primitive.NilObjectID)
@@ -31,6 +35,7 @@ type DeviceAttribute struct {
 	Name        string      `json:"name" bson:",omitempty"`
 	Description *string     `json:"description,omitempty" bson:",omitempty"`
 	Value       interface{} `json:"value" bson:",omitempty"`
+	Scope       string      `json:"scope" bson:",omitempty"`
 }
 
 func (da DeviceAttribute) Validate() error {

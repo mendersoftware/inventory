@@ -1,4 +1,4 @@
-// Copyright 2019 Northern.tech AS
+// Copyright 2020 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -40,7 +40,7 @@ import (
 )
 
 const (
-	DbVersion = "0.1.0"
+	DbVersion = "0.2.0"
 
 	DbName        = "inventory"
 	DbDevicesColl = "devices"
@@ -50,6 +50,9 @@ const (
 	DbDevGroup           = "group"
 	DbDevAttributesDesc  = "description"
 	DbDevAttributesValue = "value"
+	DbDevAttributesScope = "scope"
+
+	DbScopeInventory = "inventory"
 )
 
 var (
@@ -325,6 +328,14 @@ func makeAttrUpsert(attrs model.DeviceAttributes) map[string]interface{} {
 	upsert := map[string]interface{}{}
 
 	for name, a := range attrs {
+		if a.Scope != "" {
+			// prefix attribute name with a scope
+			name = fmt.Sprintf("%s-%s", a.Scope, name)
+			fieldName =
+				fmt.Sprintf("%s.%s.%s", DbDevAttributes, name, DbDevAttributesScope)
+			upsert[fieldName] = a.Scope
+		}
+
 		if a.Description != nil {
 			fieldName =
 				fmt.Sprintf("%s.%s.%s", DbDevAttributes, name, DbDevAttributesDesc)
@@ -541,7 +552,7 @@ func (db *DataStoreMongo) MigrateTenant(ctx context.Context, version string, ten
 	l.Infof("migrating %s", database)
 
 	m := migrate.SimpleMigrator{
-		Session:     db.client,
+		Client:      db.client,
 		Db:          database,
 		Automigrate: db.automigrate,
 	}
@@ -555,7 +566,12 @@ func (db *DataStoreMongo) MigrateTenant(ctx context.Context, version string, ten
 		Tenant: tenantId,
 	})
 
-	migrations := []migrate.Migration{}
+	migrations := []migrate.Migration{
+		&migration_0_2_0{
+			ms:  db,
+			ctx: ctx,
+		},
+	}
 
 	err = m.Apply(ctx, *ver, migrations)
 	if err != nil {

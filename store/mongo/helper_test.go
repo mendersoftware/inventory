@@ -1,4 +1,4 @@
-// Copyright 2019 Northern.tech AS
+// Copyright 2020 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -11,12 +11,11 @@
 //    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
-package mongo_test
+package mongo
 
 import (
 	"errors"
 	"github.com/mendersoftware/inventory/model"
-	. "github.com/mendersoftware/inventory/store/mongo"
 	"github.com/stretchr/testify/assert"
 	"testing"
 
@@ -58,14 +57,14 @@ func TestMongoDeviceFindById(t *testing.T) {
 		// Make sure we start test with empty database
 		db.Wipe()
 
-		session := db.Session()
+		client := db.Client()
 
 		if testCase.InputDevice != nil {
-			_, _ = session.Database(mstore.DbFromContext(db.Ctx, DbName)).Collection(DbDevicesColl).InsertOne(db.Ctx, testCase.InputDevice)
+			_, _ = client.Database(mstore.DbFromContext(db.CTX(), DbName)).Collection(DbDevicesColl).InsertOne(db.CTX(), testCase.InputDevice)
 		}
 
 		var dbdev model.Device
-		err := DeviceFindById(db.Ctx, session.Database(mstore.DbFromContext(db.Ctx, DbName)).Collection(DbDevicesColl), testCase.InputID, &dbdev)
+		err := DeviceFindById(db.CTX(), client.Database(mstore.DbFromContext(db.CTX(), DbName)).Collection(DbDevicesColl), testCase.InputID, &dbdev)
 
 		if testCase.InputDevice != nil {
 			assert.NoError(t, err, "error getting device")
