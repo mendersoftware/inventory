@@ -67,6 +67,7 @@ def inventory_attributes(management_client):
             # does it matter if you pass a field name = None?
             attr = management_client.inventoryAttribute(name=n,
                                                         value=v,
+                                                        scope='inventory',
                                                         description=d)
             attributeList.append(attr)
 

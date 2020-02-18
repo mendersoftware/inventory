@@ -151,7 +151,8 @@ func (db *DataStoreMongo) GetDevices(ctx context.Context, q store.ListQuery) ([]
 	queryFilters := make([]bson.M, 0)
 	for _, filter := range q.Filters {
 		op := mongoOperator(filter.Operator)
-		field := fmt.Sprintf("%s.%s.%s", DbDevAttributes, filter.AttrName, DbDevAttributesValue)
+		name := fmt.Sprintf("%s-%s", filter.AttrScope, filter.AttrName)
+		field := fmt.Sprintf("%s.%s.%s", DbDevAttributes, name, DbDevAttributesValue)
 		switch filter.Operator {
 		default:
 			if filter.ValueFloat != nil {
@@ -190,7 +191,8 @@ func (db *DataStoreMongo) GetDevices(ctx context.Context, q store.ListQuery) ([]
 	// an empty query object, as unsorted queries would fail otherwise
 	sortQuery := bson.M{"$skip": 0}
 	if q.Sort != nil {
-		sortField := fmt.Sprintf("%s.%s.%s", DbDevAttributes, q.Sort.AttrName, DbDevAttributesValue)
+		name := fmt.Sprintf("%s-%s", q.Sort.AttrScope, q.Sort.AttrName)
+		sortField := fmt.Sprintf("%s.%s.%s", DbDevAttributes, name, DbDevAttributesValue)
 		sortFieldQuery := bson.M{}
 		sortFieldQuery[sortField] = 1
 		if !q.Sort.Ascending {

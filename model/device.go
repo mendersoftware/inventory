@@ -119,6 +119,9 @@ func (d *DeviceAttributes) UnmarshalJSON(b []byte) error {
 	if len(attrsArray) > 0 {
 		*d = DeviceAttributes{}
 		for _, attr := range attrsArray {
+			if attr.Scope == "" {
+				attr.Scope = AttrScopeInventory
+			}
 			(*d)[attr.Name] = attr
 		}
 	}
@@ -131,7 +134,13 @@ func (d DeviceAttributes) MarshalJSON() ([]byte, error) {
 
 	for a, v := range d {
 		nv := v
-		nv.Name = a
+		if v.Name == "" {
+			v.Name = a
+		}
+		nv.Name = v.Name
+		if nv.Scope == "" {
+			nv.Scope = AttrScopeInventory
+		}
 		attrsArray = append(attrsArray, nv)
 	}
 

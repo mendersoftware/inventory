@@ -47,37 +47,37 @@ func TestMongoGetDevices(t *testing.T) {
 		{
 			ID: model.DeviceID("3"),
 			Attributes: map[string]model.DeviceAttribute{
-				"attrString": {Name: "attrString", Value: "val3", Description: strPtr("desc1"), Scope: model.AttrScopeInventory},
-				"attrFloat":  {Name: "attrFloat", Value: 3.0, Description: strPtr("desc2"), Scope: model.AttrScopeInventory},
+				DbScopeInventory + "-attrString": {Name: "attrString", Value: "val3", Description: strPtr("desc1"), Scope: model.AttrScopeInventory},
+				DbScopeInventory + "-attrFloat":  {Name: "attrFloat", Value: 3.0, Description: strPtr("desc2"), Scope: model.AttrScopeInventory},
 			},
 		},
 		{
 			ID: model.DeviceID("4"),
 			Attributes: map[string]model.DeviceAttribute{
-				"attrString": {Name: "attrString", Value: "val4", Description: strPtr("desc1"), Scope: model.AttrScopeInventory},
-				"attrFloat":  {Name: "attrFloat", Value: 4.0, Description: strPtr("desc2"), Scope: model.AttrScopeInventory},
+				DbScopeInventory + "-attrString": {Name: "attrString", Value: "val4", Description: strPtr("desc1"), Scope: model.AttrScopeInventory},
+				DbScopeInventory + "-attrFloat":  {Name: "attrFloat", Value: 4.0, Description: strPtr("desc2"), Scope: model.AttrScopeInventory},
 			},
 		},
 		{
 			ID: model.DeviceID("5"),
 			Attributes: map[string]model.DeviceAttribute{
-				"attrString": {Name: "attrString", Value: "val5", Description: strPtr("desc1"), Scope: model.AttrScopeInventory},
-				"attrFloat":  {Name: "attrFloat", Value: 5.0, Description: strPtr("desc2"), Scope: model.AttrScopeInventory},
+				DbScopeInventory + "-attrString": {Name: "attrString", Value: "val5", Description: strPtr("desc1"), Scope: model.AttrScopeInventory},
+				DbScopeInventory + "-attrFloat":  {Name: "attrFloat", Value: 5.0, Description: strPtr("desc2"), Scope: model.AttrScopeInventory},
 			},
 			Group: model.GroupName("2"),
 		},
 		{
 			ID: model.DeviceID("6"),
 			Attributes: map[string]model.DeviceAttribute{
-				"attrString": {Name: "attrString", Value: "val6", Description: strPtr("desc1"), Scope: model.AttrScopeInventory},
-				"attrFloat":  {Name: "attrFloat", Value: 4.0, Description: strPtr("desc2"), Scope: model.AttrScopeInventory},
+				DbScopeInventory + "-attrString": {Name: "attrString", Value: "val6", Description: strPtr("desc1"), Scope: model.AttrScopeInventory},
+				DbScopeInventory + "-attrFloat":  {Name: "attrFloat", Value: 4.0, Description: strPtr("desc2"), Scope: model.AttrScopeInventory},
 			},
 		},
 		{
 			ID: model.DeviceID("7"),
 			Attributes: map[string]model.DeviceAttribute{
-				"attrString": {Name: "attrString", Value: "val4", Description: strPtr("desc1"), Scope: model.AttrScopeInventory},
-				"attrFloat":  {Name: "attrFloat", Value: 6.0, Description: strPtr("desc2"), Scope: model.AttrScopeInventory},
+				DbScopeInventory + "-attrString": {Name: "attrString", Value: "val4", Description: strPtr("desc1"), Scope: model.AttrScopeInventory},
+				DbScopeInventory + "-attrFloat":  {Name: "attrFloat", Value: 6.0, Description: strPtr("desc2"), Scope: model.AttrScopeInventory},
 			},
 		},
 	}
@@ -151,8 +151,9 @@ func TestMongoGetDevices(t *testing.T) {
 			limit:    20,
 			filters: []store.Filter{
 				{
-					AttrName: "attrString",
-					Value:    "val3", Operator: store.Eq,
+					AttrName:  "attrString",
+					AttrScope: model.AttrScopeInventory,
+					Value:     "val3", Operator: store.Eq,
 				},
 			},
 			sort: nil,
@@ -165,6 +166,7 @@ func TestMongoGetDevices(t *testing.T) {
 			filters: []store.Filter{
 				{
 					AttrName:   "attrFloat",
+					AttrScope:  model.AttrScopeInventory,
 					Value:      "5.0",
 					ValueFloat: &floatVal5,
 					Operator:   store.Eq,
@@ -179,12 +181,14 @@ func TestMongoGetDevices(t *testing.T) {
 			limit:    20,
 			filters: []store.Filter{
 				{
-					AttrName: "attrString",
-					Value:    "val4",
-					Operator: store.Eq,
+					AttrName:  "attrString",
+					AttrScope: model.AttrScopeInventory,
+					Value:     "val4",
+					Operator:  store.Eq,
 				},
 				{
 					AttrName:   "attrFloat",
+					AttrScope:  model.AttrScopeInventory,
 					Value:      "4.0",
 					ValueFloat: &floatVal4,
 					Operator:   store.Eq,
@@ -200,6 +204,7 @@ func TestMongoGetDevices(t *testing.T) {
 			filters:  nil,
 			sort: &store.Sort{
 				AttrName:  "attrFloat",
+				AttrScope: model.AttrScopeInventory,
 				Ascending: false,
 			},
 		},

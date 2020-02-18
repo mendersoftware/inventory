@@ -1,4 +1,4 @@
-// Copyright 2019 Northern.tech AS
+// Copyright 2020 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"reflect"
 	"strconv"
 	"testing"
 
@@ -134,9 +135,10 @@ func TestApiParseFilterParams(t *testing.T) {
 			inReq: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&attr_name1=A0001", nil),
 			filters: []store.Filter{
 				store.Filter{
-					AttrName: "attr_name1",
-					Value:    "A0001",
-					Operator: store.Eq,
+					AttrName:  "attr_name1",
+					AttrScope: model.AttrScopeInventory,
+					Value:     "A0001",
+					Operator:  store.Eq,
 				},
 			},
 		},
@@ -144,9 +146,10 @@ func TestApiParseFilterParams(t *testing.T) {
 			inReq: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&attr_name1=qe:123:123:123", nil),
 			filters: []store.Filter{
 				store.Filter{
-					AttrName: "attr_name1",
-					Value:    "qe:123:123:123",
-					Operator: store.Eq,
+					AttrName:  "attr_name1",
+					AttrScope: model.AttrScopeInventory,
+					Value:     "qe:123:123:123",
+					Operator:  store.Eq,
 				},
 			},
 		},
@@ -155,6 +158,7 @@ func TestApiParseFilterParams(t *testing.T) {
 			filters: []store.Filter{
 				store.Filter{
 					AttrName:   "attr_name1",
+					AttrScope:  model.AttrScopeInventory,
 					Value:      "3.14",
 					ValueFloat: floatPtr(3.14),
 					Operator:   store.Eq,
@@ -165,9 +169,10 @@ func TestApiParseFilterParams(t *testing.T) {
 			inReq: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&attr_name1=eq:A0001", nil),
 			filters: []store.Filter{
 				store.Filter{
-					AttrName: "attr_name1",
-					Value:    "A0001",
-					Operator: store.Eq,
+					AttrName:  "attr_name1",
+					AttrScope: model.AttrScopeInventory,
+					Value:     "A0001",
+					Operator:  store.Eq,
 				},
 			},
 		},
@@ -175,9 +180,32 @@ func TestApiParseFilterParams(t *testing.T) {
 			inReq: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&attr_name1=eq:qe:123:123:123", nil),
 			filters: []store.Filter{
 				store.Filter{
-					AttrName: "attr_name1",
-					Value:    "qe:123:123:123",
-					Operator: store.Eq,
+					AttrName:  "attr_name1",
+					AttrScope: model.AttrScopeInventory,
+					Value:     "qe:123:123:123",
+					Operator:  store.Eq,
+				},
+			},
+		},
+		"eq - long form, colons, with scope": {
+			inReq: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&scope/attr_name1=eq:qe:123:123:123", nil),
+			filters: []store.Filter{
+				store.Filter{
+					AttrName:  "attr_name1",
+					AttrScope: "scope",
+					Value:     "qe:123:123:123",
+					Operator:  store.Eq,
+				},
+			},
+		},
+		"eq - long form, dashes, with scope": {
+			inReq: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&scope/attr-name1=eq:qe-123-123-123", nil),
+			filters: []store.Filter{
+				store.Filter{
+					AttrName:  "attr-name1",
+					AttrScope: "scope",
+					Value:     "qe-123-123-123",
+					Operator:  store.Eq,
 				},
 			},
 		},
@@ -405,6 +433,8 @@ func TestApiInventoryAddDevice(t *testing.T) {
 		inReq *http.Request
 
 		inventoryErr error
+
+		deviceAttributes model.DeviceAttributes
 	}{
 		"empty body": {
 			inReq: test.MakeSimpleRequest("POST",
@@ -444,6 +474,35 @@ func TestApiInventoryAddDevice(t *testing.T) {
 				OutputBodyObject: nil,
 				OutputHeaders:    map[string][]string{"Location": {"devices/id-0001"}},
 			},
+			deviceAttributes: model.DeviceAttributes{
+				"a1": {Name: "a1", Value: "00:00:00:01", Description: strPtr("ddd"), Scope: model.AttrScopeInventory},
+				"a2": {Name: "a2", Value: 123.2, Description: strPtr("ddd"), Scope: model.AttrScopeInventory},
+				"a3": {Name: "a3", Value: []interface{}{"00:00:00:01", "00"}, Description: strPtr("ddd"), Scope: model.AttrScopeInventory},
+			},
+		},
+		"body formatted ok, all fields present, attributes with scope": {
+			inReq: test.MakeSimpleRequest("POST",
+				"http://1.2.3.4/api/internal/v1/inventory/devices",
+				map[string]interface{}{
+					"id": "id-0001",
+					"attributes": []map[string]interface{}{
+						{"name": "a1", "value": "00:00:00:01", "description": "ddd", "scope": model.AttrScopeInventory},
+						{"name": "a2", "value": 123.2, "description": "ddd", "scope": model.AttrScopeInventory},
+						{"name": "a3", "value": []interface{}{"00:00:00:01", "00"}, "description": "ddd", "scope": model.AttrScopeInventory},
+					},
+				},
+			),
+			inventoryErr: nil,
+			JSONResponseParams: utils.JSONResponseParams{
+				OutputStatus:     http.StatusCreated,
+				OutputBodyObject: nil,
+				OutputHeaders:    map[string][]string{"Location": {"devices/id-0001"}},
+			},
+			deviceAttributes: model.DeviceAttributes{
+				"a1": {Name: "a1", Value: "00:00:00:01", Description: strPtr("ddd"), Scope: model.AttrScopeInventory},
+				"a2": {Name: "a2", Value: 123.2, Description: strPtr("ddd"), Scope: model.AttrScopeInventory},
+				"a3": {Name: "a3", Value: []interface{}{"00:00:00:01", "00"}, Description: strPtr("ddd"), Scope: model.AttrScopeInventory},
+			},
 		},
 		"body formatted ok, wrong attributes type": {
 			inReq: test.MakeSimpleRequest("POST",
@@ -456,7 +515,7 @@ func TestApiInventoryAddDevice(t *testing.T) {
 			inventoryErr: nil,
 			JSONResponseParams: utils.JSONResponseParams{
 				OutputStatus:     http.StatusBadRequest,
-				OutputBodyObject: RestError("failed to decode request body: json: cannot unmarshal number into Go value of type []model.DeviceAttribute"),
+				OutputBodyObject: RestError("failed to decode request body: json: cannot unmarshal number into Go struct field Device.attributes of type []model.DeviceAttribute"),
 			},
 		},
 		"body formatted ok, 'id' missing": {
@@ -532,7 +591,17 @@ func TestApiInventoryAddDevice(t *testing.T) {
 
 		inv.On("AddDevice",
 			ctx,
-			mock.AnythingOfType("*model.Device")).Return(tc.inventoryErr)
+			mock.MatchedBy(
+				func(dev *model.Device) bool {
+					if tc.deviceAttributes != nil {
+						if !reflect.DeepEqual(tc.deviceAttributes, dev.Attributes) {
+							assert.FailNow(t, "", "attributes not equal: %v \n%v\n", tc.deviceAttributes, dev.Attributes)
+						}
+					}
+					return true
+				},
+			),
+		).Return(tc.inventoryErr)
 
 		apih := makeMockApiHandler(t, &inv)
 
@@ -551,7 +620,8 @@ func TestApiInventoryUpsertAttributes(t *testing.T) {
 
 		inventoryErr error
 
-		resp utils.JSONResponseParams
+		resp             utils.JSONResponseParams
+		deviceAttributes model.DeviceAttributes
 	}{
 		"no auth": {
 			inReq: test.MakeSimpleRequest("PATCH",
@@ -675,6 +745,42 @@ func TestApiInventoryUpsertAttributes(t *testing.T) {
 				OutputStatus:     http.StatusOK,
 				OutputBodyObject: nil,
 			},
+			deviceAttributes: model.DeviceAttributes{
+				"name1": {Name: "name1", Value: "value1", Description: strPtr("descr1"), Scope: model.AttrScopeInventory},
+				"name2": {Name: "name2", Value: float64(2), Description: strPtr("descr2"), Scope: model.AttrScopeInventory},
+			},
+		},
+
+		"body formatted ok, attributes ok (all fields), with scope": {
+			inReq: test.MakeSimpleRequest("PATCH",
+				"http://1.2.3.4/api/0.1.0/attributes",
+				[]model.DeviceAttribute{
+					{
+						Name:        "name1",
+						Value:       "value1",
+						Description: strPtr("descr1"),
+						Scope:       model.AttrScopeInventory,
+					},
+					{
+						Name:        "name2",
+						Value:       2,
+						Description: strPtr("descr2"),
+						Scope:       model.AttrScopeInventory,
+					},
+				},
+			),
+			inHdrs: map[string]string{
+				"Authorization": makeDeviceAuthHeader(`{"sub": "fakeid"}`),
+			},
+			inventoryErr: nil,
+			resp: utils.JSONResponseParams{
+				OutputStatus:     http.StatusOK,
+				OutputBodyObject: nil,
+			},
+			deviceAttributes: model.DeviceAttributes{
+				"name1": {Name: "name1", Value: "value1", Description: strPtr("descr1"), Scope: model.AttrScopeInventory},
+				"name2": {Name: "name2", Value: float64(2), Description: strPtr("descr2"), Scope: model.AttrScopeInventory},
+			},
 		},
 
 		"body formatted ok, attributes ok (all fields, arrays)": {
@@ -787,7 +893,17 @@ func TestApiInventoryUpsertAttributes(t *testing.T) {
 		inv.On("UpsertAttributes",
 			ctx,
 			mock.AnythingOfType("model.DeviceID"),
-			mock.AnythingOfType("model.DeviceAttributes")).Return(tc.inventoryErr)
+			mock.MatchedBy(
+				func(attrs model.DeviceAttributes) bool {
+					if tc.deviceAttributes != nil {
+						if !reflect.DeepEqual(tc.deviceAttributes, attrs) {
+							assert.FailNow(t, "", "attributes not equal: %v \n%v\n", tc.deviceAttributes, attrs)
+						}
+					}
+					return true
+				},
+			),
+		).Return(tc.inventoryErr)
 
 		apih := makeMockApiHandler(t, &inv)
 

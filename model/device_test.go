@@ -64,8 +64,8 @@ func TestDeviceAttributesMarshal(t *testing.T) {
 	// assert.JSONEq(). Since we're interested in how the output JSON is
 	// formatted, use 2 possible variants and check that the output matches at
 	// least one.
-	exp1 := `[{"name":"foo","value":"bar","scope":""},{"name":"bar","value":[1,2,3],"scope":""}]`
-	exp2 := `[{"name":"bar","value":[1,2,3],"scope":""},{"name":"foo","value":"bar","scope":""}]`
+	exp1 := `[{"name":"foo","value":"bar","scope":"inventory"},{"name":"bar","value":[1,2,3],"scope":"inventory"}]`
+	exp2 := `[{"name":"bar","value":[1,2,3],"scope":"inventory"},{"name":"foo","value":"bar","scope":"inventory"}]`
 	if string(data) != exp1 && string(data) != exp2 {
 		assert.Fail(t, "unexpected JSON marshal output, got:", string(data))
 	}
