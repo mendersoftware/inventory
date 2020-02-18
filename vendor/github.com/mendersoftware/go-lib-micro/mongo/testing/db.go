@@ -25,7 +25,7 @@ import (
 // TestDBRunner exports selected calls of dbtest.DBServer API, just the ones
 // that are useful in tests.
 type TestDBRunner interface {
-	Session() *mongo.Client
+	Client() *mongo.Client
 	Wipe()
 	CTX() context.Context
 }
