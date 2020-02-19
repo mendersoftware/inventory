@@ -1,4 +1,4 @@
-// Copyright 2017 Northern.tech AS
+// Copyright 2020 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -26,6 +26,11 @@ var runAcceptanceTests bool
 // used for parsing '-cli-args' for urfave/cli when running acceptance tests
 // this is because of a conflict between urfave/cli and regular go flags required for testing (can't mix the two)
 var cliArgsRaw string
+
+var _ = func() bool {
+	testing.Init()
+	return true
+}()
 
 func init() {
 	flag.BoolVar(&runAcceptanceTests, "acceptance-tests", false, "set flag when running acceptance tests")
