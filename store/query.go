@@ -1,4 +1,4 @@
-// Copyright 2019 Northern.tech AS
+// Copyright 2020 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ const (
 
 type Filter struct {
 	AttrName   string
+	AttrScope  string
 	Value      string
 	ValueFloat *float64
 	Operator   ComparisonOperator
@@ -28,6 +29,7 @@ type Filter struct {
 
 type Sort struct {
 	AttrName  string
+	AttrScope string
 	Ascending bool
 }
 

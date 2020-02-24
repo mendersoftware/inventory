@@ -1,4 +1,4 @@
-// Copyright 2019 Northern.tech AS
+// Copyright 2020 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -51,6 +51,7 @@ const (
 	queryParamSort           = "sort"
 	queryParamHasGroup       = "has_group"
 	queryParamValueSeparator = ":"
+	queryParamScopeSeparator = "/"
 	sortOrderAsc             = "asc"
 	sortOrderDesc            = "desc"
 	sortAttributeNameIdx     = 0
@@ -112,7 +113,7 @@ func (i *inventoryHandlers) GetApp() (rest.App, error) {
 // `sort` paramater value is an attribute name with optional direction (desc or asc)
 // separated by colon (:)
 //
-// eg. `sort=attr_name1` or `sort=attr_name1:asd`
+// eg. `sort=attr_name1` or `sort=attr_name1:asc`
 func parseSortParam(r *rest.Request) (*store.Sort, error) {
 	sortStr, err := utils.ParseQueryParmStr(r, queryParamSort, false, nil)
 	if err != nil {
@@ -122,7 +123,16 @@ func parseSortParam(r *rest.Request) (*store.Sort, error) {
 		return nil, nil
 	}
 	sortValArray := strings.Split(sortStr, queryParamValueSeparator)
-	sort := store.Sort{AttrName: sortValArray[sortAttributeNameIdx]}
+	attrNameWithScope := strings.SplitN(sortValArray[sortAttributeNameIdx], queryParamScopeSeparator, 2)
+	var scope, attrName string
+	if len(attrNameWithScope) == 1 {
+		scope = model.AttrScopeInventory
+		attrName = attrNameWithScope[0]
+	} else {
+		scope = attrNameWithScope[0]
+		attrName = attrNameWithScope[1]
+	}
+	sort := store.Sort{AttrName: attrName, AttrScope: scope}
 	if len(sortValArray) == 2 {
 		sortOrder := sortValArray[sortOrderIdx]
 		if sortOrder != sortOrderAsc && sortOrder != sortOrderDesc {
@@ -151,7 +161,16 @@ func parseFilterParams(r *rest.Request) ([]store.Filter, error) {
 			return nil, err
 		}
 
-		filter = store.Filter{AttrName: name}
+		attrNameWithScope := strings.SplitN(name, queryParamScopeSeparator, 2)
+		var scope, attrName string
+		if len(attrNameWithScope) == 1 {
+			scope = model.AttrScopeInventory
+			attrName = attrNameWithScope[0]
+		} else {
+			scope = attrNameWithScope[0]
+			attrName = attrNameWithScope[1]
+		}
+		filter = store.Filter{AttrName: attrName, AttrScope: scope}
 
 		// make sure we parse ':'s in value, it's either:
 		// not there
@@ -291,6 +310,12 @@ func (i *inventoryHandlers) AddDeviceHandler(w rest.ResponseWriter, r *rest.Requ
 	l := log.FromContext(ctx)
 
 	dev, err := parseDevice(r)
+	if err != nil {
+		u.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
+		return
+	}
+
+	dev.Attributes, err = validateAttributes(dev.Attributes)
 	if err != nil {
 		u.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
 		return
@@ -456,12 +481,24 @@ func parseAttributes(r *rest.Request) (model.DeviceAttributes, error) {
 		return nil, errors.Wrap(err, "failed to decode request body")
 	}
 
-	for _, a := range attrs {
-		if err = a.Validate(); err != nil {
+	attrs, err = validateAttributes(attrs)
+	if err != nil {
+		return nil, err
+	}
+
+	return attrs, nil
+}
+
+func validateAttributes(attrs model.DeviceAttributes) (model.DeviceAttributes, error) {
+	for i, a := range attrs {
+		if a.Scope == "" {
+			a.Scope = model.AttrScopeInventory
+			attrs[i] = a
+		}
+		if err := a.Validate(); err != nil {
 			return nil, err
 		}
 	}
-
 	return attrs, nil
 }
 

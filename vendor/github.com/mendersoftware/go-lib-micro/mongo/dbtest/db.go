@@ -12,7 +12,6 @@
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
 
-
 // Copyright 2010-2013 Gustavo Niemeyer <gustavo@niemeyer.net>
 
 // mgo - MongoDB driver for Go
@@ -63,7 +62,7 @@ import (
 
 // DBServer controls a MongoDB server process to be used within test suites.
 //
-// The test server is started when Session is called the first time and should
+// The test server is started when Client is called the first time and should
 // remain running for the duration of all tests, with the Wipe method being
 // called between tests (before each of them) to clear stored data. After all tests
 // are done, the Stop method should be called to stop the test server.
@@ -73,7 +72,7 @@ import (
 type DBServer struct {
 	Ctx     context.Context
 	timeout time.Duration
-	session *mongo.Client
+	client  *mongo.Client
 	output  bytes.Buffer
 	server  *exec.Cmd
 	dbpath  string
@@ -153,14 +152,14 @@ func (dbs *DBServer) monitor() error {
 // It's okay to call Stop multiple times. After the test server is
 // stopped it cannot be restarted.
 //
-// All database sessions must be closed before or while the Stop method
+// All database clients must be closed before or while the Stop method
 // is running. Otherwise Stop will panic after a timeout informing that
-// there is a session leak.
+// there is a client leak.
 func (dbs *DBServer) Stop() {
-	if dbs.session != nil {
-		if dbs.session != nil {
-			dbs.session.Disconnect(dbs.Ctx)
-			dbs.session = nil
+	if dbs.client != nil {
+		if dbs.client != nil {
+			dbs.client.Disconnect(dbs.Ctx)
+			dbs.client = nil
 		}
 	}
 	if dbs.server != nil {
@@ -180,15 +179,15 @@ func (dbs *DBServer) Stop() {
 	}
 }
 
-// Session returns a new session to the server. The returned session
-// must be closed after the test is done with it.
+// Client returns a new client to the server. The returned client
+// must be disconnected after the tests are finished.
 //
-// The first Session obtained from a DBServer will start it.
-func (dbs *DBServer) Session() *mongo.Client {
+// The first call to Client will start the DBServer.
+func (dbs *DBServer) Client() *mongo.Client {
 	if dbs.server == nil {
 		dbs.start()
 	}
-	if dbs.session == nil {
+	if dbs.client == nil {
 		var err error
 
 		if dbs.timeout == 0 {
@@ -196,15 +195,15 @@ func (dbs *DBServer) Session() *mongo.Client {
 		}
 		clientOptions := options.Client().ApplyURI("mongodb://" + dbs.host + "/test")
 		dbs.Ctx = context.Background() // context.WithTimeout(context.Background(), dbs.timeout*time.Second)
-		dbs.session, err = mongo.Connect(dbs.Ctx, clientOptions)
+		dbs.client, err = mongo.Connect(dbs.Ctx, clientOptions)
 		if err != nil {
 			panic(err)
 		}
-		if dbs.session == nil {
+		if dbs.client == nil {
 			panic("cant connect")
 		}
 	}
-	return dbs.session
+	return dbs.client
 }
 
 func (dbs *DBServer) CTX() context.Context {
@@ -212,19 +211,12 @@ func (dbs *DBServer) CTX() context.Context {
 }
 
 // Wipe drops all created databases and their data.
-//
-// The MongoDB server remains running if it was prevoiusly running,
-// or stopped if it was previously stopped.
-//
-// All database sessions must be closed before or while the Wipe method
-// is running. Otherwise Wipe will panic after a timeout informing that
-// there is a session leak.
 func (dbs *DBServer) Wipe() {
-	if dbs.server == nil || dbs.session == nil {
+	if dbs.server == nil || dbs.client == nil {
 		return
 	}
-	session := dbs.Session()
-	names, err := session.ListDatabaseNames(dbs.Ctx, bson.M{})
+	client := dbs.Client()
+	names, err := client.ListDatabaseNames(dbs.Ctx, bson.M{})
 	if err != nil {
 		panic(err)
 	}
@@ -232,7 +224,7 @@ func (dbs *DBServer) Wipe() {
 		switch name {
 		case "admin", "local", "config":
 		default:
-			err = dbs.session.Database(name).Drop(dbs.Ctx)
+			err = dbs.client.Database(name).Drop(dbs.Ctx)
 			if err != nil {
 				panic(err)
 			}

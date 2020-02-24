@@ -1,4 +1,4 @@
-// Copyright 2019 Northern.tech AS
+// Copyright 2020 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -11,14 +11,17 @@
 //    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
+
 package mongo
 
 import (
 	"context"
-
-	"github.com/pkg/errors"
+	"fmt"
 
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
+	mstore "github.com/mendersoftware/go-lib-micro/store"
+	"github.com/pkg/errors"
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 type migration_0_2_0 struct {
@@ -27,17 +30,30 @@ type migration_0_2_0 struct {
 }
 
 func (m *migration_0_2_0) Up(from migrate.Version) error {
-	c := m.ms.client
-
-	attrs, err := m.ms.GetAllAttributeNames(m.ctx)
+	// get all attribute names
+	names, err := m.ms.GetAllAttributeNames(m.ctx)
 	if err != nil {
-		return errors.Wrap(err, "failed to apply migration 0.2.0")
+		return errors.Wrap(err, "failed to get attribute names")
 	}
 
-	for _, a := range attrs {
-		err = indexAttr(c, m.ctx, a)
+	// rename every attribute occurrence to scoped version, add scope field
+	// hacky - we're doing it in two runs, but dead simple
+	databaseName := mstore.DbFromContext(m.ctx, DbName)
+	coll := m.ms.client.Database(databaseName).Collection(DbDevicesColl)
+	for _, n := range names {
+		nold := fmt.Sprintf("%s.%s", DbDevAttributes, n)
+		nnew := fmt.Sprintf("%s.%s-%s", DbDevAttributes, DbScopeInventory, n)
+
+		_, err := coll.UpdateMany(m.ctx, bson.M{}, bson.M{"$rename": bson.M{nold: nnew}})
 		if err != nil {
-			return errors.Wrap(err, "failed to apply migration 0.2.0")
+			return errors.Wrapf(err, "failed to update attribute name %s to %s", nold, nnew)
+		}
+
+		// get all docs containing a given attribute
+		scope := fmt.Sprintf("%s.%s", nnew, DbDevAttributesScope)
+		_, err = coll.UpdateMany(m.ctx, bson.M{nnew: bson.M{"$exists": true}}, bson.M{"$set": bson.M{scope: DbScopeInventory}})
+		if err != nil {
+			return errors.Wrapf(err, "failed to update scope for attribute name %s", nold)
 		}
 	}
 

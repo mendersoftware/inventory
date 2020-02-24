@@ -42,7 +42,7 @@ func IsErrNeedsMigration(e error) bool {
 //   migrations that will be applied: 1.0.3, 1.1.0
 //
 type SimpleMigrator struct {
-	Session     *mongo.Client
+	Client      *mongo.Client
 	Db          string
 	Automigrate bool
 }
@@ -63,7 +63,7 @@ func (m *SimpleMigrator) Apply(ctx context.Context, target Version, migrations [
 		return VersionIsLess(migrations[i].Version(), migrations[j].Version())
 	})
 
-	applied, err := GetMigrationInfo(ctx, m.Session, m.Db)
+	applied, err := GetMigrationInfo(ctx, m.Client, m.Db)
 	if err != nil {
 		return errors.Wrap(err, "failed to list applied migrations")
 	}
@@ -112,7 +112,7 @@ func (m *SimpleMigrator) Apply(ctx context.Context, target Version, migrations [
 					last, mv)
 			}
 
-			if err := UpdateMigrationInfo(ctx, mv, m.Session, m.Db); err != nil {
+			if err := UpdateMigrationInfo(ctx, mv, m.Client, m.Db); err != nil {
 
 				return errors.Wrapf(err,
 					"failed to record migration from %s to %s",
@@ -131,7 +131,7 @@ func (m *SimpleMigrator) Apply(ctx context.Context, target Version, migrations [
 		l.Warnf("last migration to version %s did not produce target version %s",
 			last, target)
 		// record DB version anyways
-		if err := UpdateMigrationInfo(ctx, target, m.Session, m.Db); err != nil {
+		if err := UpdateMigrationInfo(ctx, target, m.Client, m.Db); err != nil {
 			return errors.Wrapf(err,
 				"failed to record migration from %s to %s",
 				last, target)

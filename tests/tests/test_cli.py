@@ -17,7 +17,7 @@ from common import cli, mongo, clean_db
 
 DB_NAME = "inventory"
 MIGRATION_COLLECTION = "migration_info"
-DB_VERSION = "0.1.0"
+DB_VERSION = "0.2.0"
 
 class TestMigration:
     @staticmethod

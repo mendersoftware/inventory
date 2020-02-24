@@ -1,4 +1,4 @@
-// Copyright 2017 Northern.tech AS
+// Copyright 2020 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -11,12 +11,25 @@
 //    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
+package mongo
 
-package golibmicro
+import (
+	"os"
+	"testing"
 
-import "testing"
-import mt "github.com/mendersoftware/mendertesting"
+	mtesting "github.com/mendersoftware/go-lib-micro/mongo/testing"
+)
 
-func TestLicenses(t *testing.T) {
-	mt.CheckLicenses(t)
+var db mtesting.TestDBRunner
+
+// Overwrites test execution and allows for test database setup
+func TestMain(m *testing.M) {
+
+	status := mtesting.WithDB(func(d mtesting.TestDBRunner) int {
+		db = d
+		defer db.Client().Disconnect(db.CTX())
+		return m.Run()
+	})
+
+	os.Exit(status)
 }

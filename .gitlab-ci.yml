@@ -1,3 +1,5 @@
+image: golang:1.13
+
 stages:
   - test_prep_build
   - test_prep
@@ -16,9 +18,3 @@ include:
     file: '.gitlab-ci-check-apidocs.yml'
   - project: 'Northern.tech/Mender/mendertesting'
     file: '.gitlab-ci-check-golang-dockerimage.yml'
-
-test:unit:
-  image: golang:1.11.4
-
-test:build_acceptance:
-  image: golang:1.11
