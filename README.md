@@ -19,7 +19,7 @@ searching and sorting of attributes. In general, the reported attributes
 are freely defined by the device vendor, and can be used to group devices - based on selected
 criteria - into groups for which independent deployments can be rolled out.
 
-![Mender logo](https://mender.io/user/pages/04.resources/_logos/logoS.png)
+![Mender logo](https://mender.io/user/pages/04.resources/logos/logoS.png)
 
 
 ## Getting started
