@@ -1,9 +1,15 @@
+FROM golang:1.11 as builder
+RUN mkdir -p /go/src/github.com/mendersoftware/inventory
+COPY . /go/src/github.com/mendersoftware/inventory
+RUN cd /go/src/github.com/mendersoftware/inventory && \
+    env CGO_ENABLED=0 go test -c -o inventory-test -coverpkg $(go list ./... | grep -v vendor | grep -v mocks | grep -v test | tr  '\n' ,)
+
 FROM alpine:3.4
 
 EXPOSE 8080
 RUN mkdir /tests
 
-COPY ./inventory-test /usr/bin/
+COPY  --from=builder /go/src/github.com/mendersoftware/inventory/inventory-test /usr/bin/
 COPY ./config.yaml /usr/bin/
 STOPSIGNAL SIGINT
 
