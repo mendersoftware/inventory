@@ -44,6 +44,9 @@ const (
 
 	uriInternalTenants = "/api/internal/v1/inventory/tenants"
 	uriInternalDevices = "/api/internal/v1/inventory/devices"
+
+	apiUrlManagementV2 = "/api/management/v2/inventory"
+	urlFiltersSearch   = apiUrlManagementV2 + "/filters/search"
 )
 
 const (
@@ -94,6 +97,8 @@ func (i *inventoryHandlers) GetApp() (rest.App, error) {
 
 		rest.Post(uriInternalTenants, i.CreateTenantHandler),
 		rest.Post(uriInternalDevices, i.AddDeviceHandler),
+
+		rest.Post(urlFiltersSearch, i.FiltersSearchHandler),
 	}
 
 	routes = append(routes)
@@ -582,4 +587,53 @@ func (i *inventoryHandlers) CreateTenantHandler(w rest.ResponseWriter, r *rest.R
 	}
 
 	w.WriteHeader(http.StatusCreated)
+}
+
+func (i *inventoryHandlers) FiltersSearchHandler(w rest.ResponseWriter, r *rest.Request) {
+	ctx := r.Context()
+
+	l := log.FromContext(ctx)
+
+	//extract attributes from body
+	searchParams, err := parseSearchParams(r)
+	if err != nil {
+		u.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
+		return
+	}
+
+	// query database
+	devs, totalCount, err := i.inventory.SearchDevices(ctx, *searchParams)
+	if err != nil {
+		if strings.Contains(err.Error(), "BadValue") {
+			u.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
+		} else {
+			u.RestErrWithLogInternal(w, r, l, err)
+		}
+		return
+	}
+
+	// the response writer will ensure the header name is in Kebab-Pascal-Case
+	w.Header().Add("X-Total-Count", strconv.Itoa(totalCount))
+	w.WriteJson(devs)
+}
+
+func parseSearchParams(r *rest.Request) (*model.SearchParams, error) {
+	var searchParams model.SearchParams
+
+	if err := r.DecodeJsonPayload(&searchParams); err != nil {
+		return nil, errors.Wrap(err, "failed to decode request body")
+	}
+
+	if searchParams.Page < 1 {
+		searchParams.Page = utils.PageDefault
+	}
+	if searchParams.PerPage < 1 {
+		searchParams.PerPage = utils.PerPageDefault
+	}
+
+	if err := searchParams.Validate(); err != nil {
+		return nil, err
+	}
+
+	return &searchParams, nil
 }
