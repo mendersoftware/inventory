@@ -201,6 +201,7 @@ definitions:
       - scope
       - attr
       - type
+      - value
     properties:
       scope:
         type: string
@@ -215,7 +216,7 @@ definitions:
       type:
         type: string
         description: Type or operator of the filter predicate.
-        enum: [$eq]
+        enum: [$eq, $gt, $gte, $in, $lt, $lte, $ne, $nin, $exists]
       value:
         type: string
         description: |
