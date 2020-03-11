@@ -2305,6 +2305,253 @@ func TestMongoDeleteDevice(t *testing.T) {
 	}
 }
 
+func TestMongoSearchDevices(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping TestMongoSearchDevices in short mode.")
+	}
+
+	inputDevs := []model.Device{
+		{
+			ID: model.DeviceID("0"),
+			Attributes: map[string]model.DeviceAttribute{
+				DbScopeInventory + "-MAC":   {Name: "MAC", Value: "000", Description: strPtr("MAC"), Scope: model.AttrScopeInventory},
+				DbScopeInventory + "-SN":    {Name: "SN", Value: 100, Description: strPtr("SN"), Scope: model.AttrScopeInventory},
+				DbScopeInventory + "-group": {Name: "group", Value: "foo", Description: strPtr("group"), Scope: model.AttrScopeInventory},
+			},
+		},
+		{
+			ID: model.DeviceID("1"),
+			Attributes: map[string]model.DeviceAttribute{
+				DbScopeInventory + "-MAC":   {Name: "MAC", Value: "001", Description: strPtr("MAC"), Scope: model.AttrScopeInventory},
+				DbScopeInventory + "-SN":    {Name: "SN", Value: 111, Description: strPtr("SN"), Scope: model.AttrScopeInventory},
+				DbScopeInventory + "-group": {Name: "group", Value: "foo", Description: strPtr("group"), Scope: model.AttrScopeInventory},
+			},
+		},
+		{
+			ID: model.DeviceID("2"),
+			Attributes: map[string]model.DeviceAttribute{
+				DbScopeInventory + "-MAC":   {Name: "MAC", Value: "002", Description: strPtr("MAC"), Scope: model.AttrScopeInventory},
+				DbScopeInventory + "-SN":    {Name: "SN", Value: 122, Description: strPtr("SN"), Scope: model.AttrScopeInventory},
+				DbScopeInventory + "-group": {Name: "group", Value: "foo", Description: strPtr("group"), Scope: model.AttrScopeInventory},
+			},
+		},
+		{
+			ID: model.DeviceID("3"),
+			Attributes: map[string]model.DeviceAttribute{
+				DbScopeInventory + "-MAC":   {Name: "MAC", Value: "003", Description: strPtr("MAC"), Scope: model.AttrScopeInventory},
+				DbScopeInventory + "-SN":    {Name: "SN", Value: 133, Description: strPtr("SN"), Scope: model.AttrScopeInventory},
+				DbScopeInventory + "-group": {Name: "group", Value: "bar", Description: strPtr("group"), Scope: model.AttrScopeInventory},
+			},
+		},
+		{
+			ID: model.DeviceID("4"),
+			Attributes: map[string]model.DeviceAttribute{
+				DbScopeInventory + "-MAC":   {Name: "MAC", Value: "003", Description: strPtr("MAC"), Scope: model.AttrScopeInventory},
+				DbScopeInventory + "-SN":    {Name: "SN", Value: 144, Description: strPtr("SN"), Scope: model.AttrScopeInventory},
+				DbScopeInventory + "-group": {Name: "group", Value: "bar", Description: strPtr("group"), Scope: model.AttrScopeInventory},
+			},
+		},
+	}
+
+	testCases := map[string]struct {
+		expected     []model.Device
+		devTotal     int
+		searchParams model.SearchParams
+		tenant       string
+		dbError      error
+	}{
+		"single filter, single device": {
+			expected: []model.Device{inputDevs[0]},
+			devTotal: 1,
+			searchParams: model.SearchParams{
+				Page:    1,
+				PerPage: 5,
+				Filters: []model.FilterPredicate{
+					model.FilterPredicate{
+						Scope:     "inventory",
+						Attribute: "MAC",
+						Type:      "$eq",
+						Value:     "000",
+					},
+				},
+				Sort: []model.SortCriteria{},
+			},
+		},
+		"two filters, single device": {
+			expected: []model.Device{inputDevs[0]},
+			devTotal: 1,
+			searchParams: model.SearchParams{
+				Page:    1,
+				PerPage: 5,
+				Filters: []model.FilterPredicate{
+					model.FilterPredicate{
+						Scope:     "inventory",
+						Attribute: "MAC",
+						Type:      "$eq",
+						Value:     "000",
+					},
+					model.FilterPredicate{
+						Scope:     "inventory",
+						Attribute: "SN",
+						Type:      "$eq",
+						Value:     100,
+					},
+				},
+				Sort: []model.SortCriteria{},
+			},
+		},
+		"two filters, three devices, sorted": {
+			expected: []model.Device{inputDevs[2], inputDevs[1], inputDevs[0]},
+			devTotal: 3,
+			searchParams: model.SearchParams{
+				Page:    1,
+				PerPage: 5,
+				Filters: []model.FilterPredicate{
+					model.FilterPredicate{
+						Scope:     "inventory",
+						Attribute: "MAC",
+						Type:      "$in",
+						Value:     []interface{}{"000", "001", "002"},
+					},
+					model.FilterPredicate{
+						Scope:     "inventory",
+						Attribute: "SN",
+						Type:      "$ne",
+						Value:     200,
+					},
+				},
+				Sort: []model.SortCriteria{
+					model.SortCriteria{
+						Scope:     "inventory",
+						Attribute: "MAC",
+						Order:     "desc",
+					},
+				},
+			},
+		},
+		"one filter, two devices, sorted by two attrs": {
+			expected: []model.Device{inputDevs[4], inputDevs[3]},
+			devTotal: 2,
+			searchParams: model.SearchParams{
+				Page:    1,
+				PerPage: 5,
+				Filters: []model.FilterPredicate{
+					model.FilterPredicate{
+						Scope:     "inventory",
+						Attribute: "MAC",
+						Type:      "$in",
+						Value:     []interface{}{"003", "004"},
+					},
+				},
+				Sort: []model.SortCriteria{
+					model.SortCriteria{
+						Scope:     "inventory",
+						Attribute: "MAC",
+						Order:     "asc",
+					},
+					model.SortCriteria{
+						Scope:     "inventory",
+						Attribute: "SN",
+						Order:     "desc",
+					},
+				},
+			},
+		},
+		"one filter, all devices, page and perPage": {
+			expected: []model.Device{inputDevs[2], inputDevs[3]},
+			devTotal: 5,
+			searchParams: model.SearchParams{
+				Page:    2,
+				PerPage: 2,
+				Filters: []model.FilterPredicate{
+					model.FilterPredicate{
+						Scope:     "inventory",
+						Attribute: "MAC",
+						Type:      "$ne",
+						Value:     "foo",
+					},
+				},
+				Sort: []model.SortCriteria{
+					model.SortCriteria{
+						Scope:     "inventory",
+						Attribute: "MAC",
+						Order:     "asc",
+					},
+				},
+			},
+		},
+		"$in, bad value": {
+			expected: []model.Device{inputDevs[2], inputDevs[3]},
+			devTotal: 5,
+			searchParams: model.SearchParams{
+				Page:    2,
+				PerPage: 2,
+				Filters: []model.FilterPredicate{
+					model.FilterPredicate{
+						Scope:     "inventory",
+						Attribute: "MAC",
+						Type:      "$in",
+						Value:     "foo",
+					},
+				},
+			},
+			dbError: errors.New("(BadValue) $in needs an array"),
+		},
+		"no filter": {
+			expected: inputDevs,
+			devTotal: 5,
+			searchParams: model.SearchParams{
+				Page:    1,
+				PerPage: 5,
+			},
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Logf("test case: %s", name)
+
+		// Make sure we start test with empty database
+		db.Wipe()
+
+		client := db.Client()
+
+		var ctx context.Context
+		if tc.tenant != "" {
+			ctx = identity.WithContext(db.CTX(), &identity.Identity{
+				Tenant: tc.tenant,
+			})
+		} else {
+			ctx = identity.WithContext(db.CTX(), &identity.Identity{
+				Tenant: "",
+			})
+		}
+
+		for _, d := range inputDevs {
+			_, err := client.Database(mstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl).InsertOne(ctx, d)
+			assert.NoError(t, err, "failed to setup input data")
+		}
+
+		mongoStore := NewDataStoreMongoWithSession(client)
+
+		//test
+		devs, totalCount, err := mongoStore.SearchDevices(ctx, tc.searchParams)
+
+		if tc.dbError != nil {
+			assert.Error(t, tc.dbError, err)
+		} else {
+			assert.NoError(t, err, "failed to get devices")
+			assert.Equal(t, len(tc.expected), len(devs))
+			assert.Equal(t, tc.devTotal, totalCount)
+			if len(tc.searchParams.Sort) > 0 {
+				for i, dev := range devs {
+					assert.Equal(t, tc.expected[i].ID, dev.ID)
+				}
+			}
+		}
+
+	}
+}
+
 func TestWithAutomigrate(t *testing.T) {
 	db.Wipe()
 

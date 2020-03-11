@@ -546,6 +546,105 @@ func (db *DataStoreMongo) GetAllAttributeNames(ctx context.Context) ([]string, e
 	return attributeNames, nil
 }
 
+func (db *DataStoreMongo) SearchDevices(ctx context.Context, searchParams model.SearchParams) ([]model.Device, int, error) {
+	c := db.client.Database(mstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
+
+	queryFilters := make([]bson.M, 0)
+	for _, filter := range searchParams.Filters {
+		op := filter.Type
+		name := fmt.Sprintf("%s-%s", filter.Scope, filter.Attribute)
+		field := fmt.Sprintf("%s.%s.%s", DbDevAttributes, name, DbDevAttributesValue)
+		queryFilters = append(queryFilters, bson.M{field: bson.M{op: filter.Value}})
+	}
+	findQuery := bson.M{}
+	if len(queryFilters) > 0 {
+		findQuery["$and"] = queryFilters
+	}
+	filter := bson.M{
+		"$match": bson.M{
+			"$and": []bson.M{
+				findQuery,
+			},
+		},
+	}
+
+	// since the sorting step will have to be executable we have to use a noop here instead of just
+	// an empty query object, as unsorted queries would fail otherwise
+	var sortQuery bson.M
+	if len(searchParams.Sort) > 0 {
+		sortField := bson.M{}
+		for _, sortQ := range searchParams.Sort {
+			name := fmt.Sprintf("%s-%s", sortQ.Scope, sortQ.Attribute)
+			field := fmt.Sprintf("%s.%s.%s", DbDevAttributes, name, DbDevAttributesValue)
+			sortField[field] = 1
+			if sortQ.Order == "desc" {
+				sortField[field] = -1
+			}
+		}
+		sortQuery = bson.M{"$sort": sortField}
+	} else {
+		sortQuery = bson.M{"$skip": 0}
+	}
+
+	skipQuery := bson.M{"$skip": (searchParams.Page - 1) * searchParams.PerPage}
+	limitQuery := bson.M{"$limit": searchParams.PerPage}
+	combinedQuery := bson.M{
+		"$facet": bson.M{
+			"results": []bson.M{
+				sortQuery,
+				skipQuery,
+				limitQuery,
+			},
+			"totalCount": []bson.M{
+				bson.M{"$count": "count"},
+			},
+		},
+	}
+	resultMap := bson.M{
+		"$project": bson.M{
+			"results": 1,
+			"totalCount": bson.M{
+				"$ifNull": []interface{}{
+					bson.M{
+						"$arrayElemAt": []interface{}{"$totalCount.count", 0},
+					},
+					0,
+				},
+			},
+		},
+	}
+	cursor, err := c.Aggregate(ctx, []bson.M{
+		filter,
+		combinedQuery,
+		resultMap,
+	})
+	if err != nil {
+		return nil, -1, errors.Wrap(err, "failed to search devices")
+	}
+	defer cursor.Close(ctx)
+
+	cursor.Next(ctx)
+	elem := &bson.D{}
+	if err = cursor.Decode(elem); err != nil {
+		return nil, -1, errors.Wrap(err, "failed to fetch device list")
+	}
+	m := elem.Map()
+	count := m["totalCount"].(int32)
+	results := m["results"].(primitive.A)
+	devices := make([]model.Device, len(results))
+	for i, d := range results {
+		var device model.Device
+		bsonBytes, e := bson.Marshal(d.(bson.D))
+		if e != nil {
+			return nil, int(count), errors.Wrap(e, "failed to parse device in device list")
+		}
+		bson.Unmarshal(bsonBytes, &device)
+		devices[i] = device
+	}
+
+	return devices, int(count), nil
+}
+
 func (db *DataStoreMongo) MigrateTenant(ctx context.Context, version string, tenantId string) error {
 	l := log.FromContext(ctx)
 
