@@ -37,6 +37,7 @@ type InventoryApp interface {
 	GetDeviceGroup(ctx context.Context, id model.DeviceID) (model.GroupName, error)
 	DeleteDevice(ctx context.Context, id model.DeviceID) error
 	CreateTenant(ctx context.Context, tenant model.NewTenant) error
+	SearchDevices(ctx context.Context, searchParams model.SearchParams) ([]model.Device, int, error)
 }
 
 type inventory struct {
@@ -162,4 +163,14 @@ func (i *inventory) CreateTenant(ctx context.Context, tenant model.NewTenant) er
 		return errors.Wrapf(err, "failed to apply migrations for tenant %v", tenant.ID)
 	}
 	return nil
+}
+
+func (i *inventory) SearchDevices(ctx context.Context, searchParams model.SearchParams) ([]model.Device, int, error) {
+	devs, totalCount, err := i.db.SearchDevices(ctx, searchParams)
+
+	if err != nil {
+		return nil, -1, errors.Wrap(err, "failed to fetch devices")
+	}
+
+	return devs, totalCount, nil
 }
