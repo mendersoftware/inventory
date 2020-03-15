@@ -65,12 +65,6 @@ paths:
         200:
           description: Successful response.
           headers:
-            Link:
-              type: string
-              description: |
-                Standard header, used for page navigation.
-
-                Supported relation types are 'first', 'next' and 'prev'.
             X-Total-Count:
               type: string
               description: Custom header indicating the total number of devices for the given query parameters
