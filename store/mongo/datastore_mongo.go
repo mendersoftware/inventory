@@ -418,7 +418,7 @@ func (db *DataStoreMongo) UpdateDeviceGroup(ctx context.Context, devId model.Dev
 func (db *DataStoreMongo) ListGroups(ctx context.Context) ([]model.GroupName, error) {
 	c := db.client.Database(mstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
 
-	filter := bson.M{}
+	filter := bson.M{"group": bson.M{"$exists": true}}
 	results, err := c.Distinct(ctx, "group", filter)
 	if err != nil {
 		return nil, err
