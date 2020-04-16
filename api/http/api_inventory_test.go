@@ -1526,6 +1526,125 @@ func TestUserAdmApiCreateTenant(t *testing.T) {
 	}
 }
 
+func TestApiInventoryInternalDevicesStatus(t *testing.T) {
+	t.Parallel()
+
+	rest.ErrorFieldName = "error"
+
+	deviceAttributes := model.DeviceAttributes{
+		"status": {Name: "status", Value: "accepted", Scope: model.AttrScopeIdentity},
+	}
+	deviceID := mockListDeviceIDs(1)[0]
+	tenantId := "5abcb6de7a673a0001287c71"
+	emptyTenant := ""
+	acceptedStatus := "accepted"
+
+	testCases := map[string]struct {
+		deviceAttributes model.DeviceAttributes
+		deviceId         model.DeviceID
+		tenantId         string
+		status           string
+		inReq            *http.Request
+
+		inventoryErr error
+
+		resp utils.JSONResponseParams
+	}{
+		"ok": {
+			deviceAttributes: deviceAttributes,
+			deviceId:         deviceID,
+			tenantId:         tenantId,
+			status:           acceptedStatus,
+			inReq: test.MakeSimpleRequest("POST",
+				"http://1.2.3.4/api/internal/v1/inventory/tenants/"+tenantId+"/devices/"+acceptedStatus,
+				[]string{deviceID.String()},
+			),
+			resp: utils.JSONResponseParams{
+				OutputStatus: http.StatusOK,
+			},
+		},
+
+		"ok single tenant": {
+			deviceAttributes: deviceAttributes,
+			deviceId:         deviceID,
+			tenantId:         emptyTenant,
+			status:           acceptedStatus,
+			inReq: test.MakeSimpleRequest("POST",
+				"http://1.2.3.4/api/internal/v1/inventory/tenants/"+emptyTenant+"/devices/"+acceptedStatus,
+				[]string{deviceID.String()},
+			),
+			resp: utils.JSONResponseParams{
+				OutputStatus: http.StatusOK,
+			},
+		},
+
+		"error, payload empty": {
+			deviceAttributes: deviceAttributes,
+			deviceId:         deviceID,
+			tenantId:         tenantId,
+			status:           acceptedStatus,
+			inReq: test.MakeSimpleRequest("POST",
+				"http://1.2.3.4/api/internal/v1/inventory/tenants/"+tenantId+"/devices/"+acceptedStatus,
+				nil,
+			),
+			resp: utils.JSONResponseParams{
+				OutputStatus:     http.StatusBadRequest,
+				OutputBodyObject: RestError("cant parse device ids: JSON payload is empty"),
+			},
+		},
+
+		"error, payload not expected": {
+			deviceAttributes: deviceAttributes,
+			deviceId:         deviceID,
+			tenantId:         tenantId,
+			status:           acceptedStatus,
+			inReq: test.MakeSimpleRequest("POST",
+				"http://1.2.3.4/api/internal/v1/inventory/tenants/"+tenantId+"/devices/"+acceptedStatus,
+				"unexpected here",
+			),
+			resp: utils.JSONResponseParams{
+				OutputStatus:     http.StatusBadRequest,
+				OutputBodyObject: RestError("cant parse device ids: json: cannot unmarshal string into Go value of type []string"),
+			},
+		},
+
+		"error, db Upsert failed": {
+			deviceAttributes: deviceAttributes,
+			deviceId:         deviceID,
+			tenantId:         tenantId,
+			status:           acceptedStatus,
+			inReq: test.MakeSimpleRequest("POST",
+				"http://1.2.3.4/api/internal/v1/inventory/tenants/"+tenantId+"/devices/"+acceptedStatus,
+				[]string{deviceID.String()},
+			),
+			inventoryErr: errors.New("cant upsert"),
+			resp: utils.JSONResponseParams{
+				OutputStatus:     http.StatusInternalServerError,
+				OutputBodyObject: RestError("internal error"),
+			},
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Logf("test case: %s", name)
+		inv := minventory.InventoryApp{}
+
+		ctx := contextMatcher()
+
+		inv.On("UpsertAttributes",
+			ctx,
+			deviceID,
+			tc.deviceAttributes,
+		).Return(tc.inventoryErr)
+
+		apih := makeMockApiHandler(t, &inv)
+
+		rest.ErrorFieldName = "error"
+
+		runTestRequest(t, apih, tc.inReq, tc.resp)
+	}
+}
+
 func makeReq(method, url, auth string, body interface{}) *http.Request {
 	req := test.MakeSimpleRequest(method, url, body)
 
