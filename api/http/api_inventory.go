@@ -15,6 +15,7 @@
 package http
 
 import (
+	"context"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -22,6 +23,7 @@ import (
 
 	"github.com/ant0ine/go-json-rest/rest"
 	"github.com/go-ozzo/ozzo-validation"
+	midentity "github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/log"
 	u "github.com/mendersoftware/go-lib-micro/rest_utils"
 	"github.com/pkg/errors"
@@ -42,8 +44,9 @@ const (
 	uriGroups        = "/api/0.1.0/groups"
 	uriGroupsDevices = "/api/0.1.0/groups/:name/devices"
 
-	uriInternalTenants = "/api/internal/v1/inventory/tenants"
-	uriInternalDevices = "/api/internal/v1/inventory/devices"
+	uriInternalTenants       = "/api/internal/v1/inventory/tenants"
+	uriInternalDevices       = "/api/internal/v1/inventory/devices"
+	urlInternalDevicesStatus = "/api/internal/v1/inventory/tenants/:tenant_id/devices/:status"
 )
 
 const (
@@ -94,6 +97,7 @@ func (i *inventoryHandlers) GetApp() (rest.App, error) {
 
 		rest.Post(uriInternalTenants, i.CreateTenantHandler),
 		rest.Post(uriInternalDevices, i.AddDeviceHandler),
+		rest.Post(urlInternalDevicesStatus, i.InternalDevicesStatusHandler),
 	}
 
 	routes = append(routes)
@@ -582,4 +586,60 @@ func (i *inventoryHandlers) CreateTenantHandler(w rest.ResponseWriter, r *rest.R
 	}
 
 	w.WriteHeader(http.StatusCreated)
+}
+
+func getTenantContext(ctx context.Context, tenantId string) context.Context {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if tenantId == "" {
+		return ctx
+	}
+	id := &midentity.Identity{
+		Tenant: tenantId,
+	}
+
+	ctx = midentity.WithContext(ctx, id)
+
+	return ctx
+}
+
+func (i *inventoryHandlers) InternalDevicesStatusHandler(w rest.ResponseWriter, r *rest.Request) {
+	ctx := r.Context()
+
+	l := log.FromContext(ctx)
+
+	status := r.PathParam("status")
+	if status == "" {
+		u.RestErrWithLog(w, r, l, errors.New("status not provided"), http.StatusBadRequest)
+		return
+	}
+
+	tenantId := r.PathParam("tenant_id")
+
+	ctx = getTenantContext(ctx, tenantId)
+
+	var ids []string
+	err := r.DecodeJsonPayload(&ids)
+	if err != nil {
+		u.RestErrWithLog(w, r, l, errors.Wrap(err, "cant parse device ids"), http.StatusBadRequest)
+		return
+	}
+
+	for _, id := range ids {
+		attrs := map[string]model.DeviceAttribute{"status": model.DeviceAttribute{
+			Name:        "status",
+			Description: nil,
+			Value:       status,
+			Scope:       model.AttrScopeIdentity,
+		}}
+		//upsert the attributes
+		err = i.inventory.UpsertAttributes(ctx, model.DeviceID(id), attrs)
+		if err != nil {
+			u.RestErrWithLogInternal(w, r, l, err)
+			return
+		}
+	}
+
+	w.WriteHeader(http.StatusOK)
 }
