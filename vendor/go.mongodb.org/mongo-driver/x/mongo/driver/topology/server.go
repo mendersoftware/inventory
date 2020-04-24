@@ -107,9 +107,14 @@ type Server struct {
 	subscriptionsClosed bool
 }
 
+// updateTopologyCallback is a callback used to create a server that should be called when the parent Topology instance
+// should be updated based on a new server description. The callback must return the server description that should be
+// stored by the server.
+type updateTopologyCallback func(description.Server) description.Server
+
 // ConnectServer creates a new Server and then initializes it using the
 // Connect method.
-func ConnectServer(addr address.Address, updateCallback func(description.Server), opts ...ServerOption) (*Server, error) {
+func ConnectServer(addr address.Address, updateCallback updateTopologyCallback, opts ...ServerOption) (*Server, error) {
 	srvr, err := NewServer(addr, opts...)
 	if err != nil {
 		return nil, err
@@ -166,7 +171,7 @@ func NewServer(addr address.Address, opts ...ServerOption) (*Server, error) {
 
 // Connect initializes the Server by starting background monitoring goroutines.
 // This method must be called before a Server can be used.
-func (s *Server) Connect(updateCallback func(description.Server)) error {
+func (s *Server) Connect(updateCallback updateTopologyCallback) error {
 	if !atomic.CompareAndSwapInt32(&s.connectionstate, disconnected, connected) {
 		return ErrServerConnected
 	}
@@ -191,7 +196,7 @@ func (s *Server) Disconnect(ctx context.Context) error {
 		return ErrServerClosed
 	}
 
-	s.updateTopologyCallback.Store((func(description.Server))(nil))
+	s.updateTopologyCallback.Store((updateTopologyCallback)(nil))
 
 	// For every call to Connect there must be at least 1 goroutine that is
 	// waiting on the done channel.
@@ -243,8 +248,8 @@ func (s *Server) Connection(ctx context.Context) (driver.Connection, error) {
 	conn, err := s.pool.get(ctx)
 	if err != nil {
 		s.sem.Release(1)
-		connErr, ok := err.(ConnectionError)
-		if !ok {
+		wrappedConnErr := unwrapConnectionError(err)
+		if wrappedConnErr == nil {
 			return nil, err
 		}
 
@@ -252,7 +257,7 @@ func (s *Server) Connection(ctx context.Context) (driver.Connection, error) {
 		// error, we should set the description.Server appropriately.
 		desc := description.Server{
 			Kind:      description.Unknown,
-			LastError: connErr.Wrapped,
+			LastError: wrappedConnErr,
 		}
 		s.updateDescription(desc, false)
 
@@ -317,8 +322,9 @@ func (s *Server) RequestImmediateCheck() {
 
 // ProcessError handles SDAM error handling and implements driver.ErrorProcessor.
 func (s *Server) ProcessError(err error) {
-	// Invalidate server description if not master or node recovering error occurs
-	if cerr, ok := err.(driver.Error); ok && (cerr.NetworkError() || cerr.NodeIsRecovering() || cerr.NotMaster()) {
+	// Invalidate server description if not master or node recovering error occurs.
+	// These errors can be reported as a command error or a write concern error.
+	if cerr, ok := err.(driver.Error); ok && (cerr.NodeIsRecovering() || cerr.NotMaster()) {
 		desc := s.Description()
 		desc.Kind = description.Unknown
 		desc.LastError = err
@@ -345,15 +351,16 @@ func (s *Server) ProcessError(err error) {
 		return
 	}
 
-	ne, ok := err.(ConnectionError)
-	if !ok {
+	wrappedConnErr := unwrapConnectionError(err)
+	if wrappedConnErr == nil {
 		return
 	}
 
-	if netErr, ok := ne.Wrapped.(net.Error); ok && netErr.Timeout() {
+	// Ignore transient timeout errors.
+	if netErr, ok := wrappedConnErr.(net.Error); ok && netErr.Timeout() {
 		return
 	}
-	if ne.Wrapped == context.Canceled || ne.Wrapped == context.DeadlineExceeded {
+	if wrappedConnErr == context.Canceled || wrappedConnErr == context.DeadlineExceeded {
 		return
 	}
 
@@ -362,6 +369,7 @@ func (s *Server) ProcessError(err error) {
 	desc.LastError = err
 	// updates description to unknown
 	s.updateDescription(desc, false)
+	s.pool.clear()
 }
 
 // update handles performing heartbeats and updating any subscribers of the
@@ -443,12 +451,13 @@ func (s *Server) updateDescription(desc description.Server, initial bool) {
 		//  ¯\_(ツ)_/¯
 		_ = recover()
 	}()
-	s.desc.Store(desc)
 
-	callback, ok := s.updateTopologyCallback.Load().(func(description.Server))
+	// Use the updateTopologyCallback to update the parent Topology and get the description that should be stored.
+	callback, ok := s.updateTopologyCallback.Load().(updateTopologyCallback)
 	if ok && callback != nil {
-		callback(desc)
+		desc = callback(desc)
 	}
+	s.desc.Store(desc)
 
 	s.subLock.Lock()
 	for _, c := range s.subscribers {
@@ -540,17 +549,18 @@ func (s *Server) heartbeat(conn *connection) (description.Server, *connection) {
 			if err == nil {
 				tmpDesc := op.Result(s.address)
 				descPtr = &tmpDesc
+			} else {
+				// close the connection here rather than in the error check below to avoid calling Close on a net.Conn
+				// that wasn't successfully created
+				_ = conn.close()
 			}
 		}
 
 		// we do a retry if the server is connected, if succeed return new server desc (see below)
 		if err != nil {
 			saved = err
-			if conn != nil && conn.nc != nil {
-				conn.nc.Close()
-			}
 			conn = nil
-			if _, ok := err.(ConnectionError); ok {
+			if wrappedConnErr := unwrapConnectionError(err); wrappedConnErr != nil {
 				s.pool.drain()
 				// If the server is not connected, give up and exit loop
 				if s.Description().Kind == description.Unknown {
@@ -633,6 +643,21 @@ func (ss *ServerSubscription) Unsubscribe() error {
 
 	close(ch)
 	delete(ss.s.subscribers, ss.id)
+
+	return nil
+}
+
+// unwrapConnectionError returns the connection error wrapped by err, or nil if err does not wrap a connection error.
+func unwrapConnectionError(err error) error {
+	connErr, ok := err.(ConnectionError)
+	if ok {
+		return connErr.Wrapped
+	}
+
+	driverErr, ok := err.(driver.Error)
+	if ok && driverErr.NetworkError() {
+		return driverErr.Wrapped
+	}
 
 	return nil
 }
