@@ -1,4 +1,4 @@
-// Copyright 2019 Northern.tech AS
+// Copyright 2020 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -250,6 +250,19 @@ func (_m *DataStore) UpdateDeviceGroup(ctx context.Context, devid model.DeviceID
 	var r0 error
 	if rf, ok := ret.Get(0).(func(context.Context, model.DeviceID, model.GroupName) error); ok {
 		r0 = rf(ctx, devid, group)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+func (_m *DataStore) SetAttribute(ctx context.Context, id model.DeviceID, attr model.DeviceAttribute) error {
+	ret := _m.Called(ctx, id, attr)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, model.DeviceID, model.DeviceAttribute) error); ok {
+		r0 = rf(ctx, id, attr)
 	} else {
 		r0 = ret.Error(0)
 	}

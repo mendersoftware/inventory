@@ -718,6 +718,497 @@ func TestNewDataStoreMongo(t *testing.T) {
 	assert.EqualError(t, err, "failed to open mongo-driver session")
 }
 
+func TestMongoSetAttribute(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping TestMongoSetAttribute in short mode.")
+	}
+
+	//single create timestamp for all inserted devs
+	createdTs := time.Now()
+
+	testCases := map[string]struct {
+		devs []model.Device
+
+		inDevId model.DeviceID
+		inAttrs model.DeviceAttributes
+
+		tenant string
+
+		outAttrs model.DeviceAttributes
+		err      error
+	}{
+		"dev exists, attributes exist, update both attrs (descr + val)": {
+			devs: []model.Device{
+				{
+					ID: model.DeviceID("0003"),
+					Attributes: map[string]model.DeviceAttribute{
+						"mac": {
+							Name:        "mac",
+							Value:       "0003-mac",
+							Description: strPtr("descr"),
+							Scope:       model.AttrScopeInventory,
+						},
+						"sn": {
+							Name:        "sn",
+							Value:       "0003-sn",
+							Description: strPtr("descr"),
+							Scope:       model.AttrScopeInventory,
+						},
+					},
+					CreatedTs: createdTs,
+				},
+			},
+			inDevId: model.DeviceID("0003"),
+			inAttrs: map[string]model.DeviceAttribute{
+				"mac": {
+					Description: strPtr("mac description"),
+					Value:       "0003-newmac",
+				},
+				"sn": {
+					Description: strPtr("sn description"),
+					Value:       "0003-newsn",
+				},
+			},
+
+			outAttrs: map[string]model.DeviceAttribute{
+				"mac": {
+					Description: strPtr("mac description"),
+					Value:       "0003-newmac",
+				},
+				"sn": {
+					Description: strPtr("sn description"),
+					Value:       "0003-newsn",
+				},
+			},
+		},
+		"dev exists, attributes exist, update both attrs (descr + val); with tenant": {
+			devs: []model.Device{
+				{
+					ID: model.DeviceID("0003"),
+					Attributes: map[string]model.DeviceAttribute{
+						"mac": {
+							Name:        "mac",
+							Value:       "0003-mac",
+							Description: strPtr("descr"),
+							Scope:       model.AttrScopeInventory,
+						},
+						"sn": {
+							Name:        "sn",
+							Value:       "0003-sn",
+							Description: strPtr("descr"),
+							Scope:       model.AttrScopeInventory,
+						},
+					},
+					CreatedTs: createdTs,
+				},
+			},
+			inDevId: model.DeviceID("0003"),
+			inAttrs: map[string]model.DeviceAttribute{
+				"mac": {
+					Description: strPtr("mac description"),
+					Value:       "0003-newmac",
+				},
+				"sn": {
+					Description: strPtr("sn description"),
+					Value:       "0003-newsn",
+				},
+			},
+
+			outAttrs: map[string]model.DeviceAttribute{
+				"mac": {
+					Description: strPtr("mac description"),
+					Value:       "0003-newmac",
+				},
+				"sn": {
+					Description: strPtr("sn description"),
+					Value:       "0003-newsn",
+				},
+			},
+		},
+		"dev exists, attributes exist, update one attr (descr + val)": {
+			devs: []model.Device{
+				{
+					ID: model.DeviceID("0003"),
+					Attributes: map[string]model.DeviceAttribute{
+						"mac": {
+							Name:        "mac",
+							Value:       "0003-mac",
+							Description: strPtr("descr"),
+							Scope:       model.AttrScopeInventory,
+						},
+						"sn": {
+							Name:        "sn",
+							Value:       "0003-sn",
+							Description: strPtr("descr"),
+							Scope:       model.AttrScopeInventory,
+						},
+					},
+					CreatedTs: createdTs,
+				},
+			},
+			inDevId: model.DeviceID("0003"),
+			inAttrs: map[string]model.DeviceAttribute{
+				"sn": {
+					Description: strPtr("sn description"),
+					Value:       "0003-newsn",
+				},
+			},
+
+			outAttrs: map[string]model.DeviceAttribute{
+				"mac": {
+					Description: strPtr("descr"),
+					Value:       "0003-mac",
+				},
+				"sn": {
+					Description: strPtr("sn description"),
+					Value:       "0003-newsn",
+				},
+			},
+		},
+
+		"dev exists, attributes exist, update one attr (descr only)": {
+			devs: []model.Device{
+				{
+					ID: model.DeviceID("0003"),
+					Attributes: map[string]model.DeviceAttribute{
+						"mac": {
+							Name:        "mac",
+							Value:       "0003-mac",
+							Description: strPtr("descr"),
+							Scope:       model.AttrScopeInventory,
+						},
+						"sn": {
+							Name:        "sn",
+							Value:       "0003-sn",
+							Description: strPtr("descr"),
+							Scope:       model.AttrScopeInventory,
+						},
+					},
+					CreatedTs: createdTs,
+				},
+			},
+			inDevId: model.DeviceID("0003"),
+			inAttrs: map[string]model.DeviceAttribute{
+				"sn": {
+					Description: strPtr("sn description"),
+				},
+			},
+
+			outAttrs: map[string]model.DeviceAttribute{
+				"mac": {
+					Description: strPtr("descr"),
+					Value:       "0003-mac",
+				},
+				"sn": {
+					Description: strPtr("sn description"),
+					Value:       "0003-sn",
+				},
+			},
+		},
+		"dev exists, attributes exist, update one attr (value only)": {
+			devs: []model.Device{
+				{
+					ID: model.DeviceID("0003"),
+					Attributes: map[string]model.DeviceAttribute{
+						"mac": {
+							Name:        "mac",
+							Value:       "0003-mac",
+							Description: strPtr("descr"),
+							Scope:       model.AttrScopeInventory,
+						},
+						"sn": {
+							Name:        "sn",
+							Value:       "0003-sn",
+							Description: strPtr("descr"),
+							Scope:       model.AttrScopeInventory,
+						},
+					},
+					CreatedTs: createdTs,
+				},
+			},
+			inDevId: model.DeviceID("0003"),
+			inAttrs: map[string]model.DeviceAttribute{
+				"sn": {
+					Value: "0003-newsn",
+				},
+			},
+
+			outAttrs: map[string]model.DeviceAttribute{
+				"mac": {
+					Description: strPtr("descr"),
+					Value:       "0003-mac",
+				},
+				"sn": {
+					Description: strPtr("descr"),
+					Value:       "0003-newsn",
+				},
+			},
+		},
+		"dev exists, attributes exist, update one attr (value only, change type)": {
+			devs: []model.Device{
+				{
+					ID: model.DeviceID("0003"),
+					Attributes: map[string]model.DeviceAttribute{
+						"mac": {
+							Name:        "mac",
+							Value:       "0003-mac",
+							Description: strPtr("descr"),
+							Scope:       model.AttrScopeInventory,
+						},
+						"sn": {
+							Name:        "sn",
+							Value:       "0003-sn",
+							Description: strPtr("descr"),
+							Scope:       model.AttrScopeInventory,
+						},
+					},
+					CreatedTs: createdTs,
+				},
+			},
+			inDevId: model.DeviceID("0003"),
+			inAttrs: map[string]model.DeviceAttribute{
+				"sn": {
+					Value: primitive.A{"0003-sn-1", "0003-sn-2"},
+				},
+			},
+
+			outAttrs: map[string]model.DeviceAttribute{
+				"mac": {
+					Description: strPtr("descr"),
+					Value:       "0003-mac",
+				},
+				"sn": {
+					Description: strPtr("descr"),
+					//[]interface{} instead of []string - otherwise DeepEquals fails where it really shouldn't
+					Value: primitive.A{"0003-sn-1", "0003-sn-2"},
+				},
+			},
+		},
+		"dev exists, attributes exist, add(merge) new attrs": {
+			devs: []model.Device{
+				{
+					ID: model.DeviceID("0003"),
+					Attributes: map[string]model.DeviceAttribute{
+						"mac": {
+							Name:        "mac",
+							Value:       "0003-mac",
+							Description: strPtr("descr"),
+							Scope:       model.AttrScopeInventory,
+						},
+						"sn": {
+							Name:        "sn",
+							Value:       "0003-sn",
+							Description: strPtr("descr"),
+							Scope:       model.AttrScopeInventory,
+						},
+					},
+					CreatedTs: createdTs,
+				},
+			},
+			inDevId: model.DeviceID("0003"),
+			inAttrs: map[string]model.DeviceAttribute{
+				"new-1": {
+					Name:  "new-1",
+					Value: primitive.A{"new-1-0", "new-1-0"},
+				},
+				"new-2": {
+					Name:        "new-2",
+					Value:       "new-2-val",
+					Description: strPtr("foo"),
+				},
+			},
+
+			outAttrs: map[string]model.DeviceAttribute{
+				"mac": {
+					Description: strPtr("descr"),
+					Value:       "0003-mac",
+				},
+				"sn": {
+					Name:        "sn",
+					Value:       "0003-sn",
+					Description: strPtr("descr"),
+				},
+				"new-1": {
+					Name:  "new-1",
+					Value: primitive.A{"new-1-0", "new-1-0"},
+				},
+				"new-2": {
+					Name:        "new-2",
+					Value:       "new-2-val",
+					Description: strPtr("foo"),
+				},
+			},
+		},
+		"dev exists, attributes exist, add(merge) new attrs + modify existing": {
+			devs: []model.Device{
+				{
+					ID: model.DeviceID("0003"),
+					Attributes: map[string]model.DeviceAttribute{
+						"mac": {
+							Name:        "mac",
+							Value:       "0003-mac",
+							Description: strPtr("descr"),
+							Scope:       model.AttrScopeInventory,
+						},
+						"sn": {
+							Name:        "sn",
+							Value:       "0003-sn",
+							Description: strPtr("descr"),
+							Scope:       model.AttrScopeInventory,
+						},
+					},
+					CreatedTs: createdTs,
+				},
+			},
+			inDevId: model.DeviceID("0003"),
+			inAttrs: map[string]model.DeviceAttribute{
+				"mac": {
+					Name:        "mac",
+					Value:       "0003-mac-new",
+					Description: strPtr("descr-new"),
+				},
+				"new-1": {
+					Name:  "new-1",
+					Value: primitive.A{"new-1-0", "new-1-0"},
+				},
+				"new-2": {
+					Name:        "new-2",
+					Value:       "new-2-val",
+					Description: strPtr("foo"),
+				},
+			},
+
+			outAttrs: map[string]model.DeviceAttribute{
+				"mac": {
+					Name:        "mac",
+					Value:       "0003-mac-new",
+					Description: strPtr("descr-new"),
+				},
+				"sn": {
+					Name:        "sn",
+					Value:       "0003-sn",
+					Description: strPtr("descr"),
+				},
+				"new-1": {
+					Name:  "new-1",
+					Value: primitive.A{"new-1-0", "new-1-0"},
+				},
+				"new-2": {
+					Name:        "new-2",
+					Value:       "new-2-val",
+					Description: strPtr("foo"),
+				},
+			},
+		},
+		"dev exists, no attributes exist, upsert new attrs (val + descr)": {
+			devs: []model.Device{
+				{
+					ID:        model.DeviceID("0003"),
+					CreatedTs: createdTs,
+				},
+			},
+			inDevId: model.DeviceID("0003"),
+			inAttrs: map[string]model.DeviceAttribute{
+				"ip": {
+					Value:       primitive.A{"1.2.3.4", "1.2.3.5"},
+					Description: strPtr("ip addr array"),
+				},
+				"mac": {
+					Value:       primitive.A{"0006-mac"},
+					Description: strPtr("mac addr"),
+				},
+			},
+
+			outAttrs: map[string]model.DeviceAttribute{
+				"ip": {
+					Value:       primitive.A{"1.2.3.4", "1.2.3.5"},
+					Description: strPtr("ip addr array"),
+				},
+				"mac": {
+					Value:       primitive.A{"0006-mac"},
+					Description: strPtr("mac addr"),
+				},
+			},
+		},
+		"dev doesn't exist error": {
+			devs:    []model.Device{},
+			inDevId: model.DeviceID("0099"),
+			inAttrs: map[string]model.DeviceAttribute{
+				"ip": {
+					Description: strPtr("ip addr array"),
+					Value:       primitive.A{"1.2.3.4", "1.2.3.5"},
+				},
+			},
+
+			outAttrs: map[string]model.DeviceAttribute{
+				"ip": {
+					Description: strPtr("ip addr array"),
+					Value:       primitive.A{"1.2.3.4", "1.2.3.5"},
+				},
+			},
+			err: store.ErrDevNotFound,
+		},
+	}
+
+	for name, tc := range testCases {
+
+		t.Logf("%s", name)
+		//setup
+		db.Wipe()
+
+		s := db.Client()
+
+		var ctx context.Context
+		if tc.tenant != "" {
+			ctx = identity.WithContext(db.CTX(), &identity.Identity{
+				Tenant: tc.tenant,
+			})
+		} else {
+			ctx = identity.WithContext(db.CTX(), &identity.Identity{
+				Tenant: "",
+			})
+		}
+
+		for _, d := range tc.devs {
+			_, err := s.Database(mstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl).InsertOne(ctx, d)
+			assert.NoError(t, err, "failed to setup input data")
+		}
+
+		//test
+		d := NewDataStoreMongoWithSession(s)
+
+		for name, a := range tc.inAttrs {
+			a.Name = name
+			err := d.SetAttribute(ctx, tc.inDevId, a)
+			if tc.err != nil {
+				assert.Error(t, err, store.ErrDevNotFound)
+			} else {
+				assert.NoError(t, err, "SetAttribute failed")
+			}
+		}
+
+		if tc.err == store.ErrDevNotFound {
+			return
+		}
+		//get the device back
+		var dev model.Device
+		err := DeviceFindById(ctx, s.Database(DbName).Collection(DbDevicesColl), tc.inDevId, &dev)
+		assert.NoError(t, err, "error getting device")
+
+		if !compare(dev.Attributes, tc.outAttrs) {
+			t.Errorf("attributes mismatch, have: %v\nwant: %v", dev.Attributes, tc.outAttrs)
+		}
+
+		//check timestamp validity
+		//note that mongo stores time with lower precision- custom comparison
+		assert.Condition(t,
+			func() bool {
+				return dev.UpdatedTs.After(dev.CreatedTs) ||
+					dev.UpdatedTs.Unix() == dev.CreatedTs.Unix()
+			})
+	}
+}
+
 func TestMongoUpsertAttributes(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping TestMongoUpsertAttributes in short mode.")
@@ -1488,24 +1979,31 @@ func TestMongoListGroups(t *testing.T) {
 		"groups foo, bar": {
 			InputDevices: []model.Device{
 				{
-					ID:    model.DeviceID("1"),
-					Group: model.GroupName("foo"),
+					ID: model.DeviceID("1"),
+					Attributes: map[string]model.DeviceAttribute{
+						"identity-group": {Name: "group", Value: "foo", Description: strPtr("device group"), Scope: model.AttrScopeIdentity},
+					},
 				},
 				{
-					ID:    model.DeviceID("2"),
-					Group: model.GroupName("foo"),
+					ID: model.DeviceID("2"),
+					Attributes: map[string]model.DeviceAttribute{
+						"identity-group": {Name: "group", Value: "foo", Description: strPtr("device group"), Scope: model.AttrScopeIdentity},
+					},
 				},
 				{
-					ID:    model.DeviceID("3"),
-					Group: model.GroupName("foo"),
+					ID: model.DeviceID("3"),
+					Attributes: map[string]model.DeviceAttribute{
+						"identity-group": {Name: "group", Value: "foo", Description: strPtr("device group"), Scope: model.AttrScopeIdentity},
+					},
 				},
 				{
-					ID:    model.DeviceID("4"),
-					Group: model.GroupName("bar"),
+					ID: model.DeviceID("4"),
+					Attributes: map[string]model.DeviceAttribute{
+						"identity-group": {Name: "group", Value: "bar", Description: strPtr("device group"), Scope: model.AttrScopeIdentity},
+					},
 				},
 				{
-					ID:    model.DeviceID("5"),
-					Group: model.GroupName(""),
+					ID: model.DeviceID("5"),
 				},
 			},
 			OutputGroups: []model.GroupName{"foo", "bar"},
@@ -1513,24 +2011,31 @@ func TestMongoListGroups(t *testing.T) {
 		"groups foo, bar; with tenant": {
 			InputDevices: []model.Device{
 				{
-					ID:    model.DeviceID("1"),
-					Group: model.GroupName("foo"),
+					ID: model.DeviceID("1"),
+					Attributes: map[string]model.DeviceAttribute{
+						"identity-group": {Name: "group", Value: "foo", Description: strPtr("device group"), Scope: model.AttrScopeIdentity},
+					},
 				},
 				{
-					ID:    model.DeviceID("2"),
-					Group: model.GroupName("foo"),
+					ID: model.DeviceID("2"),
+					Attributes: map[string]model.DeviceAttribute{
+						"identity-group": {Name: "group", Value: "foo", Description: strPtr("device group"), Scope: model.AttrScopeIdentity},
+					},
 				},
 				{
-					ID:    model.DeviceID("3"),
-					Group: model.GroupName("foo"),
+					ID: model.DeviceID("3"),
+					Attributes: map[string]model.DeviceAttribute{
+						"identity-group": {Name: "group", Value: "foo", Description: strPtr("device group"), Scope: model.AttrScopeIdentity},
+					},
 				},
 				{
-					ID:    model.DeviceID("4"),
-					Group: model.GroupName("bar"),
+					ID: model.DeviceID("4"),
+					Attributes: map[string]model.DeviceAttribute{
+						"identity-group": {Name: "group", Value: "bar", Description: strPtr("device group"), Scope: model.AttrScopeIdentity},
+					},
 				},
 				{
-					ID:    model.DeviceID("5"),
-					Group: model.GroupName(""),
+					ID: model.DeviceID("5"),
 				},
 			},
 			tenant:       "foo",
@@ -1539,16 +2044,13 @@ func TestMongoListGroups(t *testing.T) {
 		"no groups": {
 			InputDevices: []model.Device{
 				{
-					ID:    model.DeviceID("1"),
-					Group: model.GroupName(""),
+					ID: model.DeviceID("1"),
 				},
 				{
-					ID:    model.DeviceID("2"),
-					Group: model.GroupName(""),
+					ID: model.DeviceID("2"),
 				},
 				{
-					ID:    model.DeviceID("3"),
-					Group: model.GroupName(""),
+					ID: model.DeviceID("3"),
 				},
 			},
 			OutputGroups: []model.GroupName{},
@@ -1556,16 +2058,13 @@ func TestMongoListGroups(t *testing.T) {
 		"no groups; with tenant": {
 			InputDevices: []model.Device{
 				{
-					ID:    model.DeviceID("1"),
-					Group: model.GroupName(""),
+					ID: model.DeviceID("1"),
 				},
 				{
-					ID:    model.DeviceID("2"),
-					Group: model.GroupName(""),
+					ID: model.DeviceID("2"),
 				},
 				{
-					ID:    model.DeviceID("3"),
-					Group: model.GroupName(""),
+					ID: model.DeviceID("3"),
 				},
 			},
 			tenant:       "foo",
