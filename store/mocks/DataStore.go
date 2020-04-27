@@ -270,6 +270,19 @@ func (_m *DataStore) SetAttribute(ctx context.Context, id model.DeviceID, attr m
 	return r0
 }
 
+func (_m *DataStore) UnSetAttribute(ctx context.Context, id model.DeviceID, attr model.DeviceAttribute) error {
+	ret := _m.Called(ctx, id, attr)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, model.DeviceID, model.DeviceAttribute) error); ok {
+		r0 = rf(ctx, id, attr)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // UpsertAttributes provides a mock function with given fields: ctx, id, attrs
 func (_m *DataStore) UpsertAttributes(ctx context.Context, id model.DeviceID, attrs model.DeviceAttributes) error {
 	ret := _m.Called(ctx, id, attrs)

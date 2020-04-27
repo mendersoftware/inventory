@@ -1,4 +1,4 @@
-// Copyright 2019 Northern.tech AS
+// Copyright 2020 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -23,9 +23,9 @@ import (
 
 var (
 	// device not found
-	ErrDevNotFound = errors.New("Device not found")
-
-	ErrGroupNotFound = errors.New("group not found")
+	ErrDevNotFound       = errors.New("Device not found")
+	ErrDevOrAttrNotFound = errors.New("attribute or device not found")
+	ErrGroupNotFound     = errors.New("group not found")
 )
 
 type DataStore interface {
@@ -45,6 +45,10 @@ type DataStore interface {
 
 	// delete device and all attributes
 	DeleteDevice(ctx context.Context, id model.DeviceID) error
+
+	SetAttribute(ctx context.Context, id model.DeviceID, attr model.DeviceAttribute) error
+
+	UnSetAttribute(ctx context.Context, id model.DeviceID, attr model.DeviceAttribute) error
 
 	// Updates the device attributes in a differential manner.
 	// Nonexistent attributes are created, existing are overwritten; the device resource is also created if necessary.

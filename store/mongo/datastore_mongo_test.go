@@ -42,8 +42,16 @@ func TestMongoGetDevices(t *testing.T) {
 
 	inputDevs := []model.Device{
 		{ID: model.DeviceID("0")},
-		{ID: model.DeviceID("1"), Group: model.GroupName("1")},
-		{ID: model.DeviceID("2"), Group: model.GroupName("2")},
+		{ID: model.DeviceID("1"),
+			Attributes: map[string]model.DeviceAttribute{
+				"identity-group": {Name: "group", Value: "1", Description: strPtr("device group"), Scope: model.AttrScopeIdentity},
+			},
+		},
+		{ID: model.DeviceID("2"),
+			Attributes: map[string]model.DeviceAttribute{
+				"identity-group": {Name: "group", Value: "2", Description: strPtr("device group"), Scope: model.AttrScopeIdentity},
+			},
+		},
 		{
 			ID: model.DeviceID("3"),
 			Attributes: map[string]model.DeviceAttribute{
@@ -63,8 +71,8 @@ func TestMongoGetDevices(t *testing.T) {
 			Attributes: map[string]model.DeviceAttribute{
 				DbScopeInventory + "-attrString": {Name: "attrString", Value: "val5", Description: strPtr("desc1"), Scope: model.AttrScopeInventory},
 				DbScopeInventory + "-attrFloat":  {Name: "attrFloat", Value: 5.0, Description: strPtr("desc2"), Scope: model.AttrScopeInventory},
+				"identity-group":                 {Name: "group", Value: "2", Description: strPtr("device group"), Scope: model.AttrScopeIdentity},
 			},
-			Group: model.GroupName("2"),
 		},
 		{
 			ID: model.DeviceID("6"),
@@ -716,6 +724,163 @@ func TestNewDataStoreMongo(t *testing.T) {
 
 	assert.Nil(t, ds)
 	assert.EqualError(t, err, "failed to open mongo-driver session")
+}
+
+func TestMongoUnSetAttribute(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping TestMongoSetAttribute in short mode.")
+	}
+
+	createdTs := time.Now()
+
+	testCases := map[string]struct {
+		devs []model.Device
+
+		inDevId model.DeviceID
+		inAttrs model.DeviceAttributes
+
+		tenant string
+
+		outAttrs model.DeviceAttributes
+		err      error
+	}{
+		"attribute unset": {
+			devs: []model.Device{
+				{
+					ID: model.DeviceID("0003"),
+					Attributes: map[string]model.DeviceAttribute{
+						"inventory-mac": {
+							Name:  "mac",
+							Value: "0003-mac",
+							Scope: model.AttrScopeInventory,
+						},
+						"inventory-sn": {
+							Name:  "sn",
+							Value: "0003-sn",
+							Scope: model.AttrScopeInventory,
+						},
+					},
+					CreatedTs: createdTs,
+				},
+			},
+			inDevId: model.DeviceID("0003"),
+			inAttrs: map[string]model.DeviceAttribute{
+				"mac": {
+					Name:  "mac",
+					Value: "0003-mac",
+					Scope: model.AttrScopeInventory,
+				},
+				"sn": {
+					Name:  "sn",
+					Value: "0003-sn",
+					Scope: model.AttrScopeInventory,
+				},
+			},
+
+			outAttrs: map[string]model.DeviceAttribute{
+				"mac": {
+					Value: "0003-mac",
+				},
+				"sn": {
+					Value: "0003-sn",
+				},
+			},
+		},
+
+		"attribute not existing": {
+			devs: []model.Device{
+				{
+					ID: model.DeviceID("0003"),
+					Attributes: map[string]model.DeviceAttribute{
+						"mac-2": {
+							Name:  "mac-2",
+							Value: "0003-mac-2",
+							Scope: model.AttrScopeInventory,
+						},
+						"sn-2": {
+							Name:  "sn-2",
+							Value: "0003-sn-2",
+							Scope: model.AttrScopeInventory,
+						},
+					},
+					CreatedTs: createdTs,
+				},
+			},
+			inDevId: model.DeviceID("0003"),
+			inAttrs: map[string]model.DeviceAttribute{
+				"mac": {
+					Name:  "mac",
+					Value: "0003-mac",
+					Scope: model.AttrScopeInventory,
+				},
+				"sn": {
+					Name:  "sn",
+					Value: "0003-sn",
+					Scope: model.AttrScopeInventory,
+				},
+			},
+
+			outAttrs: map[string]model.DeviceAttribute{
+				"mac": {
+					Value: "0003-mac",
+				},
+				"sn": {
+					Value: "0003-sn",
+				},
+			},
+
+			err: store.ErrDevOrAttrNotFound,
+		},
+	}
+
+	for name, tc := range testCases {
+
+		t.Logf("%s", name)
+		//setup
+		db.Wipe()
+
+		s := db.Client()
+
+		var ctx context.Context
+		if tc.tenant != "" {
+			ctx = identity.WithContext(db.CTX(), &identity.Identity{
+				Tenant: tc.tenant,
+			})
+		} else {
+			ctx = identity.WithContext(db.CTX(), &identity.Identity{
+				Tenant: "",
+			})
+		}
+
+		for _, d := range tc.devs {
+			_, err := s.Database(mstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl).InsertOne(ctx, d)
+			assert.NoError(t, err, "failed to setup input data")
+		}
+
+		//test
+		d := NewDataStoreMongoWithSession(s)
+
+		for _, a := range tc.inAttrs {
+			err := d.UnSetAttribute(ctx, tc.inDevId, a)
+			if tc.err != nil {
+				assert.Error(t, err, tc.err)
+			} else {
+				assert.NoError(t, err, "UnSetAttribute failed: ")
+			}
+		}
+
+		if tc.err == store.ErrDevOrAttrNotFound {
+			return
+		}
+		//get the device back
+		var dev model.Device
+		err := DeviceFindById(ctx, s.Database(DbName).Collection(DbDevicesColl), tc.inDevId, &dev)
+		assert.NoError(t, err, "error getting device")
+
+		if !compare(dev.Attributes, tc.outAttrs) {
+			t.Errorf("attributes mismatch, have: %v\nwant: %v", dev.Attributes, tc.outAttrs)
+		}
+	}
 }
 
 func TestMongoSetAttribute(t *testing.T) {
@@ -1762,16 +1927,20 @@ func TestMongoUpdateDeviceGroup(t *testing.T) {
 			InputDeviceID:  model.DeviceID("1"),
 			InputGroupName: model.GroupName("abc"),
 			InputDevice: &model.Device{
-				ID:    model.DeviceID("1"),
-				Group: model.GroupName("def"),
+				ID: model.DeviceID("1"),
+				Attributes: map[string]model.DeviceAttribute{
+					"identity-group": {Name: "group", Value: "def", Description: strPtr("device group"), Scope: model.AttrScopeIdentity},
+				},
 			},
 		},
 		"update group for device, group exists; with tenant": {
 			InputDeviceID:  model.DeviceID("1"),
 			InputGroupName: model.GroupName("abc"),
 			InputDevice: &model.Device{
-				ID:    model.DeviceID("1"),
-				Group: model.GroupName("def"),
+				ID: model.DeviceID("1"),
+				Attributes: map[string]model.DeviceAttribute{
+					"identity-group": {Name: "group", Value: "def", Description: strPtr("device group"), Scope: model.AttrScopeIdentity},
+				},
 			},
 			tenant: "foo",
 		},
@@ -1779,8 +1948,7 @@ func TestMongoUpdateDeviceGroup(t *testing.T) {
 			InputDeviceID:  model.DeviceID("1"),
 			InputGroupName: model.GroupName("abc"),
 			InputDevice: &model.Device{
-				ID:    model.DeviceID("1"),
-				Group: model.GroupName(""),
+				ID: model.DeviceID("1"),
 			},
 		},
 	}
@@ -1818,7 +1986,7 @@ func TestMongoUpdateDeviceGroup(t *testing.T) {
 			assert.NoError(t, err, "expected no error")
 
 			groupsColl := client.Database(mstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
-			cursor, err := groupsColl.Find(ctx, bson.M{"group": model.GroupName("abc")})
+			cursor, err := groupsColl.Find(ctx, bson.M{"attributes.identity-group.value": model.GroupName("abc")})
 			assert.NoError(t, err, "expected no error")
 
 			count := 0
@@ -1874,29 +2042,33 @@ func TestMongoUnsetDevicesGroupWithGroupName(t *testing.T) {
 			InputDeviceID:  model.DeviceID("1"),
 			InputGroupName: model.GroupName("e16c71ec"),
 			InputDevice:    nil,
-			OutputError:    store.ErrDevNotFound,
+			OutputError:    store.ErrDevOrAttrNotFound,
 		},
 		"unset group for device with group id, device not found; with tenant": {
 			InputDeviceID:  model.DeviceID("1"),
 			InputGroupName: model.GroupName("e16c71ec"),
 			InputDevice:    nil,
 			tenant:         "foo",
-			OutputError:    store.ErrDevNotFound,
+			OutputError:    store.ErrDevOrAttrNotFound,
 		},
 		"unset group for device, ok": {
 			InputDeviceID:  model.DeviceID("1"),
 			InputGroupName: model.GroupName("e16c71ec"),
 			InputDevice: &model.Device{
-				ID:    model.DeviceID("1"),
-				Group: model.GroupName("e16c71ec"),
+				ID: model.DeviceID("1"),
+				Attributes: map[string]model.DeviceAttribute{
+					"identity-group": {Name: "group", Value: "e16c71ec", Description: strPtr("device group"), Scope: model.AttrScopeIdentity},
+				},
 			},
 		},
 		"unset group for device, ok; with tenant": {
 			InputDeviceID:  model.DeviceID("1"),
 			InputGroupName: model.GroupName("e16c71ec"),
 			InputDevice: &model.Device{
-				ID:    model.DeviceID("1"),
-				Group: model.GroupName("e16c71ec"),
+				ID: model.DeviceID("1"),
+				Attributes: map[string]model.DeviceAttribute{
+					"identity-group": {Name: "group", Value: "e16c71ec", Description: strPtr("device group"), Scope: model.AttrScopeIdentity},
+				},
 			},
 			tenant: "foo",
 		},
@@ -1904,20 +2076,24 @@ func TestMongoUnsetDevicesGroupWithGroupName(t *testing.T) {
 			InputDeviceID:  model.DeviceID("1"),
 			InputGroupName: model.GroupName("other-group-name"),
 			InputDevice: &model.Device{
-				ID:    model.DeviceID("1"),
-				Group: model.GroupName("e16c71ec"),
+				ID: model.DeviceID("1"),
+				Attributes: map[string]model.DeviceAttribute{
+					"identity-group": {Name: "group", Value: "e16c71ec", Description: strPtr("device group"), Scope: model.AttrScopeIdentity},
+				},
 			},
-			OutputError: store.ErrDevNotFound,
+			OutputError: store.ErrDevOrAttrNotFound,
 		},
 		"unset group for device with incorrect group name provided; with tenant": {
 			InputDeviceID:  model.DeviceID("1"),
 			InputGroupName: model.GroupName("other-group-name"),
 			InputDevice: &model.Device{
-				ID:    model.DeviceID("1"),
-				Group: model.GroupName("e16c71ec"),
+				ID: model.DeviceID("1"),
+				Attributes: map[string]model.DeviceAttribute{
+					"identity-group": {Name: "group", Value: "e16c71ec", Description: strPtr("device group"), Scope: model.AttrScopeIdentity},
+				},
 			},
 			tenant:      "foo",
-			OutputError: store.ErrDevNotFound,
+			OutputError: store.ErrDevOrAttrNotFound,
 		},
 	}
 
@@ -1954,7 +2130,7 @@ func TestMongoUnsetDevicesGroupWithGroupName(t *testing.T) {
 			assert.NoError(t, err, "expected no error")
 
 			groupsColl := client.Database(mstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
-			cursor, err := groupsColl.Find(ctx, bson.M{"group": model.GroupName("e16c71ec")})
+			cursor, err := groupsColl.Find(ctx, bson.M{"attributes.identity-group.value": model.GroupName("e16c71ec")})
 			assert.NoError(t, err, "expected no error")
 
 			count := 0
@@ -2119,40 +2295,56 @@ func TestGetDevicesByGroup(t *testing.T) {
 
 	devDevices := []model.Device{
 		{
-			ID:    model.DeviceID("1"),
-			Group: model.GroupName("dev"),
+			ID: model.DeviceID("1"),
+			Attributes: map[string]model.DeviceAttribute{
+				"identity-group": {Name: "group", Value: "dev", Description: strPtr("device group"), Scope: model.AttrScopeIdentity},
+			},
 		},
 		{
-			ID:    model.DeviceID("6"),
-			Group: model.GroupName("dev"),
+			ID: model.DeviceID("6"),
+			Attributes: map[string]model.DeviceAttribute{
+				"identity-group": {Name: "group", Value: "dev", Description: strPtr("device group"), Scope: model.AttrScopeIdentity},
+			},
 		},
 		{
-			ID:    model.DeviceID("8"),
-			Group: model.GroupName("dev"),
+			ID: model.DeviceID("8"),
+			Attributes: map[string]model.DeviceAttribute{
+				"identity-group": {Name: "group", Value: "dev", Description: strPtr("device group"), Scope: model.AttrScopeIdentity},
+			},
 		},
 	}
 	prodDevices := []model.Device{
 		{
-			ID:    model.DeviceID("2"),
-			Group: model.GroupName("prod"),
+			ID: model.DeviceID("2"),
+			Attributes: map[string]model.DeviceAttribute{
+				"identity-group": {Name: "group", Value: "prod", Description: strPtr("device group"), Scope: model.AttrScopeIdentity},
+			},
 		},
 		{
-			ID:    model.DeviceID("4"),
-			Group: model.GroupName("prod"),
+			ID: model.DeviceID("4"),
+			Attributes: map[string]model.DeviceAttribute{
+				"identity-group": {Name: "group", Value: "prod", Description: strPtr("device group"), Scope: model.AttrScopeIdentity},
+			},
 		},
 		{
-			ID:    model.DeviceID("5"),
-			Group: model.GroupName("prod"),
+			ID: model.DeviceID("5"),
+			Attributes: map[string]model.DeviceAttribute{
+				"identity-group": {Name: "group", Value: "prod", Description: strPtr("device group"), Scope: model.AttrScopeIdentity},
+			},
 		},
 	}
 	testDevices := []model.Device{
 		{
-			ID:    model.DeviceID("3"),
-			Group: model.GroupName("test"),
+			ID: model.DeviceID("3"),
+			Attributes: map[string]model.DeviceAttribute{
+				"identity-group": {Name: "group", Value: "test", Description: strPtr("device group"), Scope: model.AttrScopeIdentity},
+			},
 		},
 		{
-			ID:    model.DeviceID("7"),
-			Group: model.GroupName("test"),
+			ID: model.DeviceID("7"),
+			Attributes: map[string]model.DeviceAttribute{
+				"identity-group": {Name: "group", Value: "test", Description: strPtr("device group"), Scope: model.AttrScopeIdentity},
+			},
 		},
 	}
 
@@ -2301,36 +2493,52 @@ func TestGetDevicesByGroupWithTenant(t *testing.T) {
 
 	inputDevices := []model.Device{
 		{
-			ID:    model.DeviceID("1"),
-			Group: model.GroupName("dev"),
+			ID: model.DeviceID("1"),
+			Attributes: map[string]model.DeviceAttribute{
+				"identity-group": {Name: "group", Value: "dev", Description: strPtr("device group"), Scope: model.AttrScopeIdentity},
+			},
 		},
 		{
-			ID:    model.DeviceID("2"),
-			Group: model.GroupName("prod"),
+			ID: model.DeviceID("2"),
+			Attributes: map[string]model.DeviceAttribute{
+				"identity-group": {Name: "group", Value: "prod", Description: strPtr("device group"), Scope: model.AttrScopeIdentity},
+			},
 		},
 		{
-			ID:    model.DeviceID("3"),
-			Group: model.GroupName("test"),
+			ID: model.DeviceID("3"),
+			Attributes: map[string]model.DeviceAttribute{
+				"identity-group": {Name: "group", Value: "test", Description: strPtr("device group"), Scope: model.AttrScopeIdentity},
+			},
 		},
 		{
-			ID:    model.DeviceID("4"),
-			Group: model.GroupName("prod"),
+			ID: model.DeviceID("4"),
+			Attributes: map[string]model.DeviceAttribute{
+				"identity-group": {Name: "group", Value: "prod", Description: strPtr("device group"), Scope: model.AttrScopeIdentity},
+			},
 		},
 		{
-			ID:    model.DeviceID("5"),
-			Group: model.GroupName("prod"),
+			ID: model.DeviceID("5"),
+			Attributes: map[string]model.DeviceAttribute{
+				"identity-group": {Name: "group", Value: "prod", Description: strPtr("device group"), Scope: model.AttrScopeIdentity},
+			},
 		},
 		{
-			ID:    model.DeviceID("6"),
-			Group: model.GroupName("dev"),
+			ID: model.DeviceID("6"),
+			Attributes: map[string]model.DeviceAttribute{
+				"identity-group": {Name: "group", Value: "dev", Description: strPtr("device group"), Scope: model.AttrScopeIdentity},
+			},
 		},
 		{
-			ID:    model.DeviceID("7"),
-			Group: model.GroupName("test"),
+			ID: model.DeviceID("7"),
+			Attributes: map[string]model.DeviceAttribute{
+				"identity-group": {Name: "group", Value: "test", Description: strPtr("device group"), Scope: model.AttrScopeIdentity},
+			},
 		},
 		{
-			ID:    model.DeviceID("8"),
-			Group: model.GroupName("dev"),
+			ID: model.DeviceID("8"),
+			Attributes: map[string]model.DeviceAttribute{
+				"identity-group": {Name: "group", Value: "dev", Description: strPtr("device group"), Scope: model.AttrScopeIdentity},
+			},
 		},
 	}
 
@@ -2442,8 +2650,10 @@ func TestGetDeviceGroup(t *testing.T) {
 
 	inputDevices := []model.Device{
 		{
-			ID:    model.DeviceID("1"),
-			Group: model.GroupName("dev"),
+			ID: model.DeviceID("1"),
+			Attributes: map[string]model.DeviceAttribute{
+				"identity-group": {Name: "group", Value: "dev", Description: strPtr("device group"), Scope: model.AttrScopeIdentity},
+			},
 		},
 		{
 			ID: model.DeviceID("2"),
@@ -2503,8 +2713,10 @@ func TestGetDeviceGroupWithTenant(t *testing.T) {
 
 	inputDevices := []model.Device{
 		{
-			ID:    model.DeviceID("1"),
-			Group: model.GroupName("dev"),
+			ID: model.DeviceID("1"),
+			Attributes: map[string]model.DeviceAttribute{
+				"identity-group": {Name: "group", Value: "dev", Description: strPtr("device group"), Scope: model.AttrScopeIdentity},
+			},
 		},
 		{
 			ID: model.DeviceID("2"),
@@ -2588,6 +2800,40 @@ func TestMigrate(t *testing.T) {
 			},
 		},
 	}
+	someGroups := []string{"group0", "group1"}
+	someDevsWithGroups := []model.Device{
+		{
+			ID: model.DeviceID("8"),
+			Attributes: map[string]model.DeviceAttribute{
+				"mac": {Name: "mac", Value: "foo", Description: strPtr("desc"), Scope: model.AttrScopeInventory},
+				"sn":  {Name: "sn", Value: "bar", Description: strPtr("desc"), Scope: model.AttrScopeInventory},
+			},
+			Group: model.GroupName(someGroups[0]),
+		},
+		{
+			ID: model.DeviceID("7"),
+			Attributes: map[string]model.DeviceAttribute{
+				"mac": {Name: "mac", Value: "foo", Description: strPtr("desc"), Scope: model.AttrScopeInventory},
+				"foo": {Name: "foo", Value: "foo", Description: strPtr("desc"), Scope: model.AttrScopeInventory},
+				"bar": {Name: "bar", Value: "bar", Description: strPtr("desc"), Scope: model.AttrScopeInventory},
+			},
+			Group: model.GroupName(someGroups[1]),
+		},
+		{
+			ID: model.DeviceID("6"),
+			Attributes: map[string]model.DeviceAttribute{
+				"baz": {Name: "baz", Value: "baz", Description: strPtr("desc"), Scope: model.AttrScopeInventory},
+			},
+			Group: model.GroupName(someGroups[0]),
+		},
+		{
+			ID: model.DeviceID("5"),
+			Attributes: map[string]model.DeviceAttribute{
+				"baz": {Name: "baz", Value: "baz", Description: strPtr("desc"), Scope: model.AttrScopeInventory},
+			},
+			Group: model.GroupName(someGroups[1]),
+		},
+	}
 
 	testCases := map[string]struct {
 		versionFrom string
@@ -2595,8 +2841,9 @@ func TestMigrate(t *testing.T) {
 		automigrate bool
 		tenant      string
 
-		outVers []string
-		err     error
+		outGroups []string
+		outVers   []string
+		err       error
 	}{
 		"from no version (fresh db)": {
 			versionFrom: "",
@@ -2604,6 +2851,7 @@ func TestMigrate(t *testing.T) {
 
 			outVers: []string{
 				"0.2.0",
+				"1.0.0",
 			},
 		},
 		"from 0.1.0 (first, dummy migration)": {
@@ -2613,12 +2861,13 @@ func TestMigrate(t *testing.T) {
 			outVers: []string{
 				"0.1.0",
 				"0.2.0",
+				"1.0.0",
 			},
 		},
 		"from 0.1.0, no-automigrate": {
 			versionFrom: "0.0.0",
 
-			err: errors.New("failed to apply migrations: db needs migration: inventory has version 0.0.0, needs version 0.2.0"),
+			err: errors.New("failed to apply migrations: db needs migration: inventory has version 0.0.0, needs version 1.0.0"),
 		},
 		"with devices, from 0.1.0": {
 			versionFrom: "0.1.0",
@@ -2628,6 +2877,7 @@ func TestMigrate(t *testing.T) {
 			outVers: []string{
 				"0.1.0",
 				"0.2.0",
+				"1.0.0",
 			},
 		},
 		"with devices, from 0.1.0, with tenant": {
@@ -2638,6 +2888,7 @@ func TestMigrate(t *testing.T) {
 
 			outVers: []string{
 				"0.2.0",
+				"1.0.0",
 			},
 		},
 		"with devices, from 0.1.0, with tenant, other devs": {
@@ -2649,6 +2900,19 @@ func TestMigrate(t *testing.T) {
 			outVers: []string{
 				"0.1.0",
 				"0.2.0",
+				"1.0.0",
+			},
+		},
+		"with devices, from 0.2.0, with tenant, devices with groups": {
+			versionFrom: "0.2.0",
+			inDevs:      someDevsWithGroups,
+			automigrate: true,
+			tenant:      "tenant",
+
+			outGroups: someGroups,
+			outVers: []string{
+				"0.2.0",
+				"1.0.0",
 			},
 		},
 	}
@@ -2722,6 +2986,16 @@ func TestMigrate(t *testing.T) {
 			assert.Equal(t, len(tc.outVers), count)
 			for i, v := range tc.outVers {
 				assert.Equal(t, v, out[i].Version.String())
+			}
+
+			if len(tc.outGroups) > 0 {
+				gs, err := store.ListGroups(ctx)
+				assert.NoError(t, err, "ListGroups failed")
+				t.Logf("groups: %v", gs)
+				assert.Len(t, gs, len(tc.outGroups))
+				for _, eg := range tc.outGroups {
+					assert.Contains(t, gs, model.GroupName(eg))
+				}
 			}
 		} else {
 			assert.EqualError(t, err, tc.err.Error())

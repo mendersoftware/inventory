@@ -40,7 +40,7 @@ import (
 )
 
 const (
-	DbVersion = "0.2.0"
+	DbVersion = "1.0.0"
 
 	DbName        = "inventory"
 	DbDevicesColl = "devices"
@@ -148,6 +148,15 @@ func NewDataStoreMongo(config DataStoreMongoConfig) (store.DataStore, error) {
 func (db *DataStoreMongo) GetDevices(ctx context.Context, q store.ListQuery) ([]model.Device, int, error) {
 	c := db.client.Database(mstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
 
+	if q.GroupName != "" {
+		q.Filters = append(q.Filters, store.Filter{
+			AttrName:   "group",
+			AttrScope:  "identity",
+			Value:      q.GroupName,
+			ValueFloat: nil,
+			Operator:   store.Eq,
+		})
+	}
 	queryFilters := make([]bson.M, 0)
 	for _, filter := range q.Filters {
 		op := mongoOperator(filter.Operator)
@@ -169,18 +178,13 @@ func (db *DataStoreMongo) GetDevices(ctx context.Context, q store.ListQuery) ([]
 	if len(queryFilters) > 0 {
 		findQuery["$and"] = queryFilters
 	}
-	groupFilter := bson.M{}
-	if q.GroupName != "" {
-		groupFilter = bson.M{DbDevGroup: q.GroupName}
-	}
 	groupExistenceFilter := bson.M{}
 	if q.HasGroup != nil {
-		groupExistenceFilter = bson.M{DbDevGroup: bson.M{"$exists": *q.HasGroup}}
+		groupExistenceFilter = bson.M{"attributes.identity-group.value": bson.M{"$exists": *q.HasGroup}}
 	}
 	filter := bson.M{
 		"$match": bson.M{
 			"$and": []bson.M{
-				groupFilter,
 				groupExistenceFilter,
 				findQuery,
 			},
@@ -309,6 +313,39 @@ func (db *DataStoreMongo) AddDevice(ctx context.Context, dev *model.Device) erro
 	return nil
 }
 
+func (db *DataStoreMongo) SetAttribute(ctx context.Context, id model.DeviceID, attr model.DeviceAttribute) error {
+	c := db.client.Database(mstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
+	filter := bson.M{"_id": id}
+	update := makeAttrSet(attr)
+	update["updated_ts"] = time.Now()
+	update = bson.M{"$set": update}
+	res, err := c.UpdateOne(ctx, filter, update)
+	if err != nil {
+		return err
+	}
+	if res.MatchedCount < 1 {
+		return store.ErrDevNotFound
+	}
+	return nil
+}
+
+func (db *DataStoreMongo) UnSetAttribute(ctx context.Context, id model.DeviceID, attr model.DeviceAttribute) error {
+	c := db.client.Database(mstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
+	filter := makeAttrSet(attr)
+	filter["_id"] = id
+	update := makeAttrSet(attr)
+	//update["updated_ts"] = time.Now()
+	update = bson.M{"$unset": update}
+	res, err := c.UpdateOne(ctx, filter, update)
+	if err != nil {
+		return err
+	}
+	if res.MatchedCount < 1 {
+		return store.ErrDevOrAttrNotFound
+	}
+	return nil
+}
+
 func (db *DataStoreMongo) UpsertAttributes(ctx context.Context, id model.DeviceID, attrs model.DeviceAttributes) error {
 	c := db.client.Database(mstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
 	filter := bson.M{"_id": id} // idDev}
@@ -322,6 +359,42 @@ func (db *DataStoreMongo) UpsertAttributes(ctx context.Context, id model.DeviceI
 		return err
 	}
 	return nil
+}
+
+// prepare an attribute upsert doc based on DeviceAttribute
+func makeAttrSet(a model.DeviceAttribute) map[string]interface{} {
+	var fieldName string
+	upsert := map[string]interface{}{}
+
+	name := a.Name
+	if a.Scope != "" {
+		// prefix attribute name with a scope
+		name = fmt.Sprintf("%s-%s", a.Scope, name)
+		fieldName =
+			fmt.Sprintf("%s.%s.%s", DbDevAttributes, name, DbDevAttributesScope)
+		upsert[fieldName] = a.Scope
+	}
+
+	if a.Description != nil {
+		fieldName =
+			fmt.Sprintf("%s.%s.%s", DbDevAttributes, name, DbDevAttributesDesc)
+		upsert[fieldName] = a.Description
+
+	}
+
+	if a.Value != nil {
+		fieldName =
+			fmt.Sprintf("%s.%s.%s", DbDevAttributes, name, DbDevAttributesValue)
+		upsert[fieldName] = a.Value
+	}
+
+	if a.Name != "" {
+		fieldName =
+			fmt.Sprintf("%s.%s.%s", DbDevAttributes, name, "name")
+		upsert[fieldName] = a.Name
+	}
+
+	return upsert
 }
 
 // prepare an attribute upsert doc based on DeviceAttributes map
@@ -370,56 +443,32 @@ func mongoOperator(co store.ComparisonOperator) string {
 }
 
 func (db *DataStoreMongo) UnsetDeviceGroup(ctx context.Context, id model.DeviceID, groupName model.GroupName) error {
-	c := db.client.Database(mstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
-
-	filter := bson.M{
-		"_id":   id,
-		"group": groupName,
-	}
-	update := bson.M{
-		"$unset": bson.M{
-			"group": 1,
-		},
-	}
-
-	res, err := c.UpdateMany(ctx, filter, update) //Update one or update many?
+	err := db.UnSetAttribute(ctx, id, model.DeviceAttribute{
+		Name:        "group",
+		Description: nil,
+		Value:       groupName.String(),
+		Scope:       "identity",
+	})
 	if err != nil {
 		return err
 	}
-	if res.ModifiedCount > 0 {
-		return nil
-	} else {
-		return store.ErrDevNotFound
-	} // to check the update count
+	return nil
 }
 
 func (db *DataStoreMongo) UpdateDeviceGroup(ctx context.Context, devId model.DeviceID, newGroup model.GroupName) error {
-	c := db.client.Database(mstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
-
-	filter := bson.M{
-		"_id": devId,
-	}
-	update := bson.M{
-		"$set": &model.Device{Group: newGroup},
-	}
-
-	res, err := c.UpdateOne(ctx, filter, update)
-	if err != nil {
-		return err
-	}
-
-	if res.ModifiedCount > 0 {
-		return nil
-	} else {
-		return store.ErrDevNotFound
-	} // to check the update count
+	return db.SetAttribute(ctx, devId, model.DeviceAttribute{
+		Name:        "group",
+		Description: nil,
+		Value:       newGroup.String(),
+		Scope:       "identity",
+	})
 }
 
 func (db *DataStoreMongo) ListGroups(ctx context.Context) ([]model.GroupName, error) {
 	c := db.client.Database(mstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
 
-	filter := bson.M{"group": bson.M{"$exists": true}}
-	results, err := c.Distinct(ctx, "group", filter)
+	filter := bson.M{"attributes.identity-group.value": bson.M{"$exists": true}}
+	results, err := c.Distinct(ctx, "attributes.identity-group.value", filter)
 	if err != nil {
 		return nil, err
 	}
@@ -434,7 +483,7 @@ func (db *DataStoreMongo) ListGroups(ctx context.Context) ([]model.GroupName, er
 func (db *DataStoreMongo) GetDevicesByGroup(ctx context.Context, group model.GroupName, skip, limit int) ([]model.DeviceID, int, error) {
 	c := db.client.Database(mstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
 
-	filter := bson.M{DbDevGroup: group}
+	filter := bson.M{"attributes.identity-group.value": group}
 	result := c.FindOne(ctx, filter)
 	if result == nil {
 		return nil, -1, store.ErrGroupNotFound
@@ -475,6 +524,9 @@ func (db *DataStoreMongo) GetDeviceGroup(ctx context.Context, id model.DeviceID)
 		return "", errors.Wrap(err, "failed to get device")
 	}
 
+	if _, ok := dev.Attributes["identity-group"]; ok {
+		dev.Group = model.GroupName(dev.Attributes["identity-group"].Value.(string))
+	}
 	return dev.Group, nil
 }
 
@@ -570,6 +622,10 @@ func (db *DataStoreMongo) MigrateTenant(ctx context.Context, version string, ten
 
 	migrations := []migrate.Migration{
 		&migration_0_2_0{
+			ms:  db,
+			ctx: ctx,
+		},
+		&migration_1_0_0{
 			ms:  db,
 			ctx: ctx,
 		},
