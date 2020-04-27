@@ -134,7 +134,7 @@ func TestApiParseFilterParams(t *testing.T) {
 		"eq - short form(implicit)": {
 			inReq: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&attr_name1=A0001", nil),
 			filters: []store.Filter{
-				store.Filter{
+				{
 					AttrName:  "attr_name1",
 					AttrScope: model.AttrScopeInventory,
 					Value:     "A0001",
@@ -145,7 +145,7 @@ func TestApiParseFilterParams(t *testing.T) {
 		"eq - short form(implicit), colons": {
 			inReq: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&attr_name1=qe:123:123:123", nil),
 			filters: []store.Filter{
-				store.Filter{
+				{
 					AttrName:  "attr_name1",
 					AttrScope: model.AttrScopeInventory,
 					Value:     "qe:123:123:123",
@@ -156,7 +156,7 @@ func TestApiParseFilterParams(t *testing.T) {
 		"eq - short form(implicit), float": {
 			inReq: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&attr_name1=3.14", nil),
 			filters: []store.Filter{
-				store.Filter{
+				{
 					AttrName:   "attr_name1",
 					AttrScope:  model.AttrScopeInventory,
 					Value:      "3.14",
@@ -168,7 +168,7 @@ func TestApiParseFilterParams(t *testing.T) {
 		"eq - long form": {
 			inReq: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&attr_name1=eq:A0001", nil),
 			filters: []store.Filter{
-				store.Filter{
+				{
 					AttrName:  "attr_name1",
 					AttrScope: model.AttrScopeInventory,
 					Value:     "A0001",
@@ -179,7 +179,7 @@ func TestApiParseFilterParams(t *testing.T) {
 		"eq - long form, colons": {
 			inReq: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&attr_name1=eq:qe:123:123:123", nil),
 			filters: []store.Filter{
-				store.Filter{
+				{
 					AttrName:  "attr_name1",
 					AttrScope: model.AttrScopeInventory,
 					Value:     "qe:123:123:123",
@@ -190,7 +190,7 @@ func TestApiParseFilterParams(t *testing.T) {
 		"eq - long form, colons, with scope": {
 			inReq: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&scope/attr_name1=eq:qe:123:123:123", nil),
 			filters: []store.Filter{
-				store.Filter{
+				{
 					AttrName:  "attr_name1",
 					AttrScope: "scope",
 					Value:     "qe:123:123:123",
@@ -201,7 +201,7 @@ func TestApiParseFilterParams(t *testing.T) {
 		"eq - long form, dashes, with scope": {
 			inReq: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&scope/attr-name1=eq:qe-123-123-123", nil),
 			filters: []store.Filter{
-				store.Filter{
+				{
 					AttrName:  "attr-name1",
 					AttrScope: "scope",
 					Value:     "qe-123-123-123",
@@ -475,9 +475,9 @@ func TestApiInventoryAddDevice(t *testing.T) {
 				OutputHeaders:    map[string][]string{"Location": {"devices/id-0001"}},
 			},
 			deviceAttributes: model.DeviceAttributes{
-				"a1": {Name: "a1", Value: "00:00:00:01", Description: strPtr("ddd"), Scope: model.AttrScopeInventory},
-				"a2": {Name: "a2", Value: 123.2, Description: strPtr("ddd"), Scope: model.AttrScopeInventory},
-				"a3": {Name: "a3", Value: []interface{}{"00:00:00:01", "00"}, Description: strPtr("ddd"), Scope: model.AttrScopeInventory},
+				{Name: "a1", Value: "00:00:00:01", Description: strPtr("ddd"), Scope: model.AttrScopeInventory},
+				{Name: "a2", Value: 123.2, Description: strPtr("ddd"), Scope: model.AttrScopeInventory},
+				{Name: "a3", Value: []interface{}{"00:00:00:01", "00"}, Description: strPtr("ddd"), Scope: model.AttrScopeInventory},
 			},
 		},
 		"body formatted ok, all fields present, attributes with scope": {
@@ -499,9 +499,9 @@ func TestApiInventoryAddDevice(t *testing.T) {
 				OutputHeaders:    map[string][]string{"Location": {"devices/id-0001"}},
 			},
 			deviceAttributes: model.DeviceAttributes{
-				"a1": {Name: "a1", Value: "00:00:00:01", Description: strPtr("ddd"), Scope: model.AttrScopeInventory},
-				"a2": {Name: "a2", Value: 123.2, Description: strPtr("ddd"), Scope: model.AttrScopeInventory},
-				"a3": {Name: "a3", Value: []interface{}{"00:00:00:01", "00"}, Description: strPtr("ddd"), Scope: model.AttrScopeInventory},
+				{Name: "a1", Value: "00:00:00:01", Description: strPtr("ddd"), Scope: model.AttrScopeInventory},
+				{Name: "a2", Value: 123.2, Description: strPtr("ddd"), Scope: model.AttrScopeInventory},
+				{Name: "a3", Value: []interface{}{"00:00:00:01", "00"}, Description: strPtr("ddd"), Scope: model.AttrScopeInventory},
 			},
 		},
 		"body formatted ok, wrong attributes type": {
@@ -543,7 +543,7 @@ func TestApiInventoryAddDevice(t *testing.T) {
 			inventoryErr: nil,
 			JSONResponseParams: utils.JSONResponseParams{
 				OutputStatus:     http.StatusBadRequest,
-				OutputBodyObject: RestError("attributes: (asd: (value: array values must be of consistent type (string or float64).); asd2: (value: array values must be of consistent type (string or float64).).)."),
+				OutputBodyObject: RestError("attributes: (value: array values must be of consistent type: string or float64.)."),
 			},
 		},
 		"body formatted ok, attribute name missing": {
@@ -559,7 +559,7 @@ func TestApiInventoryAddDevice(t *testing.T) {
 			inventoryErr: nil,
 			JSONResponseParams: utils.JSONResponseParams{
 				OutputStatus:     http.StatusBadRequest,
-				OutputBodyObject: RestError("attributes: (: (name: cannot be blank.).)."),
+				OutputBodyObject: RestError("attributes: (name: cannot be blank.)."),
 			},
 		},
 		"body formatted ok, inv error": {
@@ -746,8 +746,8 @@ func TestApiInventoryUpsertAttributes(t *testing.T) {
 				OutputBodyObject: nil,
 			},
 			deviceAttributes: model.DeviceAttributes{
-				"name1": {Name: "name1", Value: "value1", Description: strPtr("descr1"), Scope: model.AttrScopeInventory},
-				"name2": {Name: "name2", Value: float64(2), Description: strPtr("descr2"), Scope: model.AttrScopeInventory},
+				{Name: "name1", Value: "value1", Description: strPtr("descr1"), Scope: model.AttrScopeInventory},
+				{Name: "name2", Value: float64(2), Description: strPtr("descr2"), Scope: model.AttrScopeInventory},
 			},
 		},
 
@@ -778,8 +778,8 @@ func TestApiInventoryUpsertAttributes(t *testing.T) {
 				OutputBodyObject: nil,
 			},
 			deviceAttributes: model.DeviceAttributes{
-				"name1": {Name: "name1", Value: "value1", Description: strPtr("descr1"), Scope: model.AttrScopeInventory},
-				"name2": {Name: "name2", Value: float64(2), Description: strPtr("descr2"), Scope: model.AttrScopeInventory},
+				{Name: "name1", Value: "value1", Description: strPtr("descr1"), Scope: model.AttrScopeInventory},
+				{Name: "name2", Value: float64(2), Description: strPtr("descr2"), Scope: model.AttrScopeInventory},
 			},
 		},
 
@@ -1532,7 +1532,7 @@ func TestApiInventoryInternalDevicesStatus(t *testing.T) {
 	rest.ErrorFieldName = "error"
 
 	deviceAttributes := model.DeviceAttributes{
-		"status": {Name: "status", Value: "accepted", Scope: model.AttrScopeIdentity},
+		{Name: "status", Value: "accepted", Scope: model.AttrScopeIdentity},
 	}
 	deviceID := mockListDeviceIDs(1)[0]
 	tenantId := "5abcb6de7a673a0001287c71"

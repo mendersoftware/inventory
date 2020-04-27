@@ -27,7 +27,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	mopts "go.mongodb.org/mongo-driver/mongo/options"
 
 	"github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/log"
@@ -51,6 +51,7 @@ const (
 	DbDevAttributesDesc  = "description"
 	DbDevAttributesValue = "value"
 	DbDevAttributesScope = "scope"
+	DbDevAttributesName  = "name"
 
 	DbScopeInventory = "inventory"
 )
@@ -95,10 +96,10 @@ func NewDataStoreMongo(config DataStoreMongoConfig) (store.DataStore, error) {
 		if !strings.Contains(config.ConnectionString, "://") {
 			config.ConnectionString = "mongodb://" + config.ConnectionString
 		}
-		clientOptions := options.Client().ApplyURI(config.ConnectionString)
+		clientOptions := mopts.Client().ApplyURI(config.ConnectionString)
 
 		if config.Username != "" {
-			clientOptions.SetAuth(options.Credential{
+			clientOptions.SetAuth(mopts.Credential{
 				Username: config.Username,
 				Password: config.Password,
 			})
@@ -143,6 +144,11 @@ func NewDataStoreMongo(config DataStoreMongoConfig) (store.DataStore, error) {
 	db := &DataStoreMongo{client: clientGlobal}
 
 	return db, nil
+}
+
+type internalDeviceResult struct {
+	Devices    []model.Device `bson:"results"`
+	TotalCount int            `bson:"totalCount"`
 }
 
 func (db *DataStoreMongo) GetDevices(ctx context.Context, q store.ListQuery) ([]model.Device, int, error) {
@@ -209,11 +215,11 @@ func (db *DataStoreMongo) GetDevices(ctx context.Context, q store.ListQuery) ([]
 		"$facet": bson.M{
 			"results": []bson.M{
 				sortQuery,
-				bson.M{"$skip": q.Skip},
+				{"$skip": q.Skip},
 				limitQuery,
 			},
 			"totalCount": []bson.M{
-				bson.M{"$count": "count"},
+				{"$count": "count"},
 			},
 		},
 	}
@@ -238,26 +244,14 @@ func (db *DataStoreMongo) GetDevices(ctx context.Context, q store.ListQuery) ([]
 	})
 	defer cursor.Close(ctx)
 
-	cursor.Next(ctx)
-	elem := &bson.D{}
-	if err = cursor.Decode(elem); err != nil {
+	if !cursor.Next(ctx) {
+		return nil, 0, nil
+	}
+	res := internalDeviceResult{}
+	if err = cursor.Decode(&res); err != nil {
 		return nil, -1, errors.Wrap(err, "failed to fetch device list")
 	}
-	m := elem.Map()
-	count := m["totalCount"].(int32)
-	results := m["results"].(primitive.A)
-	devices := make([]model.Device, len(results))
-	for i, d := range results {
-		var device model.Device
-		bsonBytes, e := bson.Marshal(d.(bson.D))
-		if e != nil {
-			return nil, int(count), errors.Wrap(e, "failed to parse device in device list")
-		}
-		bson.Unmarshal(bsonBytes, &device)
-		devices[i] = device
-	}
-
-	return devices, int(count), nil
+	return res.Devices, res.TotalCount, nil
 }
 
 func (db *DataStoreMongo) GetDevice(ctx context.Context, id model.DeviceID) (*model.Device, error) {
@@ -289,76 +283,107 @@ func (db *DataStoreMongo) GetDevice(ctx context.Context, id model.DeviceID) (*mo
 	return &res, nil
 }
 
+// AddDevice inserts a new device, initializing the inventory data.
 func (db *DataStoreMongo) AddDevice(ctx context.Context, dev *model.Device) error {
-	c := db.client.Database(mstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
-	filter := bson.M{"_id": dev.ID}
-	update := makeAttrUpsert(dev.Attributes)
+	collDevs := db.client.
+		Database(mstore.DbFromContext(ctx, DbName)).
+		Collection(DbDevicesColl)
+	update, err := makeAttrUpsert(dev.Attributes)
+	if err != nil {
+		return err
+	}
 	now := time.Now()
-	update["updated_ts"] = now
-	update = bson.M{"$set": update,
-		"$setOnInsert": bson.M{"created_ts": now}}
-	l := log.FromContext(ctx)
-	l.Debugf("upserting: '%s'->'%s'.", filter, update)
-	res, err := c.UpdateOne(ctx, filter, update, options.Update().SetUpsert(true)) //this does not insert anything else than ID from model.Device
+	update["update_ts"] = now
+	update["created_ts"] = now
+	if dev.Group != "" {
+		update["group"] = dev.Group
+	}
+	updateOpts := mopts.Update()
+	updateOpts.SetUpsert(true)
+	_, err = collDevs.UpdateOne(
+		ctx,
+		bson.M{"_id": dev.ID},
+		bson.M{"$set": update},
+		updateOpts,
+	)
 	if err != nil {
 		return errors.Wrap(err, "failed to store device")
 	}
-	if res.ModifiedCount < 1 {
-		return errors.Wrap(err, "failed to store device")
-	} // to check the update count
 	return nil
 }
 
+// UpsertAttributes makes an upsert on the device's attributes.
 func (db *DataStoreMongo) UpsertAttributes(ctx context.Context, id model.DeviceID, attrs model.DeviceAttributes) error {
 	c := db.client.Database(mstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
 	filter := bson.M{"_id": id} // idDev}
-	update := makeAttrUpsert(attrs)
+	update, err := makeAttrUpsert(attrs)
+	if err != nil {
+		return err
+	}
 	now := time.Now()
 	update["updated_ts"] = now
-	update = bson.M{"$set": update,
-		"$setOnInsert": bson.M{"created_ts": now}}
-	_, err := c.UpdateOne(ctx, filter, update, options.Update().SetUpsert(true))
+	update = bson.M{
+		"$set":         update,
+		"$setOnInsert": bson.M{"created_ts": now},
+	}
+	_, err = c.UpdateOne(ctx, filter, update, mopts.Update().SetUpsert(true))
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-// prepare an attribute upsert doc based on DeviceAttributes map
-func makeAttrUpsert(attrs model.DeviceAttributes) map[string]interface{} {
+// makeAttrUpsert creates a new upsert document for the given attributes.
+func makeAttrUpsert(attrs model.DeviceAttributes) (bson.M, error) {
 	var fieldName string
-	upsert := map[string]interface{}{}
+	upsert := make(bson.M)
 
-	for name, a := range attrs {
-		if a.Scope != "" {
-			// prefix attribute name with a scope
-			name = fmt.Sprintf("%s-%s", a.Scope, name)
-			fieldName =
-				fmt.Sprintf("%s.%s.%s", DbDevAttributes, name, DbDevAttributesScope)
-			upsert[fieldName] = a.Scope
+	for i := range attrs {
+		if attrs[i].Name == "" {
+			return nil, store.ErrNoAttrName
+		}
+		if attrs[i].Scope == "" {
+			// Default to inventory scope
+			attrs[i].Scope = model.AttrScopeInventory
+		}
+		fieldPrefix := fmt.Sprintf("%s.%s-%s",
+			DbDevAttributes, attrs[i].Scope, attrs[i].Name,
+		)
+
+		fieldName = fmt.Sprintf(
+			"%s.%s",
+			fieldPrefix,
+			DbDevAttributesScope,
+		)
+		upsert[fieldName] = attrs[i].Scope
+
+		fieldName = fmt.Sprintf(
+			"%s.%s",
+			fieldPrefix,
+			DbDevAttributesName,
+		)
+		upsert[fieldName] = attrs[i].Name
+
+		if attrs[i].Value != nil {
+			fieldName = fmt.Sprintf(
+				"%s.%s",
+				fieldPrefix,
+				DbDevAttributesValue,
+			)
+			upsert[fieldName] = attrs[i].Value
 		}
 
-		if a.Description != nil {
-			fieldName =
-				fmt.Sprintf("%s.%s.%s", DbDevAttributes, name, DbDevAttributesDesc)
-			upsert[fieldName] = a.Description
+		if attrs[i].Description != nil {
+			fieldName = fmt.Sprintf(
+				"%s.%s",
+				fieldPrefix,
+				DbDevAttributesDesc,
+			)
+			upsert[fieldName] = attrs[i].Description
 
-		}
-
-		if a.Value != nil {
-			fieldName =
-				fmt.Sprintf("%s.%s.%s", DbDevAttributes, name, DbDevAttributesValue)
-			upsert[fieldName] = a.Value
-		}
-
-		if a.Name != "" {
-			fieldName =
-				fmt.Sprintf("%s.%s.%s", DbDevAttributes, name, "name")
-			upsert[fieldName] = a.Name
 		}
 	}
-
-	return upsert
+	return upsert, nil
 }
 
 func mongoOperator(co store.ComparisonOperator) string {
@@ -512,7 +537,7 @@ func (db *DataStoreMongo) GetAllAttributeNames(ctx context.Context) ([]string, e
 		"$group": bson.M{
 			"_id": nil,
 			"allkeys": bson.M{
-				"$addToSet": "$arrayofkeyvalue.k",
+				"$addToSet": "$arrayofkeyvalue.v.name",
 			},
 		},
 	}
@@ -523,6 +548,9 @@ func (db *DataStoreMongo) GetAllAttributeNames(ctx context.Context) ([]string, e
 		unwind,
 		group,
 	})
+	if err != nil {
+		return nil, err
+	}
 	defer cursor.Close(ctx)
 
 	cursor.Next(ctx)

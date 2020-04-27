@@ -26,6 +26,10 @@ var (
 	ErrDevNotFound = errors.New("Device not found")
 
 	ErrGroupNotFound = errors.New("group not found")
+
+	// ErrNoAttrName is return if attributes are attempted upserted without
+	// a Name identifier.
+	ErrNoAttrName = errors.New("attribute name not present")
 )
 
 type DataStore interface {

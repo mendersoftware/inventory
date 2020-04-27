@@ -31,11 +31,11 @@ func TestDeviceAttributesUnmarshal(t *testing.T) {
 	assert.NoError(t, err)
 
 	exp := DeviceAttributes{
-		"foo": {
+		{
 			Name:  "foo",
 			Value: "bar",
 		},
-		"baz": {
+		{
 			Name:  "baz",
 			Value: "zen",
 		},
@@ -47,11 +47,14 @@ func TestDeviceAttributesUnmarshal(t *testing.T) {
 func TestDeviceAttributesMarshal(t *testing.T) {
 
 	da := DeviceAttributes{
-		"foo": {
+		{
+			Name:  "foo",
+			Scope: "inventory",
 			Value: "bar",
 		},
-		"bar": {
+		{
 			Name:  "bar",
+			Scope: "inventory",
 			Value: []int{1, 2, 3},
 		},
 	}
@@ -59,16 +62,8 @@ func TestDeviceAttributesMarshal(t *testing.T) {
 	data, err := json.Marshal(&da)
 	assert.NoError(t, err)
 
-	// Map keys are retrieved in random order, hence the order of elements in the
-	// list may differ with each run, thus preventing us from using
-	// assert.JSONEq(). Since we're interested in how the output JSON is
-	// formatted, use 2 possible variants and check that the output matches at
-	// least one.
-	exp1 := `[{"name":"foo","value":"bar","scope":"inventory"},{"name":"bar","value":[1,2,3],"scope":"inventory"}]`
-	exp2 := `[{"name":"bar","value":[1,2,3],"scope":"inventory"},{"name":"foo","value":"bar","scope":"inventory"}]`
-	if string(data) != exp1 && string(data) != exp2 {
-		assert.Fail(t, "unexpected JSON marshal output, got:", string(data))
-	}
+	exp := `[{"name":"foo","value":"bar","scope":"inventory"},{"name":"bar","value":[1,2,3],"scope":"inventory"}]`
+	assert.JSONEq(t, string(data), exp)
 
 	var uda DeviceAttributes
 	json.Unmarshal(data, &da)
