@@ -42,7 +42,7 @@ import (
 //       That is, s/DbDevGroup/DbDevAttributesGroupName/
 
 const (
-	DbVersion = "0.2.0"
+	DbVersion = "0.3.0"
 
 	DbName        = "inventory"
 	DbDevicesColl = "devices"
@@ -615,6 +615,10 @@ func (db *DataStoreMongo) MigrateTenant(ctx context.Context, version string, ten
 
 	migrations := []migrate.Migration{
 		&migration_0_2_0{
+			ms:  db,
+			ctx: ctx,
+		},
+		&migration_0_3_0{
 			ms:  db,
 			ctx: ctx,
 		},

@@ -30,15 +30,8 @@ import (
 	"github.com/mendersoftware/inventory/model"
 )
 
-type legacyDevice struct {
-	ID         model.DeviceID                   `bson:"_id"`
-	Attributes map[string]model.DeviceAttribute `bson:",omitempty"`
-	Group      string                           `bson:"group,omitempty"`
-	CreatedTs  time.Time                        `bson:"created_ts,omitempty"`
-	UpdatedTs  time.Time                        `bson:"updated_ts,omitempty"`
-}
-
-func TestMigration_0_2_0(t *testing.T) {
+func TestMigration_0_3_0(t *testing.T) {
+	testTimestamp := time.Now()
 	cases := map[string]struct {
 		inDevs  []interface{}
 		outDevs []model.Device
@@ -54,12 +47,10 @@ func TestMigration_0_2_0(t *testing.T) {
 							Value:       "val3",
 							Description: strPtr("desc"),
 						},
-						"bar": {
-							Name:        "bar",
-							Value:       3.0,
-							Description: strPtr("desc"),
-						},
 					},
+					Group:     "foobar",
+					UpdatedTs: testTimestamp,
+					CreatedTs: testTimestamp,
 				},
 			},
 			outDevs: []model.Device{
@@ -71,14 +62,93 @@ func TestMigration_0_2_0(t *testing.T) {
 						Description: strPtr("desc"),
 						Scope:       model.AttrScopeInventory,
 					}, {
-						Name:        "bar",
-						Value:       3.0,
+						Name:  "created_ts",
+						Value: testTimestamp,
+						Scope: model.AttrScopeIdentity,
+					}, {
+						Name:  "updated_ts",
+						Value: testTimestamp,
+						Scope: model.AttrScopeIdentity,
+					}, {
+						Name:  "group",
+						Value: "foobar",
+						Scope: model.AttrScopeIdentity,
+					}},
+					Group: "foobar",
+				},
+			},
+		},
+		"one ungrouped and one grouped device": {
+			inDevs: []interface{}{
+				legacyDevice{
+					ID: model.DeviceID("1"),
+					Attributes: map[string]model.DeviceAttribute{
+						"foo": {
+							Name:        "foo",
+							Value:       "val3",
+							Description: strPtr("desc"),
+						},
+					},
+					Group:     "foobar",
+					UpdatedTs: testTimestamp,
+					CreatedTs: testTimestamp,
+				},
+				legacyDevice{
+					ID: model.DeviceID("2"),
+					Attributes: map[string]model.DeviceAttribute{
+						"foo": {
+							Name:        "foo",
+							Value:       "val3",
+							Description: strPtr("desc"),
+						},
+					},
+					UpdatedTs: testTimestamp,
+					CreatedTs: testTimestamp,
+				},
+			},
+			outDevs: []model.Device{
+				{
+					ID: model.DeviceID("1"),
+					Attributes: model.DeviceAttributes{{
+						Name:        "foo",
+						Value:       "val3",
 						Description: strPtr("desc"),
 						Scope:       model.AttrScopeInventory,
+					}, {
+						Name:  "created_ts",
+						Value: testTimestamp,
+						Scope: model.AttrScopeIdentity,
+					}, {
+						Name:  "updated_ts",
+						Value: testTimestamp,
+						Scope: model.AttrScopeIdentity,
+					}, {
+						Name:  "group",
+						Value: "foobar",
+						Scope: model.AttrScopeIdentity,
 					}},
-				}},
+					Group: "foobar",
+				}, {
+					ID: model.DeviceID("2"),
+					Attributes: model.DeviceAttributes{{
+						Name:        "foo",
+						Value:       "val3",
+						Description: strPtr("desc"),
+						Scope:       model.AttrScopeInventory,
+					}, {
+						Name:  "created_ts",
+						Value: testTimestamp,
+						Scope: model.AttrScopeIdentity,
+					}, {
+						Name:  "updated_ts",
+						Value: testTimestamp,
+						Scope: model.AttrScopeIdentity,
+					}},
+				},
+			},
 		},
-		"a couple devs, same attributes": {
+		"multiple devs, with tenant": {
+			tenant: "foobarbaz",
 			inDevs: []interface{}{
 				legacyDevice{
 					ID: model.DeviceID("1"),
@@ -88,125 +158,82 @@ func TestMigration_0_2_0(t *testing.T) {
 							Value:       "val3",
 							Description: strPtr("desc"),
 						},
-						"bar": {
-							Name:        "bar",
-							Value:       3.0,
-							Description: strPtr("desc"),
-						}},
+					},
+					Group:     "foobar",
+					UpdatedTs: testTimestamp,
+					CreatedTs: testTimestamp,
 				},
 				legacyDevice{
 					ID: model.DeviceID("2"),
-					Attributes: map[string]model.DeviceAttribute{
-						"foo2": {
-							Name:        "foo2",
-							Value:       "val32",
-							Description: strPtr("desc2"),
-						},
-						"bar2": {
-							Name:        "bar2",
-							Value:       2.0,
-							Description: strPtr("desc2"),
-						},
-					},
-				},
-			},
-			outDevs: []model.Device{
-				{
-					ID: model.DeviceID("1"),
-					Attributes: model.DeviceAttributes{
-						{
-							Name:        "foo",
-							Value:       "val3",
-							Description: strPtr("desc"),
-							Scope:       model.AttrScopeInventory,
-						},
-						{
-							Name:        "bar",
-							Value:       3.0,
-							Description: strPtr("desc"),
-							Scope:       model.AttrScopeInventory,
-						},
-					},
-				},
-				{
-					ID: model.DeviceID("2"),
-					Attributes: model.DeviceAttributes{
-						{
-							Name:        "foo2",
-							Value:       "val32",
-							Description: strPtr("desc2"),
-							Scope:       model.AttrScopeInventory,
-						},
-						{
-							Name:        "bar2",
-							Value:       2.0,
-							Description: strPtr("desc2"),
-							Scope:       model.AttrScopeInventory,
-						},
-					},
-				},
-			},
-		},
-		"a couple devs, diff attributes": {
-			inDevs: []interface{}{
-				legacyDevice{
-					ID: model.DeviceID("1"),
 					Attributes: map[string]model.DeviceAttribute{
 						"foo": {
 							Name:        "foo",
 							Value:       "val3",
 							Description: strPtr("desc"),
 						},
-						"bar": {
-							Name:        "bar",
-							Value:       3.0,
-							Description: strPtr("desc"),
-						},
 					},
+					UpdatedTs: testTimestamp,
+					CreatedTs: testTimestamp,
 				},
 				legacyDevice{
-					ID: model.DeviceID("2"),
-					Attributes: map[string]model.DeviceAttribute{
-						"baz": {
-							Name:        "baz",
-							Value:       "val",
-							Description: strPtr("desc"),
-						},
-					},
+					ID:        model.DeviceID("3"),
+					UpdatedTs: testTimestamp,
+					CreatedTs: testTimestamp,
 				},
 			},
 			outDevs: []model.Device{
 				{
 					ID: model.DeviceID("1"),
-					Attributes: model.DeviceAttributes{
-						{
-							Name:        "foo",
-							Value:       "val3",
-							Description: strPtr("desc"),
-							Scope:       model.AttrScopeInventory,
-						}, {
-							Name:        "bar",
-							Value:       3.0,
-							Description: strPtr("desc"),
-							Scope:       model.AttrScopeInventory,
-						},
-					},
-				},
-				{
+					Attributes: model.DeviceAttributes{{
+						Name:        "foo",
+						Value:       "val3",
+						Description: strPtr("desc"),
+						Scope:       model.AttrScopeInventory,
+					}, {
+						Name:  "created_ts",
+						Value: testTimestamp,
+						Scope: model.AttrScopeIdentity,
+					}, {
+						Name:  "updated_ts",
+						Value: testTimestamp,
+						Scope: model.AttrScopeIdentity,
+					}, {
+						Name:  "group",
+						Value: "foobar",
+						Scope: model.AttrScopeIdentity,
+					}},
+					Group: "foobar",
+				}, {
 					ID: model.DeviceID("2"),
-					Attributes: model.DeviceAttributes{
-						{
-							Name:        "baz",
-							Value:       "val",
-							Description: strPtr("desc"),
-							Scope:       model.AttrScopeInventory,
-						},
-					},
+					Attributes: model.DeviceAttributes{{
+						Name:        "foo",
+						Value:       "val3",
+						Description: strPtr("desc"),
+						Scope:       model.AttrScopeInventory,
+					}, {
+						Name:  "created_ts",
+						Value: testTimestamp,
+						Scope: model.AttrScopeIdentity,
+					}, {
+						Name:  "updated_ts",
+						Value: testTimestamp,
+						Scope: model.AttrScopeIdentity,
+					}},
+				}, {
+					ID: model.DeviceID("3"),
+					Attributes: model.DeviceAttributes{{
+						Name:  "created_ts",
+						Value: testTimestamp,
+						Scope: model.AttrScopeIdentity,
+					}, {
+						Name:  "updated_ts",
+						Value: testTimestamp,
+						Scope: model.AttrScopeIdentity,
+					}},
 				},
 			},
 		},
 	}
-
 	for n, tc := range cases {
 		t.Run(fmt.Sprintf("tc %s", n), func(t *testing.T) {
 			ctx := context.Background()
@@ -222,20 +249,27 @@ func TestMigration_0_2_0(t *testing.T) {
 			s := db.Client()
 			ds := NewDataStoreMongoWithSession(s).(*DataStoreMongo)
 
-			prep_0_1_0(t, ctx, ds)
-
-			mig_0_2_0 := migration_0_2_0{
-				ms:  ds,
-				ctx: ctx,
+			migrations := []migrate.Migration{
+				&migration_0_2_0{
+					ms:  ds,
+					ctx: ctx,
+				},
+				&migration_0_3_0{
+					ms:  ds,
+					ctx: ctx,
+				},
+			}
+			migrator := &migrate.SimpleMigrator{
+				Client:      s,
+				Db:          mstore.DbFromContext(ctx, DbName),
+				Automigrate: true,
 			}
 
 			c := s.Database(mstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
 			_, err := c.InsertMany(ctx, tc.inDevs)
 			assert.NoError(t, err)
 
-			//test
-			err = mig_0_2_0.Up(migrate.MakeVersion(0, 1, 0))
-
+			err = migrator.Apply(ctx, migrate.MakeVersion(0, 3, 0), migrations)
 			assert.NoError(t, err)
 
 			var dbdevs []*model.Device
@@ -247,22 +281,9 @@ func TestMigration_0_2_0(t *testing.T) {
 			assert.Len(t, dbdevs, len(tc.outDevs))
 
 			sort.Slice(dbdevs, func(i, j int) bool { return dbdevs[i].ID < dbdevs[j].ID })
-
 			for i := range dbdevs {
 				compareDevsWithoutTimestamps(t, &tc.outDevs[i], dbdevs[i])
 			}
 		})
 	}
-}
-
-func prep_0_1_0(t *testing.T, ctx context.Context, ds *DataStoreMongo) {
-	m := migrate.DummyMigrator{
-		Client:      ds.client,
-		Db:          mstore.DbFromContext(ctx, DbName),
-		Automigrate: true,
-	}
-
-	last := migrate.MakeVersion(0, 1, 0)
-	err := m.Apply(ctx, last, nil)
-	assert.NoError(t, err)
 }

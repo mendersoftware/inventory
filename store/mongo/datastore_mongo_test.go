@@ -2208,6 +2208,7 @@ func TestMigrate(t *testing.T) {
 
 			outVers: []string{
 				"0.2.0",
+				DbVersion,
 			},
 		},
 		"from 0.1.0 (first, dummy migration)": {
@@ -2217,12 +2218,13 @@ func TestMigrate(t *testing.T) {
 			outVers: []string{
 				"0.1.0",
 				"0.2.0",
+				DbVersion,
 			},
 		},
 		"from 0.1.0, no-automigrate": {
 			versionFrom: "0.0.0",
 
-			err: errors.New("failed to apply migrations: db needs migration: inventory has version 0.0.0, needs version 0.2.0"),
+			err: errors.New("failed to apply migrations: db needs migration: inventory has version 0.0.0, needs version " + DbVersion),
 		},
 		"with devices, from 0.1.0": {
 			versionFrom: "0.1.0",
@@ -2232,6 +2234,7 @@ func TestMigrate(t *testing.T) {
 			outVers: []string{
 				"0.1.0",
 				"0.2.0",
+				DbVersion,
 			},
 		},
 		"with devices, from 0.1.0, with tenant": {
@@ -2242,6 +2245,7 @@ func TestMigrate(t *testing.T) {
 
 			outVers: []string{
 				"0.2.0",
+				DbVersion,
 			},
 		},
 		"with devices, from 0.1.0, with tenant, other devs": {
@@ -2253,81 +2257,85 @@ func TestMigrate(t *testing.T) {
 			outVers: []string{
 				"0.1.0",
 				"0.2.0",
+				DbVersion,
 			},
 		},
 	}
 
 	for name, tc := range testCases {
-		t.Logf("case: %s", name)
-		db.Wipe()
+		t.Run(name, func(t *testing.T) {
+			db.Wipe()
 
-		client := db.Client()
+			client := db.Client()
 
-		var ctx context.Context
-		if tc.tenant != "" {
-			ctx = identity.WithContext(db.CTX(), &identity.Identity{
-				Tenant: tc.tenant,
-			})
-		} else {
-			ctx = identity.WithContext(db.CTX(), &identity.Identity{
-				Tenant: "",
-			})
-		}
-
-		store := NewDataStoreMongoWithSession(client)
-
-		if tc.automigrate {
-			store = store.WithAutomigrate()
-		}
-
-		// prep input data
-		// input migrations
-		if tc.versionFrom != "" {
-			v, err := migrate.NewVersion(tc.versionFrom)
-			assert.NoError(t, err)
-
-			entry := migrate.MigrationEntry{
-				Version: *v,
-			}
-			assert.NoError(t, err)
-
-			_, err = client.Database(mstore.DbFromContext(ctx, DbName)).
-				Collection(migrate.DbMigrationsColl).
-				InsertOne(ctx, entry)
-			assert.NoError(t, err)
-		}
-
-		// input devices
-		for _, d := range tc.inDevs {
-			err := store.AddDevice(ctx, &d)
-			assert.NoError(t, err)
-		}
-
-		err := store.Migrate(ctx, DbVersion)
-		if tc.err == nil {
-			assert.NoError(t, err)
-
-			// verify migration entries
-			var out []migrate.MigrationEntry
-			cursor, _ := client.Database(mstore.DbFromContext(ctx, DbName)).
-				Collection(migrate.DbMigrationsColl).
-				Find(ctx, bson.M{})
-
-			count := 0
-			for cursor.Next(db.CTX()) {
-				var res migrate.MigrationEntry
-				count++
-				err = cursor.Decode(&res)
-				out = append(out, res)
+			var ctx context.Context
+			if tc.tenant != "" {
+				ctx = identity.WithContext(db.CTX(), &identity.Identity{
+					Tenant: tc.tenant,
+				})
+			} else {
+				ctx = identity.WithContext(db.CTX(), &identity.Identity{
+					Tenant: "",
+				})
 			}
 
-			assert.Equal(t, len(tc.outVers), count)
-			for i, v := range tc.outVers {
-				assert.Equal(t, v, out[i].Version.String())
+			store := NewDataStoreMongoWithSession(client)
+
+			if tc.automigrate {
+				store = store.WithAutomigrate()
 			}
-		} else {
-			assert.EqualError(t, err, tc.err.Error())
-		}
+
+			// prep input data
+			// input migrations
+			if tc.versionFrom != "" {
+				v, err := migrate.NewVersion(tc.versionFrom)
+				assert.NoError(t, err)
+
+				entry := migrate.MigrationEntry{
+					Version: *v,
+				}
+				assert.NoError(t, err)
+
+				_, err = client.
+					Database(mstore.DbFromContext(ctx, DbName)).
+					Collection(migrate.DbMigrationsColl).
+					InsertOne(ctx, entry)
+				assert.NoError(t, err)
+			}
+
+			// input devices
+			for _, d := range tc.inDevs {
+				err := store.AddDevice(ctx, &d)
+				assert.NoError(t, err)
+			}
+
+			err := store.Migrate(ctx, DbVersion)
+			if tc.err == nil {
+				assert.NoError(t, err)
+
+				// verify migration entries
+				var out []migrate.MigrationEntry
+				cursor, _ := client.
+					Database(mstore.DbFromContext(ctx, DbName)).
+					Collection(migrate.DbMigrationsColl).
+					Find(ctx, bson.M{})
+
+				count := 0
+				for cursor.Next(db.CTX()) {
+					var res migrate.MigrationEntry
+					count++
+					err = cursor.Decode(&res)
+					out = append(out, res)
+				}
+
+				assert.Equal(t, len(tc.outVers), count)
+				for i, v := range tc.outVers {
+					assert.Equal(t, v, out[i].Version.String())
+				}
+			} else {
+				assert.EqualError(t, err, tc.err.Error())
+			}
+		})
 	}
 }
 

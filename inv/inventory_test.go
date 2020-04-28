@@ -26,6 +26,7 @@ import (
 	"github.com/mendersoftware/inventory/model"
 	"github.com/mendersoftware/inventory/store"
 	mstore "github.com/mendersoftware/inventory/store/mocks"
+	"github.com/mendersoftware/inventory/store/mongo"
 )
 
 func invForTest(d store.DataStore) InventoryApp {
@@ -637,7 +638,9 @@ func TestUserAdmCreateTenant(t *testing.T) {
 			ctx := context.Background()
 
 			tenantDb := &mstore.DataStore{}
-			tenantDb.On("MigrateTenant", ctx, "0.2.0", tc.tenant).Return(tc.tenantErr)
+			tenantDb.On("MigrateTenant",
+				ctx, mongo.DbVersion, tc.tenant).
+				Return(tc.tenantErr)
 			tenantDb.On("WithAutomigrate").Return(tenantDb)
 
 			useradm := NewInventory(tenantDb)
