@@ -19,7 +19,6 @@ import (
 	"crypto/tls"
 	"fmt"
 	"io"
-
 	"strings"
 	"sync"
 	"time"
@@ -39,6 +38,9 @@ import (
 	"github.com/mendersoftware/inventory/store"
 )
 
+// TODO: next micro-release prune all deprecated group references.
+//       That is, s/DbDevGroup/DbDevAttributesGroupName/
+
 const (
 	DbVersion = "0.2.0"
 
@@ -52,6 +54,10 @@ const (
 	DbDevAttributesValue = "value"
 	DbDevAttributesScope = "scope"
 	DbDevAttributesName  = "name"
+	DbDevAttributesGroup = DbDevAttributes + "." +
+		model.AttrScopeIdentity + "-" + DbDevGroup
+	DbDevAttributesGroupName = DbDevAttributesGroup + "." +
+		DbDevAttributesValue
 
 	DbScopeInventory = "inventory"
 )
@@ -177,11 +183,15 @@ func (db *DataStoreMongo) GetDevices(ctx context.Context, q store.ListQuery) ([]
 	}
 	groupFilter := bson.M{}
 	if q.GroupName != "" {
-		groupFilter = bson.M{DbDevGroup: q.GroupName}
+		groupFilter = bson.M{DbDevAttributesGroupName: q.GroupName}
 	}
 	groupExistenceFilter := bson.M{}
 	if q.HasGroup != nil {
-		groupExistenceFilter = bson.M{DbDevGroup: bson.M{"$exists": *q.HasGroup}}
+		groupExistenceFilter = bson.M{
+			DbDevAttributesGroup: bson.M{
+				"$exists": *q.HasGroup,
+			},
+		}
 	}
 	filter := bson.M{
 		"$match": bson.M{
@@ -285,27 +295,14 @@ func (db *DataStoreMongo) GetDevice(ctx context.Context, id model.DeviceID) (*mo
 
 // AddDevice inserts a new device, initializing the inventory data.
 func (db *DataStoreMongo) AddDevice(ctx context.Context, dev *model.Device) error {
-	collDevs := db.client.
-		Database(mstore.DbFromContext(ctx, DbName)).
-		Collection(DbDevicesColl)
-	update, err := makeAttrUpsert(dev.Attributes)
-	if err != nil {
-		return err
-	}
-	now := time.Now()
-	update["update_ts"] = now
-	update["created_ts"] = now
 	if dev.Group != "" {
-		update["group"] = dev.Group
+		dev.Attributes = append(dev.Attributes, model.DeviceAttribute{
+			Scope: "identity",
+			Name:  "group",
+			Value: dev.Group,
+		})
 	}
-	updateOpts := mopts.Update()
-	updateOpts.SetUpsert(true)
-	_, err = collDevs.UpdateOne(
-		ctx,
-		bson.M{"_id": dev.ID},
-		bson.M{"$set": update},
-		updateOpts,
-	)
+	err := db.UpsertAttributes(ctx, dev.ID, dev.Attributes)
 	if err != nil {
 		return errors.Wrap(err, "failed to store device")
 	}
@@ -314,17 +311,28 @@ func (db *DataStoreMongo) AddDevice(ctx context.Context, dev *model.Device) erro
 
 // UpsertAttributes makes an upsert on the device's attributes.
 func (db *DataStoreMongo) UpsertAttributes(ctx context.Context, id model.DeviceID, attrs model.DeviceAttributes) error {
+	const identityScope = DbDevAttributes + "." + model.AttrScopeIdentity
 	c := db.client.Database(mstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
-	filter := bson.M{"_id": id} // idDev}
+	filter := bson.M{"_id": id}
 	update, err := makeAttrUpsert(attrs)
 	if err != nil {
 		return err
 	}
 	now := time.Now()
-	update["updated_ts"] = now
+	update[identityScope+"-update_ts"] = model.DeviceAttribute{
+		Scope: "identity",
+		Name:  "updated_ts",
+		Value: now,
+	}
 	update = bson.M{
-		"$set":         update,
-		"$setOnInsert": bson.M{"created_ts": now},
+		"$set": update,
+		"$setOnInsert": bson.M{
+			identityScope + "-created_ts": model.DeviceAttribute{
+				Scope: "identity",
+				Name:  "created_ts",
+				Value: now,
+			},
+		},
 	}
 	_, err = c.UpdateOne(ctx, filter, update, mopts.Update().SetUpsert(true))
 	if err != nil {
@@ -395,27 +403,28 @@ func mongoOperator(co store.ComparisonOperator) string {
 }
 
 func (db *DataStoreMongo) UnsetDeviceGroup(ctx context.Context, id model.DeviceID, groupName model.GroupName) error {
+	// TODO: next micro-release: s/DbDevGroup/DbDevAttributesGroup/
 	c := db.client.Database(mstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
 
 	filter := bson.M{
-		"_id":   id,
-		"group": groupName,
+		"_id":      id,
+		DbDevGroup: groupName,
 	}
 	update := bson.M{
 		"$unset": bson.M{
-			"group": 1,
+			DbDevGroup:           1, // TODO: remove me next micro-release
+			DbDevAttributesGroup: 1,
 		},
 	}
 
-	res, err := c.UpdateMany(ctx, filter, update) //Update one or update many?
+	res, err := c.UpdateMany(ctx, filter, update)
 	if err != nil {
 		return err
 	}
-	if res.ModifiedCount > 0 {
-		return nil
-	} else {
+	if res.ModifiedCount <= 0 {
 		return store.ErrDevNotFound
-	} // to check the update count
+	}
+	return nil
 }
 
 func (db *DataStoreMongo) UpdateDeviceGroup(ctx context.Context, devId model.DeviceID, newGroup model.GroupName) error {
@@ -425,7 +434,14 @@ func (db *DataStoreMongo) UpdateDeviceGroup(ctx context.Context, devId model.Dev
 		"_id": devId,
 	}
 	update := bson.M{
-		"$set": &model.Device{Group: newGroup},
+		"$set": bson.M{
+			DbDevAttributesGroup: model.DeviceAttribute{
+				Scope: model.AttrScopeIdentity,
+				Name:  DbDevGroup,
+				Value: newGroup,
+			},
+			DbDevGroup: newGroup, // TODO: remove me next micro-release
+		},
 	}
 
 	res, err := c.UpdateOne(ctx, filter, update)
@@ -441,10 +457,13 @@ func (db *DataStoreMongo) UpdateDeviceGroup(ctx context.Context, devId model.Dev
 }
 
 func (db *DataStoreMongo) ListGroups(ctx context.Context) ([]model.GroupName, error) {
+	// TODO: next micro-release: s/DbDevGroup/DbDevAttributesGroupName/
 	c := db.client.Database(mstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
 
-	filter := bson.M{"group": bson.M{"$exists": true}}
-	results, err := c.Distinct(ctx, "group", filter)
+	filter := bson.M{DbDevGroup: bson.M{"$exists": true}}
+	results, err := c.Distinct(
+		ctx, DbDevGroup, filter,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -457,6 +476,7 @@ func (db *DataStoreMongo) ListGroups(ctx context.Context) ([]model.GroupName, er
 }
 
 func (db *DataStoreMongo) GetDevicesByGroup(ctx context.Context, group model.GroupName, skip, limit int) ([]model.DeviceID, int, error) {
+	// TODO: next micro-release: s/DbDevGroup/DbDevAttributesGroupName/
 	c := db.client.Database(mstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
 
 	filter := bson.M{DbDevGroup: group}
@@ -495,9 +515,6 @@ func (db *DataStoreMongo) GetDeviceGroup(ctx context.Context, id model.DeviceID)
 	dev, err := db.GetDevice(ctx, id)
 	if err != nil || dev == nil {
 		return "", store.ErrDevNotFound
-	}
-	if err != nil || dev == nil {
-		return "", errors.Wrap(err, "failed to get device")
 	}
 
 	return dev.Group, nil

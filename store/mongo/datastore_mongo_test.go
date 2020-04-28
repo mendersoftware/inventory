@@ -265,10 +265,7 @@ func TestMongoGetDevices(t *testing.T) {
 			assert.NoError(t, err, "failed to get devices")
 
 			assert.Equal(t, tc.devTotal, totalCount)
-			if !assert.Equal(t, len(tc.expected), len(devs)) {
-				time.Sleep(10 * time.Minute)
-			}
-
+			assert.Equal(t, len(tc.expected), len(devs))
 		})
 	}
 }
@@ -294,7 +291,7 @@ func TestMongoGetAllAttributeNames(t *testing.T) {
 					},
 				},
 			},
-			outAttrs: []string{"mac", "sn"},
+			outAttrs: []string{"mac", "sn", "updated_ts", "created_ts"},
 		},
 		"two devs, non-overlapping attrs": {
 			inDevs: []model.Device{
@@ -313,7 +310,7 @@ func TestMongoGetAllAttributeNames(t *testing.T) {
 					},
 				},
 			},
-			outAttrs: []string{"mac", "sn", "foo", "bar"},
+			outAttrs: []string{"mac", "sn", "foo", "bar", "updated_ts", "created_ts"},
 		},
 		"two devs, overlapping attrs": {
 			inDevs: []model.Device{
@@ -333,7 +330,7 @@ func TestMongoGetAllAttributeNames(t *testing.T) {
 					},
 				},
 			},
-			outAttrs: []string{"mac", "sn", "foo", "bar"},
+			outAttrs: []string{"mac", "sn", "foo", "bar", "updated_ts", "created_ts"},
 		},
 		"single dev, tenant": {
 			inDevs: []model.Device{
@@ -345,7 +342,7 @@ func TestMongoGetAllAttributeNames(t *testing.T) {
 					},
 				},
 			},
-			outAttrs: []string{"mac", "sn"},
+			outAttrs: []string{"mac", "sn", "updated_ts", "created_ts"},
 			tenant:   "tenant1",
 		},
 		"no devs": {
@@ -679,9 +676,8 @@ func TestMongoAddDevice(t *testing.T) {
 		}
 
 		c := client.Database(mstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
-		result, err := c.InsertOne(ctx, existing)
+		_, err := c.InsertOne(ctx, existing)
 		assert.NoError(t, err)
-		_ = result.InsertedID.(string)
 
 		err = store.AddDevice(ctx, testCase.InputDevice)
 
@@ -703,18 +699,26 @@ func TestMongoAddDevice(t *testing.T) {
 func compareDevsWithoutTimestamps(t *testing.T, expected, actual *model.Device) {
 	assert.Equal(t, expected.ID, actual.ID)
 	// Sort attribute slices (we don't care about ordering
-	sortAttrs := func(attrs model.DeviceAttributes) {
+	filterAndSortAttrs := func(attrs model.DeviceAttributes) model.DeviceAttributes {
+		for i := 0; i < len(attrs); i++ {
+			switch attrs[i].Name {
+			case "updated_ts", "created_ts":
+				attrs = append(attrs[:i], attrs[i+1:]...)
+				i--
+			}
+		}
 		sort.Slice(attrs, func(i, j int) bool {
 			if attrs[i].Scope == attrs[j].Scope {
 				return attrs[i].Name < attrs[j].Name
 			}
 			return attrs[i].Scope < attrs[j].Scope
 		})
+		return attrs
 	}
-	sortAttrs(expected.Attributes)
-	sortAttrs(actual.Attributes)
-	if !reflect.DeepEqual(expected.Attributes, actual.Attributes) {
-		assert.FailNow(t, "", "attributes not equal: %v \n%v\n", expected, actual)
+	expectedAttrs := filterAndSortAttrs(expected.Attributes)
+	actualAttrs := filterAndSortAttrs(actual.Attributes)
+	if !reflect.DeepEqual(expectedAttrs, actualAttrs) {
+		assert.FailNow(t, "", "attributes not equal; expected: %v \nactual: %v\n", expectedAttrs, actualAttrs)
 	}
 	assert.Equal(t, expected.Group, actual.Group)
 }
@@ -1292,13 +1296,12 @@ func TestMongoUpsertAttributes(t *testing.T) {
 			})
 		}
 
-		for _, d := range tc.devs {
-			_, err := s.Database(mstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl).InsertOne(ctx, d)
-			assert.NoError(t, err, "failed to setup input data")
-		}
-
 		//test
 		d := NewDataStoreMongoWithSession(s)
+		for _, dev := range tc.devs {
+			err := d.AddDevice(ctx, &dev)
+			assert.NoError(t, err, "failed to setup input data")
+		}
 
 		err := d.UpsertAttributes(ctx, tc.inDevId, tc.inAttrs)
 		assert.NoError(t, err, "UpsertAttributes failed")
@@ -1308,12 +1311,13 @@ func TestMongoUpsertAttributes(t *testing.T) {
 		err = DeviceFindById(ctx, s.Database(DbName).Collection(DbDevicesColl), tc.inDevId, &dev)
 		assert.NoError(t, err, "error getting device")
 
-		if !compare(dev.Attributes, tc.outAttrs) {
+		if !compareAttrsWithoutTimestamp(dev.Attributes, tc.outAttrs) {
 			t.Errorf("attributes mismatch, have: %v\nwant: %v", dev.Attributes, tc.outAttrs)
 		}
 
 		//check timestamp validity
 		//note that mongo stores time with lower precision- custom comparison
+		t.Log(dev.UpdatedTs)
 		assert.Condition(t,
 			func() bool {
 				return dev.UpdatedTs.After(dev.CreatedTs) ||
@@ -1420,7 +1424,9 @@ func TestMongoUpdateDeviceGroup(t *testing.T) {
 			for cursor.Next(db.CTX()) {
 				count++
 			}
-			assert.Equal(t, 1, count)
+			if !assert.Equal(t, 1, count) {
+				time.Sleep(time.Minute)
+			}
 		}
 	}
 }
@@ -1433,13 +1439,23 @@ func boolPtr(b bool) *bool {
 	return &b
 }
 
-func compare(a, b model.DeviceAttributes) bool {
-	if len(a) != len(b) {
-		return false
-	}
-
-	for k, va := range a {
-		vb := b[k]
+func compareAttrsWithoutTimestamp(a, b model.DeviceAttributes) bool {
+	la := len(a)
+	lb := len(b)
+	var i, j int
+	for i < la && j < lb {
+		va := a[i]
+		switch va.Name {
+		case "created_ts", "updated_ts":
+			i++
+			continue
+		}
+		vb := b[j]
+		switch vb.Name {
+		case "created_ts", "updated_ts":
+			j++
+			continue
+		}
 
 		if !reflect.DeepEqual(va.Value, vb.Value) {
 			return false
@@ -1448,6 +1464,8 @@ func compare(a, b model.DeviceAttributes) bool {
 		if !reflect.DeepEqual(va.Description, vb.Description) {
 			return false
 		}
+		i++
+		j++
 	}
 
 	return true
@@ -2061,25 +2079,24 @@ func TestGetDeviceGroup(t *testing.T) {
 
 	db.Wipe()
 	client := db.Client()
-
-	for _, d := range inputDevices {
-		_, err := client.Database(DbName).Collection(DbDevicesColl).InsertOne(db.CTX(), d)
+	store := NewDataStoreMongoWithSession(client)
+	for _, dev := range inputDevices {
+		err := store.AddDevice(db.CTX(), &dev)
 		assert.NoError(t, err, "failed to setup input data")
 	}
 
 	for name, tc := range testCases {
-		t.Logf("test case: %s", name)
-
-		store := NewDataStoreMongoWithSession(client)
-
-		group, err := store.GetDeviceGroup(db.CTX(), tc.InputDeviceID)
-
-		if tc.OutputError != nil {
-			assert.EqualError(t, err, tc.OutputError.Error())
-		} else {
-			assert.NoError(t, err, "expected no error")
-			assert.Equal(t, tc.OutputGroup, group)
-		}
+		t.Run(name, func(t *testing.T) {
+			group, err := store.GetDeviceGroup(
+				db.CTX(), tc.InputDeviceID,
+			)
+			if tc.OutputError != nil {
+				assert.EqualError(t, err, tc.OutputError.Error())
+			} else {
+				assert.NoError(t, err, "expected no error")
+				assert.Equal(t, tc.OutputGroup, group)
+			}
+		})
 	}
 }
 

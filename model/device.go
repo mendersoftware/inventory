@@ -122,6 +122,41 @@ type Device struct {
 	UpdatedTs time.Time `json:"updated_ts" bson:"updated_ts,omitempty"`
 }
 
+// internalDevice is only used internally to avoid recursive type-loops for
+// member functions.
+type internalDevice Device
+
+func (d *Device) UnmarshalBSON(b []byte) error {
+	if err := bson.Unmarshal(b, (*internalDevice)(d)); err != nil {
+		return err
+	}
+	for _, attr := range d.Attributes {
+		if attr.Scope == "identity" {
+			switch attr.Name {
+			case "group":
+				group, _ := attr.Value.(string)
+				d.Group = GroupName(group)
+			case "updated_ts":
+				d.UpdatedTs, _ = attr.Value.(time.Time)
+			case "created_ts":
+				d.CreatedTs, _ = attr.Value.(time.Time)
+			}
+		}
+	}
+	return nil
+}
+
+func (d Device) MarshalBSON() ([]byte, error) {
+	if d.Group != "" {
+		d.Attributes = append(d.Attributes, DeviceAttribute{
+			Scope: AttrScopeIdentity,
+			Name:  "group",
+			Value: d.Group,
+		})
+	}
+	return bson.Marshal(internalDevice(d))
+}
+
 func (d Device) Validate() error {
 	return validation.ValidateStruct(&d,
 		validation.Field(&d.ID, validation.Required, validation.Length(1, 1024)),
