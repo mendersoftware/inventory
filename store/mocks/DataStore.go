@@ -1,4 +1,4 @@
-// Copyright 2019 Northern.tech AS
+// Copyright 2020 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -227,6 +227,36 @@ func (_m *DataStore) MigrateTenant(ctx context.Context, version string, tenantId
 	}
 
 	return r0
+}
+
+// SearchDevices provides a mock function with given fields: ctx, searchParams
+func (_m *DataStore) SearchDevices(ctx context.Context, searchParams model.SearchParams) ([]model.Device, int, error) {
+	ret := _m.Called(ctx, searchParams)
+
+	var r0 []model.Device
+	if rf, ok := ret.Get(0).(func(context.Context, model.SearchParams) []model.Device); ok {
+		r0 = rf(ctx, searchParams)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]model.Device)
+		}
+	}
+
+	var r1 int
+	if rf, ok := ret.Get(1).(func(context.Context, model.SearchParams) int); ok {
+		r1 = rf(ctx, searchParams)
+	} else {
+		r1 = ret.Get(1).(int)
+	}
+
+	var r2 error
+	if rf, ok := ret.Get(2).(func(context.Context, model.SearchParams) error); ok {
+		r2 = rf(ctx, searchParams)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
 // UnsetDeviceGroup provides a mock function with given fields: ctx, id, groupName

@@ -651,3 +651,55 @@ func TestUserAdmCreateTenant(t *testing.T) {
 		})
 	}
 }
+
+func TestInventorySearchDevices(t *testing.T) {
+	t.Parallel()
+
+	testCases := map[string]struct {
+		searchParams   model.SearchParams
+		datastoreError error
+		outError       error
+		outDevices     []model.Device
+		outDeviceCount int
+	}{
+		"ok": {
+			searchParams:   model.SearchParams{},
+			datastoreError: nil,
+			outError:       nil,
+			outDevices:     []model.Device{{ID: model.DeviceID("1")}},
+			outDeviceCount: 1,
+		},
+		"datastore error": {
+			searchParams:   model.SearchParams{},
+			datastoreError: errors.New("db connection failed"),
+			outError:       errors.New("failed to fetch devices: db connection failed"),
+			outDevices:     nil,
+			outDeviceCount: -1,
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Logf("test case: %s", name)
+
+		ctx := context.Background()
+
+		db := &mstore.DataStore{}
+		db.On("SearchDevices",
+			ctx,
+			mock.AnythingOfType("model.SearchParams"),
+		).Return(tc.outDevices, tc.outDeviceCount, tc.datastoreError)
+		i := invForTest(db)
+
+		devs, totalCount, err := i.SearchDevices(ctx, tc.searchParams)
+
+		if tc.outError != nil {
+			if assert.Error(t, err) {
+				assert.EqualError(t, err, tc.outError.Error())
+			}
+		} else {
+			assert.NoError(t, err)
+			assert.Equal(t, len(devs), len(tc.outDevices))
+			assert.Equal(t, totalCount, tc.outDeviceCount)
+		}
+	}
+}

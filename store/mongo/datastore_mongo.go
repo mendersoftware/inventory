@@ -546,6 +546,61 @@ func (db *DataStoreMongo) GetAllAttributeNames(ctx context.Context) ([]string, e
 	return attributeNames, nil
 }
 
+func (db *DataStoreMongo) SearchDevices(ctx context.Context, searchParams model.SearchParams) ([]model.Device, int, error) {
+	c := db.client.Database(mstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
+
+	queryFilters := make([]bson.M, 0)
+	for _, filter := range searchParams.Filters {
+		op := filter.Type
+		name := fmt.Sprintf("%s-%s", filter.Scope, filter.Attribute)
+		field := fmt.Sprintf("%s.%s.%s", DbDevAttributes, name, DbDevAttributesValue)
+		queryFilters = append(queryFilters, bson.M{field: bson.M{op: filter.Value}})
+	}
+
+	// FIXME: remove after migrating ids to attributes
+	if len(searchParams.DeviceIDs) > 0 {
+		queryFilters = append(queryFilters, bson.M{"_id": bson.M{"$in": searchParams.DeviceIDs}})
+	}
+
+	findQuery := bson.M{}
+	if len(queryFilters) > 0 {
+		findQuery["$and"] = queryFilters
+	}
+
+	findOptions := &options.FindOptions{}
+	findOptions.SetSkip(int64((searchParams.Page - 1) * searchParams.PerPage))
+	findOptions.SetLimit(int64(searchParams.PerPage))
+
+	if len(searchParams.Sort) > 0 {
+		sortField := bson.M{}
+		for _, sortQ := range searchParams.Sort {
+			name := fmt.Sprintf("%s-%s", sortQ.Scope, sortQ.Attribute)
+			field := fmt.Sprintf("%s.%s.%s", DbDevAttributes, name, DbDevAttributesValue)
+			sortField[field] = 1
+			if sortQ.Order == "desc" {
+				sortField[field] = -1
+			}
+		}
+		findOptions.SetSort(sortField)
+	}
+
+	cursor, err := c.Find(ctx, findQuery, findOptions)
+	if err != nil {
+		return nil, -1, errors.Wrap(err, "failed to search devices")
+	}
+	defer cursor.Close(ctx)
+
+	devices := []model.Device{}
+
+	if err = cursor.All(ctx, &devices); err != nil {
+		return nil, -1, errors.Wrap(err, "failed to search devices")
+	}
+
+	count, err := c.CountDocuments(ctx, findQuery)
+
+	return devices, int(count), nil
+}
+
 func (db *DataStoreMongo) MigrateTenant(ctx context.Context, version string, tenantId string) error {
 	l := log.FromContext(ctx)
 
