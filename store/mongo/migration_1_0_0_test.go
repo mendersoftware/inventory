@@ -30,7 +30,7 @@ import (
 	"github.com/mendersoftware/inventory/model"
 )
 
-func TestMigration_0_3_0(t *testing.T) {
+func TestMigration_1_0_0(t *testing.T) {
 	testTimestamp := time.Now()
 	cases := map[string]struct {
 		inDevs  []interface{}
@@ -254,7 +254,7 @@ func TestMigration_0_3_0(t *testing.T) {
 					ms:  ds,
 					ctx: ctx,
 				},
-				&migration_0_3_0{
+				&migration_1_0_0{
 					ms:  ds,
 					ctx: ctx,
 				},
@@ -269,7 +269,7 @@ func TestMigration_0_3_0(t *testing.T) {
 			_, err := c.InsertMany(ctx, tc.inDevs)
 			assert.NoError(t, err)
 
-			err = migrator.Apply(ctx, migrate.MakeVersion(0, 3, 0), migrations)
+			err = migrator.Apply(ctx, migrate.MakeVersion(1, 0, 0), migrations)
 			assert.NoError(t, err)
 
 			var dbdevs []*model.Device

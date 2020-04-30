@@ -18,79 +18,62 @@ import (
 	"context"
 
 	"go.mongodb.org/mongo-driver/bson"
-	mopts "go.mongodb.org/mongo-driver/mongo/options"
 
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
 	mstore "github.com/mendersoftware/go-lib-micro/store"
 	"github.com/mendersoftware/inventory/model"
 )
 
-type migration_0_3_0 struct {
+type migration_1_0_0 struct {
 	ms  *DataStoreMongo
 	ctx context.Context
 }
 
 // Up creates timestamp and group attributes under the identity scope.
 // The values reflect the values previously held in the root of the document.
-func (m *migration_0_3_0) Up(from migrate.Version) error {
+func (m *migration_1_0_0) Up(from migrate.Version) error {
 	const identityScope = DbDevAttributes + "." + model.AttrScopeIdentity
 
 	databaseName := mstore.DbFromContext(m.ctx, DbName)
 	collDevs := m.ms.client.Database(databaseName).Collection(DbDevicesColl)
-	upsertOpts := mopts.Update().SetUpsert(true)
 
-	// Add timestamp attributes to the identity scope
-	cursor, err := collDevs.Find(m.ctx, bson.M{})
+	// Move timestamps to identity scope.
+	_, err := collDevs.UpdateMany(m.ctx, bson.M{}, bson.M{
+		"$rename": bson.M{
+			"created_ts": identityScope + "-created_ts.value",
+			"updated_ts": identityScope + "-updated_ts.value",
+		},
+		"$set": bson.M{
+			identityScope +
+				"-created_ts.name": "created_ts",
+			identityScope +
+				"-created_ts.scope": model.AttrScopeIdentity,
+			identityScope +
+				"-updated_ts.name": "updated_ts",
+			identityScope +
+				"-updated_ts.scope": model.AttrScopeIdentity,
+		},
+	})
 	if err != nil {
-		return err
-	}
-	defer cursor.Close(m.ctx)
-	for cursor.Next(m.ctx) {
-		var dev model.Device
-		err := cursor.Decode(&dev)
-		if err != nil {
-			return err
-		}
-		dev.Attributes = append(dev.Attributes,
-			model.DeviceAttribute{
-				Name:  "created_ts",
-				Value: dev.CreatedTs,
-				Scope: model.AttrScopeIdentity,
-			},
-			model.DeviceAttribute{
-				Name:  "updated_ts",
-				Value: dev.UpdatedTs,
-				Scope: model.AttrScopeIdentity,
-			},
-		)
-		if dev.Group != "" {
-			dev.Attributes = append(dev.Attributes,
-				model.DeviceAttribute{
-					Name:  DbDevGroup,
-					Value: dev.Group,
-					Scope: model.AttrScopeIdentity,
-				},
-			)
-		}
-		upsert, err := makeAttrUpsert(dev.Attributes)
-		if err != nil {
-			return err
-		}
-
-		_, err = collDevs.UpdateOne(
-			m.ctx,
-			bson.M{"_id": dev.ID},
-			bson.M{"$set": upsert},
-			upsertOpts,
-		)
-		if err != nil {
-			return err
-		}
+		return nil
 	}
 
-	return nil
+	// For devices in a group: move to attribute.
+	_, err = collDevs.UpdateMany(
+		m.ctx,
+		bson.M{DbDevGroup: bson.M{"$exists": true}},
+		bson.M{
+			"$rename": bson.M{DbDevGroup: DbDevAttributesGroupValue},
+			"$set": bson.M{
+				DbDevAttributesGroup + "." +
+					DbDevAttributesName: DbDevGroup,
+				DbDevAttributesGroup + "." +
+					DbDevAttributesScope: model.AttrScopeIdentity,
+			},
+		})
+	return err
 }
 
-func (m *migration_0_3_0) Version() migrate.Version {
-	return migrate.MakeVersion(0, 3, 0)
+func (m *migration_1_0_0) Version() migrate.Version {
+	return migrate.MakeVersion(1, 0, 0)
 }

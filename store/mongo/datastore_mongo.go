@@ -38,11 +38,8 @@ import (
 	"github.com/mendersoftware/inventory/store"
 )
 
-// TODO: next micro-release prune all deprecated group references.
-//       That is, s/DbDevGroup/DbDevAttributesGroupName/
-
 const (
-	DbVersion = "0.3.0"
+	DbVersion = "1.0.0"
 
 	DbName        = "inventory"
 	DbDevicesColl = "devices"
@@ -56,7 +53,7 @@ const (
 	DbDevAttributesName  = "name"
 	DbDevAttributesGroup = DbDevAttributes + "." +
 		model.AttrScopeIdentity + "-" + DbDevGroup
-	DbDevAttributesGroupName = DbDevAttributesGroup + "." +
+	DbDevAttributesGroupValue = DbDevAttributesGroup + "." +
 		DbDevAttributesValue
 
 	DbScopeInventory = "inventory"
@@ -183,7 +180,7 @@ func (db *DataStoreMongo) GetDevices(ctx context.Context, q store.ListQuery) ([]
 	}
 	groupFilter := bson.M{}
 	if q.GroupName != "" {
-		groupFilter = bson.M{DbDevAttributesGroupName: q.GroupName}
+		groupFilter = bson.M{DbDevAttributesGroupValue: q.GroupName}
 	}
 	groupExistenceFilter := bson.M{}
 	if q.HasGroup != nil {
@@ -403,16 +400,16 @@ func mongoOperator(co store.ComparisonOperator) string {
 }
 
 func (db *DataStoreMongo) UnsetDeviceGroup(ctx context.Context, id model.DeviceID, groupName model.GroupName) error {
-	// TODO: next micro-release: s/DbDevGroup/DbDevAttributesGroup/
-	c := db.client.Database(mstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
+	c := db.client.
+		Database(mstore.DbFromContext(ctx, DbName)).
+		Collection(DbDevicesColl)
 
 	filter := bson.M{
-		"_id":      id,
-		DbDevGroup: groupName,
+		"_id":                     id,
+		DbDevAttributesGroupValue: groupName,
 	}
 	update := bson.M{
 		"$unset": bson.M{
-			DbDevGroup:           1, // TODO: remove me next micro-release
 			DbDevAttributesGroup: 1,
 		},
 	}
@@ -440,7 +437,6 @@ func (db *DataStoreMongo) UpdateDeviceGroup(ctx context.Context, devId model.Dev
 				Name:  DbDevGroup,
 				Value: newGroup,
 			},
-			DbDevGroup: newGroup, // TODO: remove me next micro-release
 		},
 	}
 
@@ -457,12 +453,13 @@ func (db *DataStoreMongo) UpdateDeviceGroup(ctx context.Context, devId model.Dev
 }
 
 func (db *DataStoreMongo) ListGroups(ctx context.Context) ([]model.GroupName, error) {
-	// TODO: next micro-release: s/DbDevGroup/DbDevAttributesGroupName/
-	c := db.client.Database(mstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
+	c := db.client.
+		Database(mstore.DbFromContext(ctx, DbName)).
+		Collection(DbDevicesColl)
 
-	filter := bson.M{DbDevGroup: bson.M{"$exists": true}}
+	filter := bson.M{DbDevAttributesGroupValue: bson.M{"$exists": true}}
 	results, err := c.Distinct(
-		ctx, DbDevGroup, filter,
+		ctx, DbDevAttributesGroupValue, filter,
 	)
 	if err != nil {
 		return nil, err
@@ -476,10 +473,11 @@ func (db *DataStoreMongo) ListGroups(ctx context.Context) ([]model.GroupName, er
 }
 
 func (db *DataStoreMongo) GetDevicesByGroup(ctx context.Context, group model.GroupName, skip, limit int) ([]model.DeviceID, int, error) {
-	// TODO: next micro-release: s/DbDevGroup/DbDevAttributesGroupName/
-	c := db.client.Database(mstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
+	c := db.client.
+		Database(mstore.DbFromContext(ctx, DbName)).
+		Collection(DbDevicesColl)
 
-	filter := bson.M{DbDevGroup: group}
+	filter := bson.M{DbDevAttributesGroupValue: group}
 	result := c.FindOne(ctx, filter)
 	if result == nil {
 		return nil, -1, store.ErrGroupNotFound
@@ -618,7 +616,7 @@ func (db *DataStoreMongo) MigrateTenant(ctx context.Context, version string, ten
 			ms:  db,
 			ctx: ctx,
 		},
-		&migration_0_3_0{
+		&migration_1_0_0{
 			ms:  db,
 			ctx: ctx,
 		},

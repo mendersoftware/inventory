@@ -698,7 +698,7 @@ func TestMongoAddDevice(t *testing.T) {
 
 func compareDevsWithoutTimestamps(t *testing.T, expected, actual *model.Device) {
 	assert.Equal(t, expected.ID, actual.ID)
-	// Sort attribute slices (we don't care about ordering
+	// Sort attribute slices (we don't care about ordering)
 	filterAndSortAttrs := func(attrs model.DeviceAttributes) model.DeviceAttributes {
 		for i := 0; i < len(attrs); i++ {
 			switch attrs[i].Name {
@@ -718,9 +718,12 @@ func compareDevsWithoutTimestamps(t *testing.T, expected, actual *model.Device) 
 	expectedAttrs := filterAndSortAttrs(expected.Attributes)
 	actualAttrs := filterAndSortAttrs(actual.Attributes)
 	if !reflect.DeepEqual(expectedAttrs, actualAttrs) {
-		assert.FailNow(t, "", "attributes not equal; expected: %v \nactual: %v\n", expectedAttrs, actualAttrs)
+		assert.FailNow(
+			t, "",
+			"attributes not equal; expected: %v \nactual: %v\n",
+			expectedAttrs, actualAttrs,
+		)
 	}
-	assert.Equal(t, expected.Group, actual.Group)
 }
 
 func TestNewDataStoreMongo(t *testing.T) {
@@ -1417,7 +1420,9 @@ func TestMongoUpdateDeviceGroup(t *testing.T) {
 			assert.NoError(t, err, "expected no error")
 
 			groupsColl := client.Database(mstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
-			cursor, err := groupsColl.Find(ctx, bson.M{"group": model.GroupName("abc")})
+			cursor, err := groupsColl.Find(ctx, bson.M{
+				DbDevAttributesGroupValue: model.GroupName("abc"),
+			})
 			assert.NoError(t, err, "expected no error")
 
 			count := 0
@@ -1567,7 +1572,8 @@ func TestMongoUnsetDevicesGroupWithGroupName(t *testing.T) {
 			assert.NoError(t, err, "expected no error")
 
 			groupsColl := client.Database(mstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
-			cursor, err := groupsColl.Find(ctx, bson.M{"group": model.GroupName("e16c71ec")})
+			cursor, err := groupsColl.Find(ctx, bson.M{
+				DbDevAttributesGroupValue: model.GroupName("e16c71ec")})
 			assert.NoError(t, err, "expected no error")
 
 			count := 0
