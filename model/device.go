@@ -27,6 +27,7 @@ import (
 const (
 	AttrScopeInventory = "inventory"
 	AttrScopeIdentity  = "identity"
+	AttrScopeSystem    = "system"
 )
 
 type DeviceID string
@@ -131,7 +132,7 @@ func (d *Device) UnmarshalBSON(b []byte) error {
 		return err
 	}
 	for _, attr := range d.Attributes {
-		if attr.Scope == "identity" {
+		if attr.Scope == AttrScopeSystem {
 			switch attr.Name {
 			case "group":
 				group, _ := attr.Value.(string)
@@ -149,7 +150,7 @@ func (d *Device) UnmarshalBSON(b []byte) error {
 func (d Device) MarshalBSON() ([]byte, error) {
 	if d.Group != "" {
 		d.Attributes = append(d.Attributes, DeviceAttribute{
-			Scope: AttrScopeIdentity,
+			Scope: AttrScopeSystem,
 			Name:  "group",
 			Value: d.Group,
 		})

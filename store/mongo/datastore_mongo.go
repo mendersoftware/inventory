@@ -52,7 +52,7 @@ const (
 	DbDevAttributesScope = "scope"
 	DbDevAttributesName  = "name"
 	DbDevAttributesGroup = DbDevAttributes + "." +
-		model.AttrScopeIdentity + "-" + DbDevGroup
+		model.AttrScopeSystem + "-" + DbDevGroup
 	DbDevAttributesGroupValue = DbDevAttributesGroup + "." +
 		DbDevAttributesValue
 
@@ -261,29 +261,25 @@ func (db *DataStoreMongo) GetDevices(ctx context.Context, q store.ListQuery) ([]
 	return res.Devices, res.TotalCount, nil
 }
 
-func (db *DataStoreMongo) GetDevice(ctx context.Context, id model.DeviceID) (*model.Device, error) {
-	c := db.client.Database(mstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
-
-	l := log.FromContext(ctx)
+func (db *DataStoreMongo) GetDevice(
+	ctx context.Context,
+	id model.DeviceID,
+) (*model.Device, error) {
 	var res model.Device
+	c := db.client.
+		Database(mstore.DbFromContext(ctx, DbName)).
+		Collection(DbDevicesColl)
+	l := log.FromContext(ctx)
 
 	if id == model.NilDeviceID {
 		return nil, nil
 	}
-	cursor, err := c.Find(ctx, bson.M{DbDevId: id})
-	if err != nil {
-		l.Errorf("GetDevice returns '%s'", err.Error())
-		return nil, err
-	}
-
-	cursor.Next(ctx)
-	err = cursor.Decode(&res)
-	if err != nil {
-		if err == io.EOF {
-			l.Errorf("GetDevice returns nil,nil")
+	if err := c.FindOne(ctx, bson.M{DbDevId: id}).Decode(&res); err != nil {
+		switch err {
+		case mongo.ErrNoDocuments:
 			return nil, nil
-		} else {
-			l.Errorf("GetDevice returns nil,'%v' 'failed to fetch device'", err)
+		default:
+			l.Errorf("GetDevice: %v", err)
 			return nil, errors.Wrap(err, "failed to fetch device")
 		}
 	}
@@ -294,7 +290,7 @@ func (db *DataStoreMongo) GetDevice(ctx context.Context, id model.DeviceID) (*mo
 func (db *DataStoreMongo) AddDevice(ctx context.Context, dev *model.Device) error {
 	if dev.Group != "" {
 		dev.Attributes = append(dev.Attributes, model.DeviceAttribute{
-			Scope: "identity",
+			Scope: model.AttrScopeSystem,
 			Name:  "group",
 			Value: dev.Group,
 		})
@@ -308,7 +304,7 @@ func (db *DataStoreMongo) AddDevice(ctx context.Context, dev *model.Device) erro
 
 // UpsertAttributes makes an upsert on the device's attributes.
 func (db *DataStoreMongo) UpsertAttributes(ctx context.Context, id model.DeviceID, attrs model.DeviceAttributes) error {
-	const identityScope = DbDevAttributes + "." + model.AttrScopeIdentity
+	const systemScope = DbDevAttributes + "." + model.AttrScopeSystem
 	c := db.client.Database(mstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
 	filter := bson.M{"_id": id}
 	update, err := makeAttrUpsert(attrs)
@@ -316,16 +312,16 @@ func (db *DataStoreMongo) UpsertAttributes(ctx context.Context, id model.DeviceI
 		return err
 	}
 	now := time.Now()
-	update[identityScope+"-update_ts"] = model.DeviceAttribute{
-		Scope: "identity",
+	update[systemScope+"-update_ts"] = model.DeviceAttribute{
+		Scope: model.AttrScopeSystem,
 		Name:  "updated_ts",
 		Value: now,
 	}
 	update = bson.M{
 		"$set": update,
 		"$setOnInsert": bson.M{
-			identityScope + "-created_ts": model.DeviceAttribute{
-				Scope: "identity",
+			systemScope + "-created_ts": model.DeviceAttribute{
+				Scope: model.AttrScopeSystem,
 				Name:  "created_ts",
 				Value: now,
 			},
@@ -433,7 +429,7 @@ func (db *DataStoreMongo) UpdateDeviceGroup(ctx context.Context, devId model.Dev
 	update := bson.M{
 		"$set": bson.M{
 			DbDevAttributesGroup: model.DeviceAttribute{
-				Scope: model.AttrScopeIdentity,
+				Scope: model.AttrScopeSystem,
 				Name:  DbDevGroup,
 				Value: newGroup,
 			},

@@ -2100,7 +2100,9 @@ func TestGetDeviceGroup(t *testing.T) {
 				assert.EqualError(t, err, tc.OutputError.Error())
 			} else {
 				assert.NoError(t, err, "expected no error")
-				assert.Equal(t, tc.OutputGroup, group)
+				if !assert.Equal(t, tc.OutputGroup, group) {
+					time.Sleep(time.Minute * 5)
+				}
 			}
 		})
 	}

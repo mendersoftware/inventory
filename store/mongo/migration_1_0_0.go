@@ -32,7 +32,7 @@ type migration_1_0_0 struct {
 // Up creates timestamp and group attributes under the identity scope.
 // The values reflect the values previously held in the root of the document.
 func (m *migration_1_0_0) Up(from migrate.Version) error {
-	const identityScope = DbDevAttributes + "." + model.AttrScopeIdentity
+	const systemScope = DbDevAttributes + "." + model.AttrScopeSystem
 
 	databaseName := mstore.DbFromContext(m.ctx, DbName)
 	collDevs := m.ms.client.Database(databaseName).Collection(DbDevicesColl)
@@ -40,18 +40,18 @@ func (m *migration_1_0_0) Up(from migrate.Version) error {
 	// Move timestamps to identity scope.
 	_, err := collDevs.UpdateMany(m.ctx, bson.M{}, bson.M{
 		"$rename": bson.M{
-			"created_ts": identityScope + "-created_ts.value",
-			"updated_ts": identityScope + "-updated_ts.value",
+			"created_ts": systemScope + "-created_ts.value",
+			"updated_ts": systemScope + "-updated_ts.value",
 		},
 		"$set": bson.M{
-			identityScope +
+			systemScope +
 				"-created_ts.name": "created_ts",
-			identityScope +
-				"-created_ts.scope": model.AttrScopeIdentity,
-			identityScope +
+			systemScope +
+				"-created_ts.scope": model.AttrScopeSystem,
+			systemScope +
 				"-updated_ts.name": "updated_ts",
-			identityScope +
-				"-updated_ts.scope": model.AttrScopeIdentity,
+			systemScope +
+				"-updated_ts.scope": model.AttrScopeSystem,
 		},
 	})
 	if err != nil {
