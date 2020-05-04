@@ -1645,6 +1645,822 @@ func TestApiInventoryInternalDevicesStatus(t *testing.T) {
 	}
 }
 
+func TestApiInventorySearchDevices(t *testing.T) {
+	t.Parallel()
+	rest.ErrorFieldName = "error"
+
+	testCases := map[string]struct {
+		listDevicesNum  int
+		listDevicesErr  error
+		listDeviceTotal int
+		inReq           *http.Request
+		resp            utils.JSONResponseParams
+	}{
+		"valid pagination, no next page": {
+			listDevicesNum:  5,
+			listDevicesErr:  nil,
+			listDeviceTotal: 20,
+			inReq: test.MakeSimpleRequest("POST",
+				"http://1.2.3.4/api/management/v2/inventory/filters/search",
+				model.SearchParams{
+					Page:    4,
+					PerPage: 5,
+				},
+			),
+			resp: utils.JSONResponseParams{
+				OutputStatus:     200,
+				OutputBodyObject: mockListDevices(5),
+				OutputHeaders: map[string][]string{
+					hdrTotalCount: {"20"},
+				},
+			},
+		},
+		"valid pagination, with next page": {
+			listDevicesNum:  5,
+			listDevicesErr:  nil,
+			listDeviceTotal: 21,
+			inReq: test.MakeSimpleRequest("POST",
+				"http://1.2.3.4/api/management/v2/inventory/filters/search",
+				model.SearchParams{
+					Page:    4,
+					PerPage: 5,
+				},
+			),
+			resp: utils.JSONResponseParams{
+				OutputStatus:     200,
+				OutputBodyObject: mockListDevices(5),
+				OutputHeaders: map[string][]string{
+					hdrTotalCount: {"21"},
+				},
+			},
+		},
+		"valid filter and sort": {
+			listDevicesNum:  5,
+			listDevicesErr:  nil,
+			listDeviceTotal: 21,
+			inReq: test.MakeSimpleRequest("POST",
+				"http://1.2.3.4/api/management/v2/inventory/filters/search",
+				model.SearchParams{
+					Page:    4,
+					PerPage: 5,
+					Filters: []model.FilterPredicate{
+						model.FilterPredicate{
+							Scope:     "inventory",
+							Attribute: "foo",
+							Type:      "$eq",
+							Value:     "bar",
+						},
+						model.FilterPredicate{
+							Scope:     "inventory",
+							Attribute: "foo1",
+							Type:      "$eq",
+							Value:     "baz",
+						},
+					},
+					Sort: []model.SortCriteria{
+						model.SortCriteria{
+							Scope:     "inventory",
+							Attribute: "foo",
+							Order:     "asc",
+						},
+						model.SortCriteria{
+							Scope:     "inventory",
+							Attribute: "foo1",
+							Order:     "desc",
+						},
+					},
+				},
+			),
+			resp: utils.JSONResponseParams{
+				OutputStatus:     200,
+				OutputBodyObject: mockListDevices(5),
+				OutputHeaders: map[string][]string{
+					hdrTotalCount: {"21"},
+				},
+			},
+		},
+		"invalid filter": {
+			listDevicesNum:  5,
+			listDevicesErr:  nil,
+			listDeviceTotal: 21,
+			inReq: test.MakeSimpleRequest("POST",
+				"http://1.2.3.4/api/management/v2/inventory/filters/search",
+				model.SearchParams{
+					Page:    4,
+					PerPage: 5,
+					Filters: []model.FilterPredicate{
+						model.FilterPredicate{},
+						model.FilterPredicate{
+							Scope:     "inventory",
+							Attribute: "foo1",
+							Type:      "$eq",
+							Value:     "baz",
+						},
+					},
+					Sort: []model.SortCriteria{
+						model.SortCriteria{
+							Scope:     "inventory",
+							Attribute: "foo",
+							Order:     "asc",
+						},
+						model.SortCriteria{
+							Scope:     "inventory",
+							Attribute: "foo1",
+							Order:     "desc",
+						},
+					},
+				},
+			),
+			resp: utils.JSONResponseParams{
+				OutputStatus:     400,
+				OutputBodyObject: RestError("attribute: cannot be blank; scope: cannot be blank; type: cannot be blank; value: is required."),
+				OutputHeaders:    nil,
+			},
+		},
+		"invalid sort": {
+			listDevicesNum:  5,
+			listDevicesErr:  nil,
+			listDeviceTotal: 21,
+			inReq: test.MakeSimpleRequest("POST",
+				"http://1.2.3.4/api/management/v2/inventory/filters/search",
+				model.SearchParams{
+					Page:    4,
+					PerPage: 5,
+					Filters: []model.FilterPredicate{
+						model.FilterPredicate{
+							Scope:     "inventory",
+							Attribute: "foo",
+							Type:      "$eq",
+							Value:     "bar",
+						},
+						model.FilterPredicate{
+							Scope:     "inventory",
+							Attribute: "foo1",
+							Type:      "$eq",
+							Value:     "baz",
+						},
+					},
+					Sort: []model.SortCriteria{
+						model.SortCriteria{},
+						model.SortCriteria{
+							Scope:     "inventory",
+							Attribute: "foo1",
+							Order:     "desc",
+						},
+					},
+				},
+			),
+			resp: utils.JSONResponseParams{
+				OutputStatus:     400,
+				OutputBodyObject: RestError("attribute: cannot be blank; order: cannot be blank; scope: cannot be blank."),
+				OutputHeaders:    nil,
+			},
+		},
+		"inventory error": {
+			listDevicesNum:  5,
+			listDevicesErr:  errors.New("inventory error"),
+			listDeviceTotal: 21,
+			inReq: test.MakeSimpleRequest("POST",
+				"http://1.2.3.4/api/management/v2/inventory/filters/search",
+				model.SearchParams{
+					Page:    4,
+					PerPage: 5,
+					Filters: []model.FilterPredicate{
+						model.FilterPredicate{
+							Scope:     "inventory",
+							Attribute: "foo",
+							Type:      "$eq",
+							Value:     "bar",
+						},
+						model.FilterPredicate{
+							Scope:     "inventory",
+							Attribute: "foo1",
+							Type:      "$eq",
+							Value:     "baz",
+						},
+					},
+					Sort: []model.SortCriteria{
+						model.SortCriteria{
+							Scope:     "inventory",
+							Attribute: "foo",
+							Order:     "asc",
+						},
+						model.SortCriteria{
+							Scope:     "inventory",
+							Attribute: "foo1",
+							Order:     "desc",
+						},
+					},
+				},
+			),
+			resp: utils.JSONResponseParams{
+				OutputStatus:     500,
+				OutputBodyObject: RestError("internal error"),
+				OutputHeaders:    nil,
+			},
+		},
+		"inventory error, BadValue": {
+			listDevicesNum:  5,
+			listDevicesErr:  errors.New("inventory error: BadValue"),
+			listDeviceTotal: 21,
+			inReq: test.MakeSimpleRequest("POST",
+				"http://1.2.3.4/api/management/v2/inventory/filters/search",
+				model.SearchParams{
+					Page:    4,
+					PerPage: 5,
+					Filters: []model.FilterPredicate{
+						model.FilterPredicate{
+							Scope:     "inventory",
+							Attribute: "foo",
+							Type:      "$eq",
+							Value:     "bar",
+						},
+						model.FilterPredicate{
+							Scope:     "inventory",
+							Attribute: "foo1",
+							Type:      "$eq",
+							Value:     "baz",
+						},
+					},
+					Sort: []model.SortCriteria{
+						model.SortCriteria{
+							Scope:     "inventory",
+							Attribute: "foo",
+							Order:     "asc",
+						},
+						model.SortCriteria{
+							Scope:     "inventory",
+							Attribute: "foo1",
+							Order:     "desc",
+						},
+					},
+				},
+			),
+			resp: utils.JSONResponseParams{
+				OutputStatus:     400,
+				OutputBodyObject: RestError("inventory error: BadValue"),
+				OutputHeaders:    nil,
+			},
+		},
+		"valid": {
+			listDevicesNum:  5,
+			listDevicesErr:  nil,
+			listDeviceTotal: 21,
+			inReq: test.MakeSimpleRequest("POST",
+				"http://1.2.3.4/api/management/v2/inventory/filters/search",
+				model.SearchParams{
+					Page:    4,
+					PerPage: 5,
+					Filters: []model.FilterPredicate{
+						model.FilterPredicate{
+							Scope:     "inventory",
+							Attribute: "foo",
+							Type:      "$eq",
+							Value:     "bar",
+						},
+						model.FilterPredicate{
+							Scope:     "inventory",
+							Attribute: "foo1",
+							Type:      "$eq",
+							Value:     "baz",
+						},
+					},
+					Sort: []model.SortCriteria{
+						model.SortCriteria{
+							Scope:     "inventory",
+							Attribute: "foo",
+							Order:     "asc",
+						},
+						model.SortCriteria{
+							Scope:     "inventory",
+							Attribute: "foo1",
+							Order:     "desc",
+						},
+					},
+				},
+			),
+			resp: utils.JSONResponseParams{
+				OutputStatus:     200,
+				OutputBodyObject: mockListDevices(5),
+				OutputHeaders: map[string][]string{
+					hdrTotalCount: {"21"},
+				},
+			},
+		},
+	}
+
+	for name, testCase := range testCases {
+		t.Logf("test case: %s", name)
+		inv := minventory.InventoryApp{}
+
+		ctx := contextMatcher()
+
+		inv.On("SearchDevices",
+			ctx,
+			mock.AnythingOfType("model.SearchParams"),
+		).Return(mockListDevices(testCase.listDevicesNum), testCase.listDeviceTotal, testCase.listDevicesErr)
+
+		apih := makeMockApiHandler(t, &inv)
+
+		runTestRequest(t, apih, testCase.inReq, testCase.resp)
+	}
+}
+
+func TestApiParseSearchParams(t *testing.T) {
+	t.Parallel()
+
+	testCases := map[string]struct {
+		inReq        *http.Request
+		searchParams *model.SearchParams
+		err          error
+	}{
+		"ok": {
+			inReq: test.MakeSimpleRequest("POST",
+				"http://1.2.3.4/api/management/v2/inventory/filters/search",
+				model.SearchParams{
+					Page:    4,
+					PerPage: 5,
+					Filters: []model.FilterPredicate{
+						model.FilterPredicate{
+							Scope:     "inventory",
+							Attribute: "foo",
+							Type:      "$eq",
+							Value:     "bar",
+						},
+						model.FilterPredicate{
+							Scope:     "inventory",
+							Attribute: "foo1",
+							Type:      "$eq",
+							Value:     "baz",
+						},
+					},
+					Sort: []model.SortCriteria{
+						model.SortCriteria{
+							Scope:     "inventory",
+							Attribute: "foo",
+							Order:     "asc",
+						},
+						model.SortCriteria{
+							Scope:     "inventory",
+							Attribute: "foo1",
+							Order:     "desc",
+						},
+					},
+				},
+			),
+			searchParams: &model.SearchParams{
+				Page:    4,
+				PerPage: 5,
+				Filters: []model.FilterPredicate{
+					model.FilterPredicate{
+						Scope:     "inventory",
+						Attribute: "foo",
+						Type:      "$eq",
+						Value:     "bar",
+					},
+					model.FilterPredicate{
+						Scope:     "inventory",
+						Attribute: "foo1",
+						Type:      "$eq",
+						Value:     "baz",
+					},
+				},
+				Sort: []model.SortCriteria{
+					model.SortCriteria{
+						Scope:     "inventory",
+						Attribute: "foo",
+						Order:     "asc",
+					},
+					model.SortCriteria{
+						Scope:     "inventory",
+						Attribute: "foo1",
+						Order:     "desc",
+					},
+				},
+			},
+		},
+		"ok: all filter types and sort orders": {
+			inReq: test.MakeSimpleRequest("POST",
+				"http://1.2.3.4/api/management/v2/inventory/filters/search",
+				model.SearchParams{
+					Page:    4,
+					PerPage: 5,
+					Filters: []model.FilterPredicate{
+						model.FilterPredicate{
+							Scope:     "inventory",
+							Attribute: "foo",
+							Type:      "$eq",
+							Value:     "bar",
+						},
+						model.FilterPredicate{
+							Scope:     "inventory",
+							Attribute: "foo1",
+							Type:      "$eq",
+							Value:     5,
+						},
+					},
+					Sort: []model.SortCriteria{
+						model.SortCriteria{
+							Scope:     "inventory",
+							Attribute: "foo",
+							Order:     "asc",
+						},
+						model.SortCriteria{
+							Scope:     "inventory",
+							Attribute: "foo1",
+							Order:     "desc",
+						},
+					},
+				},
+			),
+			searchParams: &model.SearchParams{
+				Page:    4,
+				PerPage: 5,
+				Filters: []model.FilterPredicate{
+					model.FilterPredicate{
+						Scope:     "inventory",
+						Attribute: "foo",
+						Type:      "$eq",
+						Value:     "bar",
+					},
+					model.FilterPredicate{
+						Scope:     "inventory",
+						Attribute: "foo1",
+						Type:      "$eq",
+						Value:     float64(5),
+					},
+				},
+				Sort: []model.SortCriteria{
+					model.SortCriteria{
+						Scope:     "inventory",
+						Attribute: "foo",
+						Order:     "asc",
+					},
+					model.SortCriteria{
+						Scope:     "inventory",
+						Attribute: "foo1",
+						Order:     "desc",
+					},
+				},
+			},
+		},
+		"invalid Page and perPage": {
+			inReq: test.MakeSimpleRequest("POST",
+				"http://1.2.3.4/api/management/v2/inventory/filters/search",
+				model.SearchParams{
+					Page:    -3,
+					PerPage: 0,
+					Filters: []model.FilterPredicate{
+						model.FilterPredicate{
+							Scope:     "inventory",
+							Attribute: "foo",
+							Type:      "$eq",
+							Value:     "bar",
+						},
+					},
+					Sort: []model.SortCriteria{
+						model.SortCriteria{
+							Scope:     "inventory",
+							Attribute: "foo",
+							Order:     "asc",
+						},
+					},
+				},
+			),
+			searchParams: &model.SearchParams{
+				Page:    utils.PageDefault,
+				PerPage: utils.PerPageDefault,
+				Filters: []model.FilterPredicate{
+					model.FilterPredicate{
+						Scope:     "inventory",
+						Attribute: "foo",
+						Type:      "$eq",
+						Value:     "bar",
+					},
+				},
+				Sort: []model.SortCriteria{
+					model.SortCriteria{
+						Scope:     "inventory",
+						Attribute: "foo",
+						Order:     "asc",
+					},
+				},
+			},
+		},
+		"wrong sort order": {
+			inReq: test.MakeSimpleRequest("POST",
+				"http://1.2.3.4/api/management/v2/inventory/filters/search",
+				model.SearchParams{
+					Page:    4,
+					PerPage: 5,
+					Sort: []model.SortCriteria{
+						model.SortCriteria{
+							Scope:     "inventory",
+							Attribute: "foo",
+							Order:     "foo",
+						},
+						model.SortCriteria{
+							Scope:     "inventory",
+							Attribute: "foo1",
+							Order:     "desc",
+						},
+					},
+				},
+			),
+			err: errors.New("order: must be a valid value."),
+		},
+		"wrong filter type": {
+			inReq: test.MakeSimpleRequest("POST",
+				"http://1.2.3.4/api/management/v2/inventory/filters/search",
+				model.SearchParams{
+					Page:    4,
+					PerPage: 5,
+					Filters: []model.FilterPredicate{
+						model.FilterPredicate{
+							Scope:     "inventory",
+							Attribute: "foo",
+							Type:      "$eq",
+							Value:     "bar",
+						},
+						model.FilterPredicate{
+							Scope:     "inventory",
+							Attribute: "foo1",
+							Type:      "$neq",
+							Value:     "baz",
+						},
+					},
+				},
+			),
+			err: errors.New("type: must be a valid value."),
+		},
+		"invalid JSON": {
+			inReq: test.MakeSimpleRequest("POST",
+				"http://1.2.3.4/api/management/v2/inventory/filters/search",
+				"invalid json",
+			),
+			err: errors.New("failed to decode request body: json: cannot unmarshal string into Go value of type model.SearchParams"),
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(fmt.Sprintf("test case: %s", name), func(t *testing.T) {
+			req := rest.Request{Request: tc.inReq}
+			params, err := parseSearchParams(&req)
+			if tc.err != nil {
+				assert.EqualError(t, tc.err, err.Error())
+			} else {
+				assert.NoError(t, err)
+				assert.NotNil(t, params)
+				assert.NotEmpty(t, params)
+
+				assert.Equal(t, tc.searchParams, params)
+			}
+		})
+	}
+}
+
+func TestApiInventoryInternalSearchDevices(t *testing.T) {
+	t.Parallel()
+	rest.ErrorFieldName = "error"
+
+	testCases := map[string]struct {
+		listDevicesNum  int
+		listDevicesErr  error
+		listDeviceTotal int
+		inReq           *http.Request
+		resp            utils.JSONResponseParams
+	}{
+		"valid filter and sort": {
+			listDevicesNum:  5,
+			listDevicesErr:  nil,
+			listDeviceTotal: 21,
+			inReq: test.MakeSimpleRequest("POST",
+				"http://1.2.3.4/api/internal/v2/inventory/tenants/foo/filters/search",
+				model.SearchParams{
+					Page:    4,
+					PerPage: 5,
+					Filters: []model.FilterPredicate{
+						model.FilterPredicate{
+							Scope:     "inventory",
+							Attribute: "foo",
+							Type:      "$eq",
+							Value:     "bar",
+						},
+						model.FilterPredicate{
+							Scope:     "inventory",
+							Attribute: "foo1",
+							Type:      "$eq",
+							Value:     "baz",
+						},
+					},
+					Sort: []model.SortCriteria{
+						model.SortCriteria{
+							Scope:     "inventory",
+							Attribute: "foo",
+							Order:     "asc",
+						},
+						model.SortCriteria{
+							Scope:     "inventory",
+							Attribute: "foo1",
+							Order:     "desc",
+						},
+					},
+				},
+			),
+			resp: utils.JSONResponseParams{
+				OutputStatus:     200,
+				OutputBodyObject: mockListDevices(5),
+				OutputHeaders: map[string][]string{
+					hdrTotalCount: {"21"},
+				},
+			},
+		},
+		"invalid filter": {
+			listDevicesNum:  5,
+			listDevicesErr:  nil,
+			listDeviceTotal: 21,
+			inReq: test.MakeSimpleRequest("POST",
+				"http://1.2.3.4/api/internal/v2/inventory/tenants/foo/filters/search",
+				model.SearchParams{
+					Page:    4,
+					PerPage: 5,
+					Filters: []model.FilterPredicate{
+						model.FilterPredicate{},
+						model.FilterPredicate{
+							Scope:     "inventory",
+							Attribute: "foo1",
+							Type:      "$eq",
+							Value:     "baz",
+						},
+					},
+					Sort: []model.SortCriteria{
+						model.SortCriteria{
+							Scope:     "inventory",
+							Attribute: "foo",
+							Order:     "asc",
+						},
+						model.SortCriteria{
+							Scope:     "inventory",
+							Attribute: "foo1",
+							Order:     "desc",
+						},
+					},
+				},
+			),
+			resp: utils.JSONResponseParams{
+				OutputStatus:     400,
+				OutputBodyObject: RestError("attribute: cannot be blank; scope: cannot be blank; type: cannot be blank; value: is required."),
+				OutputHeaders:    nil,
+			},
+		},
+		"no tenant id": {
+			listDevicesNum:  5,
+			listDevicesErr:  nil,
+			listDeviceTotal: 21,
+			inReq: test.MakeSimpleRequest("POST",
+				"http://1.2.3.4/api/internal/v2/inventory/tenants//filters/search",
+				model.SearchParams{
+					Page:    4,
+					PerPage: 5,
+					Filters: []model.FilterPredicate{
+						model.FilterPredicate{
+							Scope:     "inventory",
+							Attribute: "foo",
+							Type:      "$eq",
+							Value:     "bar",
+						},
+						model.FilterPredicate{
+							Scope:     "inventory",
+							Attribute: "foo1",
+							Type:      "$eq",
+							Value:     "baz",
+						},
+					},
+					Sort: []model.SortCriteria{
+						model.SortCriteria{
+							Scope:     "inventory",
+							Attribute: "foo",
+							Order:     "asc",
+						},
+						model.SortCriteria{
+							Scope:     "inventory",
+							Attribute: "foo1",
+							Order:     "desc",
+						},
+					},
+				},
+			),
+			resp: utils.JSONResponseParams{
+				OutputStatus:     400,
+				OutputBodyObject: RestError("tenant_id not provided"),
+				OutputHeaders:    nil,
+			},
+		},
+		"inventory error": {
+			listDevicesNum:  5,
+			listDevicesErr:  errors.New("inventory error"),
+			listDeviceTotal: 21,
+			inReq: test.MakeSimpleRequest("POST",
+				"http://1.2.3.4/api/internal/v2/inventory/tenants/foo/filters/search",
+				model.SearchParams{
+					Page:    4,
+					PerPage: 5,
+					Filters: []model.FilterPredicate{
+						model.FilterPredicate{
+							Scope:     "inventory",
+							Attribute: "foo",
+							Type:      "$eq",
+							Value:     "bar",
+						},
+						model.FilterPredicate{
+							Scope:     "inventory",
+							Attribute: "foo1",
+							Type:      "$eq",
+							Value:     "baz",
+						},
+					},
+					Sort: []model.SortCriteria{
+						model.SortCriteria{
+							Scope:     "inventory",
+							Attribute: "foo",
+							Order:     "asc",
+						},
+						model.SortCriteria{
+							Scope:     "inventory",
+							Attribute: "foo1",
+							Order:     "desc",
+						},
+					},
+				},
+			),
+			resp: utils.JSONResponseParams{
+				OutputStatus:     500,
+				OutputBodyObject: RestError("internal error"),
+				OutputHeaders:    nil,
+			},
+		},
+		"inventory error, BadValue": {
+			listDevicesNum:  5,
+			listDevicesErr:  errors.New("inventory error: BadValue"),
+			listDeviceTotal: 21,
+			inReq: test.MakeSimpleRequest("POST",
+				"http://1.2.3.4/api/internal/v2/inventory/tenants/foo/filters/search",
+				model.SearchParams{
+					Page:    4,
+					PerPage: 5,
+					Filters: []model.FilterPredicate{
+						model.FilterPredicate{
+							Scope:     "inventory",
+							Attribute: "foo",
+							Type:      "$eq",
+							Value:     "bar",
+						},
+						model.FilterPredicate{
+							Scope:     "inventory",
+							Attribute: "foo1",
+							Type:      "$eq",
+							Value:     "baz",
+						},
+					},
+					Sort: []model.SortCriteria{
+						model.SortCriteria{
+							Scope:     "inventory",
+							Attribute: "foo",
+							Order:     "asc",
+						},
+						model.SortCriteria{
+							Scope:     "inventory",
+							Attribute: "foo1",
+							Order:     "desc",
+						},
+					},
+				},
+			),
+			resp: utils.JSONResponseParams{
+				OutputStatus:     400,
+				OutputBodyObject: RestError("inventory error: BadValue"),
+				OutputHeaders:    nil,
+			},
+		},
+	}
+
+	for name, testCase := range testCases {
+		t.Logf("test case: %s", name)
+		inv := minventory.InventoryApp{}
+
+		ctx := contextMatcher()
+
+		inv.On("SearchDevices",
+			ctx,
+			mock.AnythingOfType("model.SearchParams"),
+		).Return(mockListDevices(testCase.listDevicesNum), testCase.listDeviceTotal, testCase.listDevicesErr)
+
+		apih := makeMockApiHandler(t, &inv)
+
+		runTestRequest(t, apih, testCase.inReq, testCase.resp)
+	}
+}
+
 func makeReq(method, url, auth string, body interface{}) *http.Request {
 	req := test.MakeSimpleRequest(method, url, body)
 
