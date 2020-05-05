@@ -49,7 +49,7 @@ paths:
                 type: number
                 format: integer
                 default: 10
-                description: Number of results per page.
+                description: Maximum number of results per page.
               filters:
                 type: array
                 description: List of filter predicates, chained with boolean AND operators to build the search condition definition.
