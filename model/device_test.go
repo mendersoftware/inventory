@@ -75,3 +75,133 @@ func TestDeviceAttributesMarshal(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "[]", string(data))
 }
+
+func TestValidateDeviceAttributes(t *testing.T) {
+	testCases := []struct {
+		Name string
+
+		Attributes DeviceAttributes
+		ErrMessage string
+	}{
+		{
+			Name: "Strings and floats",
+
+			Attributes: DeviceAttributes{{
+				Name:  "foo",
+				Value: "stringer",
+				Scope: "stringers",
+			}, {
+				Name:  "bar",
+				Value: float64(123.0),
+				Scope: "floaters",
+			}, {
+				Name:  "baz",
+				Value: "1234567.0",
+				Scope: "nonFloaters",
+			}},
+		},
+		{
+			Name: "String arrays",
+
+			Attributes: DeviceAttributes{{
+				Name:  "foo",
+				Value: []string{"bar", "baz"},
+				Scope: "slicers",
+			}, {
+				Name:  "bar",
+				Value: []interface{}{"123.4", "567.89"},
+				Scope: "slicers",
+			}},
+		},
+		{
+			Name: "Float64 arrays",
+
+			Attributes: DeviceAttributes{{
+				Name:  "foo",
+				Value: []float64{123.567, 456.789},
+				Scope: "floatingSlicers",
+			}, {
+				Name:  "bar",
+				Value: []interface{}{float64(1.0)},
+				Scope: "floatingSlicer",
+			}},
+		},
+		{
+			Name:       "Empty attributes",
+			Attributes: DeviceAttributes{},
+		},
+		{
+			Name: "Empty slice",
+			Attributes: DeviceAttributes{{
+				Name:  "Empty slice is ok",
+				Value: []interface{}{},
+				Scope: "void",
+			}},
+		},
+		{
+			Name: "Attribute missing value",
+			Attributes: DeviceAttributes{{
+				Name:  "nil",
+				Scope: "void",
+			}},
+			ErrMessage: "supported types are string, float64, " +
+				"and arrays thereof",
+		},
+		{
+			Name: "Illegal float",
+			Attributes: DeviceAttributes{{
+				Name:  "Wrong float",
+				Value: float32(123),
+				Scope: "totallyLegit",
+			}},
+			ErrMessage: "supported types are string, float64, " +
+				"and arrays thereof",
+		},
+		{
+			Name: "Illegal string type",
+			Attributes: DeviceAttributes{{
+				Name:  "foo",
+				Value: []byte("foobar"),
+				Scope: "prettyStringish",
+			}},
+			ErrMessage: "supported types are string, float64, " +
+				"and arrays thereof",
+		},
+		{
+			Name: "Mixed type slice",
+			Attributes: DeviceAttributes{{
+				Name:  "mixedSignals",
+				Value: []interface{}{'c', 123, []byte("bleh")},
+				Scope: "bagOfTypes",
+			}},
+			ErrMessage: "array values must be either " +
+				"string or float64",
+		},
+		{
+			Name: "Mixed slice of legal types",
+			Attributes: DeviceAttributes{{
+				Name:  "totallyLegit",
+				Value: []interface{}{"stringer", 123.0},
+				Scope: "bagOfTypes",
+			}},
+			ErrMessage: "array values must be of consistent type: " +
+				"string or float64",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.Name, func(t *testing.T) {
+			err := tc.Attributes.Validate()
+			if tc.ErrMessage != "" {
+				if assert.Error(t, err) {
+					assert.Contains(
+						t, err.Error(), tc.ErrMessage,
+					)
+				}
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+
+}
