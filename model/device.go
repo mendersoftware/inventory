@@ -28,6 +28,10 @@ const (
 	AttrScopeInventory = "inventory"
 	AttrScopeIdentity  = "identity"
 	AttrScopeSystem    = "system"
+
+	AttrNameGroup   = "group"
+	AttrNameUpdated = "updated_ts"
+	AttrNameCreated = "created_ts"
 )
 
 type DeviceID string
@@ -134,12 +138,12 @@ func (d *Device) UnmarshalBSON(b []byte) error {
 	for _, attr := range d.Attributes {
 		if attr.Scope == AttrScopeSystem {
 			switch attr.Name {
-			case "group":
+			case AttrNameGroup:
 				group, _ := attr.Value.(string)
 				d.Group = GroupName(group)
-			case "updated_ts":
+			case AttrNameUpdated:
 				d.UpdatedTs, _ = attr.Value.(time.Time)
-			case "created_ts":
+			case AttrNameCreated:
 				d.CreatedTs, _ = attr.Value.(time.Time)
 			}
 		}
@@ -151,7 +155,7 @@ func (d Device) MarshalBSON() ([]byte, error) {
 	if d.Group != "" {
 		d.Attributes = append(d.Attributes, DeviceAttribute{
 			Scope: AttrScopeSystem,
-			Name:  "group",
+			Name:  AttrNameGroup,
 			Value: d.Group,
 		})
 	}

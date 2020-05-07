@@ -38,37 +38,73 @@ func (m *migration_1_0_0) Up(from migrate.Version) error {
 	collDevs := m.ms.client.Database(databaseName).Collection(DbDevicesColl)
 
 	// Move timestamps to identity scope.
+	createdNameField := makeAttrField(
+		model.AttrNameCreated,
+		model.AttrScopeSystem,
+		DbDevAttributesName,
+	)
+	createdScopeField := makeAttrField(
+		model.AttrNameCreated,
+		model.AttrScopeSystem,
+		DbDevAttributesScope,
+	)
+	createdValueField := makeAttrField(
+		model.AttrNameCreated,
+		model.AttrScopeSystem,
+		DbDevAttributesValue,
+	)
+	updatedNameField := makeAttrField(
+		model.AttrNameUpdated,
+		model.AttrScopeSystem,
+		DbDevAttributesName,
+	)
+	updatedScopeField := makeAttrField(
+		model.AttrNameUpdated,
+		model.AttrScopeSystem,
+		DbDevAttributesScope,
+	)
+	updatedValueField := makeAttrField(
+		model.AttrNameUpdated,
+		model.AttrScopeSystem,
+		DbDevAttributesValue,
+	)
 	_, err := collDevs.UpdateMany(m.ctx, bson.M{}, bson.M{
 		"$rename": bson.M{
-			"created_ts": systemScope + "-created_ts.value",
-			"updated_ts": systemScope + "-updated_ts.value",
+			model.AttrNameCreated: createdValueField,
+			model.AttrNameUpdated: updatedValueField,
 		},
 		"$set": bson.M{
-			systemScope +
-				"-created_ts.name": "created_ts",
-			systemScope +
-				"-created_ts.scope": model.AttrScopeSystem,
-			systemScope +
-				"-updated_ts.name": "updated_ts",
-			systemScope +
-				"-updated_ts.scope": model.AttrScopeSystem,
+			createdNameField:  model.AttrNameCreated,
+			createdScopeField: model.AttrScopeSystem,
+			updatedNameField:  model.AttrNameUpdated,
+			updatedScopeField: model.AttrScopeSystem,
 		},
 	})
 	if err != nil {
 		return nil
 	}
 
+	groupNameField := makeAttrField(
+		model.AttrNameGroup,
+		model.AttrScopeSystem,
+		DbDevAttributesName,
+	)
+	groupScopeField := makeAttrField(
+		model.AttrNameGroup,
+		model.AttrScopeSystem,
+		DbDevAttributesScope,
+	)
 	// For devices in a group: move to attribute.
 	_, err = collDevs.UpdateMany(
 		m.ctx,
 		bson.M{DbDevGroup: bson.M{"$exists": true}},
 		bson.M{
-			"$rename": bson.M{DbDevGroup: DbDevAttributesGroupValue},
+			"$rename": bson.M{
+				model.AttrNameGroup: DbDevAttributesGroupValue,
+			},
 			"$set": bson.M{
-				DbDevAttributesGroup + "." +
-					DbDevAttributesName: DbDevGroup,
-				DbDevAttributesGroup + "." +
-					DbDevAttributesScope: model.AttrScopeIdentity,
+				groupNameField:  model.AttrNameGroup,
+				groupScopeField: model.AttrScopeSystem,
 			},
 		})
 	return err

@@ -52,7 +52,7 @@ const (
 	DbDevAttributesScope = "scope"
 	DbDevAttributesName  = "name"
 	DbDevAttributesGroup = DbDevAttributes + "." +
-		model.AttrScopeSystem + "-" + DbDevGroup
+		model.AttrScopeSystem + "-" + model.AttrNameGroup
 	DbDevAttributesGroupValue = DbDevAttributesGroup + "." +
 		DbDevAttributesValue
 
@@ -291,7 +291,7 @@ func (db *DataStoreMongo) AddDevice(ctx context.Context, dev *model.Device) erro
 	if dev.Group != "" {
 		dev.Attributes = append(dev.Attributes, model.DeviceAttribute{
 			Scope: model.AttrScopeSystem,
-			Name:  "group",
+			Name:  model.AttrNameGroup,
 			Value: dev.Group,
 		})
 	}
@@ -305,24 +305,30 @@ func (db *DataStoreMongo) AddDevice(ctx context.Context, dev *model.Device) erro
 // UpsertAttributes makes an upsert on the device's attributes.
 func (db *DataStoreMongo) UpsertAttributes(ctx context.Context, id model.DeviceID, attrs model.DeviceAttributes) error {
 	const systemScope = DbDevAttributes + "." + model.AttrScopeSystem
-	c := db.client.Database(mstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
+	const updatedField = systemScope + "-" + model.AttrNameUpdated
+	const createdField = systemScope + "-" + model.AttrNameCreated
+
+	c := db.client.
+		Database(mstore.DbFromContext(ctx, DbName)).
+		Collection(DbDevicesColl)
+
 	filter := bson.M{"_id": id}
 	update, err := makeAttrUpsert(attrs)
 	if err != nil {
 		return err
 	}
 	now := time.Now()
-	update[systemScope+"-update_ts"] = model.DeviceAttribute{
+	update[updatedField] = model.DeviceAttribute{
 		Scope: model.AttrScopeSystem,
-		Name:  "updated_ts",
+		Name:  model.AttrNameUpdated,
 		Value: now,
 	}
 	update = bson.M{
 		"$set": update,
 		"$setOnInsert": bson.M{
-			systemScope + "-created_ts": model.DeviceAttribute{
+			createdField: model.DeviceAttribute{
 				Scope: model.AttrScopeSystem,
-				Name:  "created_ts",
+				Name:  model.AttrNameCreated,
 				Value: now,
 			},
 		},
@@ -332,6 +338,17 @@ func (db *DataStoreMongo) UpsertAttributes(ctx context.Context, id model.DeviceI
 		return err
 	}
 	return nil
+}
+
+// makeAttrField is a convenience function for composing attribute field names.
+func makeAttrField(attrName, attrScope string, subFields ...string) string {
+	field := fmt.Sprintf("%s.%s-%s", DbDevAttributes, attrScope, attrName)
+	if len(subFields) > 0 {
+		field = strings.Join(
+			append([]string{field}, subFields...), ".",
+		)
+	}
+	return field
 }
 
 // makeAttrUpsert creates a new upsert document for the given attributes.
@@ -347,37 +364,34 @@ func makeAttrUpsert(attrs model.DeviceAttributes) (bson.M, error) {
 			// Default to inventory scope
 			attrs[i].Scope = model.AttrScopeInventory
 		}
-		fieldPrefix := fmt.Sprintf("%s.%s-%s",
-			DbDevAttributes, attrs[i].Scope, attrs[i].Name,
-		)
 
-		fieldName = fmt.Sprintf(
-			"%s.%s",
-			fieldPrefix,
+		fieldName = makeAttrField(
+			attrs[i].Name,
+			attrs[i].Scope,
 			DbDevAttributesScope,
 		)
 		upsert[fieldName] = attrs[i].Scope
 
-		fieldName = fmt.Sprintf(
-			"%s.%s",
-			fieldPrefix,
+		fieldName = makeAttrField(
+			attrs[i].Name,
+			attrs[i].Scope,
 			DbDevAttributesName,
 		)
 		upsert[fieldName] = attrs[i].Name
 
 		if attrs[i].Value != nil {
-			fieldName = fmt.Sprintf(
-				"%s.%s",
-				fieldPrefix,
+			fieldName = makeAttrField(
+				attrs[i].Name,
+				attrs[i].Scope,
 				DbDevAttributesValue,
 			)
 			upsert[fieldName] = attrs[i].Value
 		}
 
 		if attrs[i].Description != nil {
-			fieldName = fmt.Sprintf(
-				"%s.%s",
-				fieldPrefix,
+			fieldName = makeAttrField(
+				attrs[i].Name,
+				attrs[i].Scope,
 				DbDevAttributesDesc,
 			)
 			upsert[fieldName] = attrs[i].Description

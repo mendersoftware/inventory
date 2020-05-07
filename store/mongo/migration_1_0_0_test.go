@@ -64,15 +64,15 @@ func TestMigration_1_0_0(t *testing.T) {
 					}, {
 						Name:  "created_ts",
 						Value: testTimestamp,
-						Scope: model.AttrScopeIdentity,
+						Scope: model.AttrScopeSystem,
 					}, {
 						Name:  "updated_ts",
 						Value: testTimestamp,
-						Scope: model.AttrScopeIdentity,
+						Scope: model.AttrScopeSystem,
 					}, {
 						Name:  "group",
 						Value: "foobar",
-						Scope: model.AttrScopeIdentity,
+						Scope: model.AttrScopeSystem,
 					}},
 					Group: "foobar",
 				},
@@ -117,15 +117,15 @@ func TestMigration_1_0_0(t *testing.T) {
 					}, {
 						Name:  "created_ts",
 						Value: testTimestamp,
-						Scope: model.AttrScopeIdentity,
+						Scope: model.AttrScopeSystem,
 					}, {
 						Name:  "updated_ts",
 						Value: testTimestamp,
-						Scope: model.AttrScopeIdentity,
+						Scope: model.AttrScopeSystem,
 					}, {
 						Name:  "group",
 						Value: "foobar",
-						Scope: model.AttrScopeIdentity,
+						Scope: model.AttrScopeSystem,
 					}},
 					Group: "foobar",
 				}, {
@@ -138,11 +138,11 @@ func TestMigration_1_0_0(t *testing.T) {
 					}, {
 						Name:  "created_ts",
 						Value: testTimestamp,
-						Scope: model.AttrScopeIdentity,
+						Scope: model.AttrScopeSystem,
 					}, {
 						Name:  "updated_ts",
 						Value: testTimestamp,
-						Scope: model.AttrScopeIdentity,
+						Scope: model.AttrScopeSystem,
 					}},
 				},
 			},
@@ -192,15 +192,15 @@ func TestMigration_1_0_0(t *testing.T) {
 					}, {
 						Name:  "created_ts",
 						Value: testTimestamp,
-						Scope: model.AttrScopeIdentity,
+						Scope: model.AttrScopeSystem,
 					}, {
 						Name:  "updated_ts",
 						Value: testTimestamp,
-						Scope: model.AttrScopeIdentity,
+						Scope: model.AttrScopeSystem,
 					}, {
 						Name:  "group",
 						Value: "foobar",
-						Scope: model.AttrScopeIdentity,
+						Scope: model.AttrScopeSystem,
 					}},
 					Group: "foobar",
 				}, {
@@ -213,22 +213,22 @@ func TestMigration_1_0_0(t *testing.T) {
 					}, {
 						Name:  "created_ts",
 						Value: testTimestamp,
-						Scope: model.AttrScopeIdentity,
+						Scope: model.AttrScopeSystem,
 					}, {
 						Name:  "updated_ts",
 						Value: testTimestamp,
-						Scope: model.AttrScopeIdentity,
+						Scope: model.AttrScopeSystem,
 					}},
 				}, {
 					ID: model.DeviceID("3"),
 					Attributes: model.DeviceAttributes{{
 						Name:  "created_ts",
 						Value: testTimestamp,
-						Scope: model.AttrScopeIdentity,
+						Scope: model.AttrScopeSystem,
 					}, {
 						Name:  "updated_ts",
 						Value: testTimestamp,
-						Scope: model.AttrScopeIdentity,
+						Scope: model.AttrScopeSystem,
 					}},
 				},
 			},
