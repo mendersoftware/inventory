@@ -39,7 +39,7 @@ func TestMongoDeviceFindById(t *testing.T) {
 			InputDevice: &model.Device{
 				ID: model.DeviceID("0002"),
 				Attributes: model.DeviceAttributes{
-					{Name: "mac", Value: "0002-mac"},
+					{Name: "mac", Value: "0002-mac", Scope: "inventory"},
 				},
 			},
 			OutputError: nil,

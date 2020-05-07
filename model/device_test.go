@@ -18,6 +18,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 func TestDeviceAttributesUnmarshal(t *testing.T) {
@@ -74,6 +75,41 @@ func TestDeviceAttributesMarshal(t *testing.T) {
 	data, err = json.Marshal(&daEmpty)
 	assert.NoError(t, err)
 	assert.Equal(t, "[]", string(data))
+}
+
+func TestMarshalUnmarshalBSON(t *testing.T) {
+	str2Ptr := func(s string) *string {
+		return &s
+	}
+	dev := Device{
+		ID:    "foo",
+		Group: "bar",
+		Attributes: DeviceAttributes{{
+			Name:        "str",
+			Value:       "foo",
+			Scope:       "bar",
+			Description: str2Ptr("fooSan!"),
+		}, {
+			Name:  "float",
+			Value: float64(123.0),
+			Scope: "floaters",
+		}},
+	}
+	// Expected added by bson.Marshal
+	groupAttr := DeviceAttribute{
+		Name:  AttrNameGroup,
+		Value: "bar",
+		Scope: AttrScopeSystem,
+	}
+
+	b, err := bson.Marshal(dev)
+	if assert.NoError(t, err) {
+		var tmp Device
+		dev.Attributes = append(dev.Attributes, groupAttr)
+		err := bson.Unmarshal(b, &tmp)
+		assert.NoError(t, err)
+		assert.EqualValues(t, dev, tmp)
+	}
 }
 
 func TestValidateDeviceAttributes(t *testing.T) {

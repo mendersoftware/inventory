@@ -152,6 +152,9 @@ func (d *Device) UnmarshalBSON(b []byte) error {
 }
 
 func (d Device) MarshalBSON() ([]byte, error) {
+	if err := d.Validate(); err != nil {
+		return nil, err
+	}
 	if d.Group != "" {
 		d.Attributes = append(d.Attributes, DeviceAttribute{
 			Scope: AttrScopeSystem,
