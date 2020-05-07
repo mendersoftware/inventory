@@ -11,16 +11,38 @@
 //    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
+
 package mongo
 
 import (
+	"context"
 	"errors"
-	"github.com/mendersoftware/inventory/model"
-	"github.com/stretchr/testify/assert"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
+
 	mstore "github.com/mendersoftware/go-lib-micro/store"
+	"github.com/mendersoftware/inventory/model"
 )
+
+func DeviceFindById(ctx context.Context, c *mongo.Collection, id model.DeviceID, dst *model.Device) error {
+	cur, err := c.Find(ctx, bson.M{"_id": id})
+	if err != nil {
+		return err
+	}
+
+	cur.Next(ctx)
+
+	// create a value into which the single document can be decoded
+	err = cur.Decode(dst)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
 
 // test funcs
 func TestMongoDeviceFindById(t *testing.T) {
