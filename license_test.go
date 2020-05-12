@@ -1,4 +1,4 @@
-// Copyright 2017 Northern.tech AS
+// Copyright 2020 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -18,5 +18,5 @@ import "testing"
 import mt "github.com/mendersoftware/mendertesting"
 
 func TestLicenses(t *testing.T) {
-	mt.CheckLicenses(t)
+	mt.CheckMenderCompliance(t)
 }
