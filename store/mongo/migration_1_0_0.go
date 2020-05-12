@@ -198,7 +198,7 @@ func (m *migration_1_0_0) Up(from migrate.Version) error {
 	l := log.FromContext(m.ctx)
 	tenantDB := mstore.DbFromContext(m.ctx, DbName)
 	if !migrate.VersionIsLess(from, m.Version()) {
-		l.Info("db '%s' already migrated", tenantDB)
+		l.Infof("db '%s' already migrated", tenantDB)
 		return nil
 	}
 

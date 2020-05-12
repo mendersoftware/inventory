@@ -715,8 +715,12 @@ func compareDevsWithoutTimestamps(t *testing.T, expected, actual *model.Device) 
 		})
 		return attrs
 	}
-	expectedAttrs := filterAndSortAttrs(expected.Attributes)
-	actualAttrs := filterAndSortAttrs(actual.Attributes)
+	expectedAttrs := make(model.DeviceAttributes, len(expected.Attributes))
+	actualAttrs := make(model.DeviceAttributes, len(actual.Attributes))
+	copy(expectedAttrs, expected.Attributes)
+	copy(actualAttrs, actual.Attributes)
+	expectedAttrs = filterAndSortAttrs(expectedAttrs)
+	actualAttrs = filterAndSortAttrs(actualAttrs)
 	if !reflect.DeepEqual(expectedAttrs, actualAttrs) {
 		assert.FailNow(
 			t, "",

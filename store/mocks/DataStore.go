@@ -1,4 +1,4 @@
-// Copyright 2019 Northern.tech AS
+// Copyright 2020 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -11,6 +11,7 @@
 //    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
+
 package mocks
 
 import context "context"
@@ -284,5 +285,21 @@ func (_m *DataStore) WithAutomigrate() store.DataStore {
 		}
 	}
 
+	return r0
+}
+
+func (_m *DataStore) Maintenance(
+	ctx context.Context,
+	version string,
+	tenantIDs ...string,
+) error {
+	args := _m.Called()
+
+	var r0 error
+	if rf, ok := args.Get(0).(func(context.Context, string, []string) error); ok {
+		r0 = rf(ctx, version, tenantIDs)
+	} else {
+		r0 = args.Error(0)
+	}
 	return r0
 }
