@@ -28,9 +28,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	mopts "go.mongodb.org/mongo-driver/mongo/options"
 
-	"github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/log"
-	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
 	mstore "github.com/mendersoftware/go-lib-micro/store"
 	"github.com/pkg/errors"
 
@@ -597,86 +595,6 @@ func (db *DataStoreMongo) GetAllAttributeNames(ctx context.Context) ([]string, e
 	}
 
 	return attributeNames, nil
-}
-
-func (db *DataStoreMongo) MigrateTenant(ctx context.Context, version string, tenantId string) error {
-	l := log.FromContext(ctx)
-
-	database := mstore.DbNameForTenant(tenantId, DbName)
-
-	l.Infof("migrating %s", database)
-
-	m := migrate.SimpleMigrator{
-		Client:      db.client,
-		Db:          database,
-		Automigrate: db.automigrate,
-	}
-
-	ver, err := migrate.NewVersion(version)
-	if err != nil {
-		return errors.Wrap(err, "failed to parse service version")
-	}
-
-	ctx = identity.WithContext(ctx, &identity.Identity{
-		Tenant: tenantId,
-	})
-
-	migrations := []migrate.Migration{
-		&migration_0_2_0{
-			ms:  db,
-			ctx: ctx,
-		},
-		&migration_1_0_0{
-			ms:  db,
-			ctx: ctx,
-		},
-	}
-
-	err = m.Apply(ctx, *ver, migrations)
-	if err != nil {
-		return errors.Wrap(err, "failed to apply migrations")
-	}
-
-	return nil
-}
-
-func (db *DataStoreMongo) Migrate(ctx context.Context, version string) error {
-	l := log.FromContext(ctx)
-
-	dbs, err := migrate.GetTenantDbs(ctx, db.client, mstore.IsTenantDb(DbName))
-	if err != nil {
-		return errors.Wrap(err, "failed go retrieve tenant DBs")
-	}
-
-	if len(dbs) == 0 {
-		dbs = []string{DbName}
-	}
-
-	if db.automigrate {
-		l.Infof("automigrate is ON, will apply migrations")
-	} else {
-		l.Infof("automigrate is OFF, will check db version compatibility")
-	}
-
-	for _, d := range dbs {
-		l.Infof("migrating %s", d)
-
-		tenantId := mstore.TenantFromDbName(d, DbName)
-
-		if err := db.MigrateTenant(ctx, version, tenantId); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// WithAutomigrate enables automatic migration and returns a new datastore based
-// on current one
-func (db *DataStoreMongo) WithAutomigrate() store.DataStore {
-	return &DataStoreMongo{
-		client:      db.client,
-		automigrate: true,
-	}
 }
 
 func indexAttr(s *mongo.Client, ctx context.Context, attr string) error {

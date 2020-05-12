@@ -77,4 +77,6 @@ type DataStore interface {
 	Migrate(ctx context.Context, version string) error
 
 	WithAutomigrate() DataStore
+
+	Maintenance(ctx context.Context, version string, tenantIDs ...string) error
 }
