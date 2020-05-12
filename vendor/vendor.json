@@ -158,21 +158,18 @@
 		},
 		{
 			"checksumSHA1": "pjoEp+2+VNBW04q05APJk8xr6wk=",
-			"origin": "github.com/mendersoftware/inventory/vendor/github.com/mendersoftware/go-lib-micro/apiclient",
 			"path": "github.com/mendersoftware/go-lib-micro/apiclient",
 			"revision": "a5eb0bc6455108fb1ecb45854c677d55244fddf4",
 			"revisionTime": "2020-02-05T13:39:50Z"
 		},
 		{
 			"checksumSHA1": "ZJ/mBXOvixbQxVBoSvq6QCLLkwQ=",
-			"origin": "github.com/mendersoftware/inventory/vendor/github.com/mendersoftware/go-lib-micro/config",
 			"path": "github.com/mendersoftware/go-lib-micro/config",
 			"revision": "a5eb0bc6455108fb1ecb45854c677d55244fddf4",
 			"revisionTime": "2020-02-05T13:39:50Z"
 		},
 		{
 			"checksumSHA1": "0mMXsZTeDNKOhEFXi97G2h3GI/k=",
-			"origin": "github.com/mendersoftware/inventory/vendor/github.com/mendersoftware/go-lib-micro/config/mocks",
 			"path": "github.com/mendersoftware/go-lib-micro/config/mocks",
 			"revision": "a5eb0bc6455108fb1ecb45854c677d55244fddf4",
 			"revisionTime": "2020-02-05T13:39:50Z"
@@ -185,7 +182,6 @@
 		},
 		{
 			"checksumSHA1": "7THIR6kf+55Xgz6biETNkB2xExs=",
-			"origin": "github.com/mendersoftware/inventory/vendor/github.com/mendersoftware/go-lib-micro/context/httpheader",
 			"path": "github.com/mendersoftware/go-lib-micro/context/httpheader",
 			"revision": "a5eb0bc6455108fb1ecb45854c677d55244fddf4",
 			"revisionTime": "2020-02-05T13:39:50Z"
@@ -204,14 +200,12 @@
 		},
 		{
 			"checksumSHA1": "aNohLlfa9GXT2AxsAKoO543Xsrk=",
-			"origin": "github.com/mendersoftware/inventory/vendor/github.com/mendersoftware/go-lib-micro/identity/cmd/dumpidentity",
 			"path": "github.com/mendersoftware/go-lib-micro/identity/cmd/dumpidentity",
 			"revision": "a5eb0bc6455108fb1ecb45854c677d55244fddf4",
 			"revisionTime": "2020-02-05T13:39:50Z"
 		},
 		{
 			"checksumSHA1": "I4c9X9UIBpI6VK1XPEt/Yo+P3RU=",
-			"origin": "github.com/mendersoftware/inventory/vendor/github.com/mendersoftware/go-lib-micro/keys",
 			"path": "github.com/mendersoftware/go-lib-micro/keys",
 			"revision": "a5eb0bc6455108fb1ecb45854c677d55244fddf4",
 			"revisionTime": "2020-02-05T13:39:50Z"
@@ -224,14 +218,12 @@
 		},
 		{
 			"checksumSHA1": "1+jIjx1TOHJjNfKUV3RSFvJxZo0=",
-			"origin": "github.com/mendersoftware/inventory/vendor/github.com/mendersoftware/go-lib-micro/log/testing",
 			"path": "github.com/mendersoftware/go-lib-micro/log/testing",
 			"revision": "a5eb0bc6455108fb1ecb45854c677d55244fddf4",
 			"revisionTime": "2020-02-05T13:39:50Z"
 		},
 		{
 			"checksumSHA1": "qr1mql4xHwl9qxWL6ra+tGxbTkM=",
-			"origin": "github.com/mendersoftware/inventory/vendor/github.com/mendersoftware/go-lib-micro/mongo/dbtest",
 			"path": "github.com/mendersoftware/go-lib-micro/mongo/dbtest",
 			"revision": "a5eb0bc6455108fb1ecb45854c677d55244fddf4",
 			"revisionTime": "2020-02-05T13:39:50Z"
@@ -244,7 +236,6 @@
 		},
 		{
 			"checksumSHA1": "MuWPWWfCmlP43WBxoNQafJJxlsU=",
-			"origin": "github.com/mendersoftware/inventory/vendor/github.com/mendersoftware/go-lib-micro/mongo/migrate/mocks",
 			"path": "github.com/mendersoftware/go-lib-micro/mongo/migrate/mocks",
 			"revision": "a5eb0bc6455108fb1ecb45854c677d55244fddf4",
 			"revisionTime": "2020-02-05T13:39:50Z"
@@ -275,7 +266,6 @@
 		},
 		{
 			"checksumSHA1": "UKrQxSOM1ZjRkv2os8gdrDDEjgo=",
-			"origin": "github.com/mendersoftware/inventory/vendor/github.com/mendersoftware/go-lib-micro/routing",
 			"path": "github.com/mendersoftware/go-lib-micro/routing",
 			"revision": "a5eb0bc6455108fb1ecb45854c677d55244fddf4",
 			"revisionTime": "2020-02-05T13:39:50Z"
@@ -299,10 +289,10 @@
 			"revisionTime": "2020-02-05T13:39:50Z"
 		},
 		{
-			"checksumSHA1": "WmpOFyg1DBnN21SjR8ayRqIcL4U=",
+			"checksumSHA1": "LH3rsULbx01UTr4Jpsparzjqq8M=",
 			"path": "github.com/mendersoftware/mendertesting",
-			"revision": "9e728b524c29827ba75d4f4abac494b8ecdffe9f",
-			"revisionTime": "2018-04-10T09:51:58Z"
+			"revision": "7d791ecb530cd55c2ebe3ec8893dfdde0c38987d",
+			"revisionTime": "2020-05-08T05:19:49Z"
 		},
 		{
 			"checksumSHA1": "EHjhpHipgm+XGccrRAms9AW3Ewk=",
