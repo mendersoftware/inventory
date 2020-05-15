@@ -15,7 +15,6 @@ package inv
 
 import (
 	"context"
-	"time"
 
 	"github.com/pkg/errors"
 
@@ -70,9 +69,6 @@ func (i *inventory) AddDevice(ctx context.Context, dev *model.Device) error {
 	if dev == nil {
 		return errors.New("no device given")
 	}
-	now := time.Now()
-	dev.CreatedTs = now
-	dev.UpdatedTs = now
 	err := i.db.AddDevice(ctx, dev)
 	if err != nil {
 		return errors.Wrap(err, "failed to add device")

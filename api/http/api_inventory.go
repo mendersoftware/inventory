@@ -329,7 +329,7 @@ func (i *inventoryHandlers) AddDeviceHandler(w rest.ResponseWriter, r *rest.Requ
 		return
 	}
 
-	dev.Attributes, err = validateAttributes(dev.Attributes)
+	err = dev.Attributes.Validate()
 	if err != nil {
 		u.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
 		return
@@ -366,6 +366,12 @@ func (i *inventoryHandlers) PatchDeviceAttributesHandler(w rest.ResponseWriter, 
 
 	//upsert the attributes
 	err = i.inventory.UpsertAttributes(ctx, model.DeviceID(idata.Subject), attrs)
+	cause := errors.Cause(err)
+	switch cause {
+	case store.ErrNoAttrName:
+		u.RestErrWithLog(w, r, l, cause, http.StatusBadRequest)
+		return
+	}
 	if err != nil {
 		u.RestErrWithLogInternal(w, r, l, err)
 		return
@@ -495,24 +501,11 @@ func parseAttributes(r *rest.Request) (model.DeviceAttributes, error) {
 		return nil, errors.Wrap(err, "failed to decode request body")
 	}
 
-	attrs, err = validateAttributes(attrs)
+	err = attrs.Validate()
 	if err != nil {
 		return nil, err
 	}
 
-	return attrs, nil
-}
-
-func validateAttributes(attrs model.DeviceAttributes) (model.DeviceAttributes, error) {
-	for i, a := range attrs {
-		if a.Scope == "" {
-			a.Scope = model.AttrScopeInventory
-			attrs[i] = a
-		}
-		if err := a.Validate(); err != nil {
-			return nil, err
-		}
-	}
 	return attrs, nil
 }
 
@@ -700,12 +693,14 @@ func (i *inventoryHandlers) InternalDevicesStatusHandler(w rest.ResponseWriter, 
 	}
 
 	for _, id := range ids {
-		attrs := map[string]model.DeviceAttribute{"status": model.DeviceAttribute{
-			Name:        "status",
-			Description: nil,
-			Value:       status,
-			Scope:       model.AttrScopeIdentity,
-		}}
+		attrs := model.DeviceAttributes{
+			{
+				Name:        "status",
+				Description: nil,
+				Value:       status,
+				Scope:       model.AttrScopeIdentity,
+			},
+		}
 		//upsert the attributes
 		err = i.inventory.UpsertAttributes(ctx, model.DeviceID(id), attrs)
 		if err != nil {

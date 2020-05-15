@@ -10,7 +10,6 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
-	"strconv"
 	"strings"
 	"time"
 
@@ -26,6 +25,7 @@ import (
 	"go.mongodb.org/mongo-driver/x/mongo/driver/auth"
 	"go.mongodb.org/mongo-driver/x/mongo/driver/connstring"
 	"go.mongodb.org/mongo-driver/x/mongo/driver/description"
+	"go.mongodb.org/mongo-driver/x/mongo/driver/ocsp"
 	"go.mongodb.org/mongo-driver/x/mongo/driver/operation"
 	"go.mongodb.org/mongo-driver/x/mongo/driver/session"
 	"go.mongodb.org/mongo-driver/x/mongo/driver/topology"
@@ -33,11 +33,14 @@ import (
 )
 
 const defaultLocalThreshold = 15 * time.Millisecond
-const batchSize = 10000
 
-// keyVaultCollOpts specifies options used to communicate with the key vault collection
-var keyVaultCollOpts = options.Collection().SetReadConcern(readconcern.Majority()).
-	SetWriteConcern(writeconcern.New(writeconcern.WMajority()))
+var (
+	// keyVaultCollOpts specifies options used to communicate with the key vault collection
+	keyVaultCollOpts = options.Collection().SetReadConcern(readconcern.Majority()).
+				SetWriteConcern(writeconcern.New(writeconcern.WMajority()))
+
+	endSessionsBatchSize = 10000
+)
 
 // Client is a handle representing a pool of connections to a MongoDB deployment. It is safe for concurrent use by
 // multiple goroutines.
@@ -237,6 +240,9 @@ func (c *Client) Ping(ctx context.Context, rp *readpref.ReadPref) error {
 }
 
 // StartSession starts a new session configured with the given options.
+//
+// If the DefaultReadConcern, DefaultWriteConcern, or DefaultReadPreference options are not set, the client's read
+// concern, write concern, or read preference will be used, respectively.
 func (c *Client) StartSession(opts ...*options.SessionOptions) (Session, error) {
 	if c.sessionPool == nil {
 		return nil, ErrClientDisconnected
@@ -284,31 +290,27 @@ func (c *Client) endSessions(ctx context.Context) {
 		return
 	}
 
-	ids := c.sessionPool.IDSlice()
-	idx, idArray := bsoncore.AppendArrayStart(nil)
-	for i, id := range ids {
-		idDoc, _ := id.MarshalBSON()
-		idArray = bsoncore.AppendDocumentElement(idArray, strconv.Itoa(i), idDoc)
-	}
-	idArray, _ = bsoncore.AppendArrayEnd(idArray, idx)
-
-	op := operation.NewEndSessions(idArray).ClusterClock(c.clock).Deployment(c.deployment).
+	sessionIDs := c.sessionPool.IDSlice()
+	op := operation.NewEndSessions(nil).ClusterClock(c.clock).Deployment(c.deployment).
 		ServerSelector(description.ReadPrefSelector(readpref.PrimaryPreferred())).CommandMonitor(c.monitor).
 		Database("admin").Crypt(c.crypt)
 
-	idx, idArray = bsoncore.AppendArrayStart(nil)
-	totalNumIDs := len(ids)
+	totalNumIDs := len(sessionIDs)
+	var currentBatch []bsoncore.Document
 	for i := 0; i < totalNumIDs; i++ {
-		idDoc, _ := ids[i].MarshalBSON()
-		idArray = bsoncore.AppendDocumentElement(idArray, strconv.Itoa(i), idDoc)
-		if ((i+1)%batchSize) == 0 || i == totalNumIDs-1 {
-			idArray, _ = bsoncore.AppendArrayEnd(idArray, idx)
-			_ = op.SessionIDs(idArray).Execute(ctx)
-			idArray = idArray[:0]
-			idx = 0
+		currentBatch = append(currentBatch, sessionIDs[i])
+
+		// If we are at the end of a batch or the end of the overall IDs array, execute the operation.
+		if ((i+1)%endSessionsBatchSize) == 0 || i == totalNumIDs-1 {
+			// Ignore all errors when ending sessions.
+			_, marshalVal, err := bson.MarshalValue(currentBatch)
+			if err == nil {
+				_ = op.SessionIDs(marshalVal).Execute(ctx)
+			}
+
+			currentBatch = currentBatch[:0]
 		}
 	}
-
 }
 
 func (c *Client) configure(opts *options.ClientOptions) error {
@@ -322,10 +324,19 @@ func (c *Client) configure(opts *options.ClientOptions) error {
 
 	// TODO(GODRIVER-814): Add tests for topology, server, and connection related options.
 
+	// Pass down URI so topology can determine whether or not SRV polling is required
+	topologyOpts = append(topologyOpts, topology.WithURI(func(uri string) string {
+		return opts.GetURI()
+	}))
+
 	// AppName
 	var appName string
 	if opts.AppName != nil {
 		appName = *opts.AppName
+
+		serverOpts = append(serverOpts, topology.WithServerAppName(func(string) string {
+			return appName
+		}))
 	}
 	// Compressors & ZlibLevel
 	var comps []string
@@ -545,6 +556,21 @@ func (c *Client) configure(opts *options.ClientOptions) error {
 	// ClusterClock
 	c.clock = new(session.ClusterClock)
 
+	// OCSP cache
+	ocspCache := ocsp.NewCache()
+	connOpts = append(
+		connOpts,
+		topology.WithOCSPCache(func(ocsp.Cache) ocsp.Cache { return ocspCache }),
+	)
+
+	// Disable communication with external OCSP responders.
+	if opts.DisableOCSPEndpointCheck != nil {
+		connOpts = append(
+			connOpts,
+			topology.WithDisableOCSPEndpointCheck(func(bool) bool { return *opts.DisableOCSPEndpointCheck }),
+		)
+	}
+
 	serverOpts = append(
 		serverOpts,
 		topology.WithClock(func(*session.ClusterClock) *session.ClusterClock { return c.clock }),
@@ -556,7 +582,9 @@ func (c *Client) configure(opts *options.ClientOptions) error {
 
 	// Deployment
 	if opts.Deployment != nil {
-		if len(serverOpts) > 2 || len(topologyOpts) > 1 {
+		// topology options: WithSeedlist and WithURI
+		// server options: WithClock and WithConnectionOptions
+		if len(serverOpts) > 2 || len(topologyOpts) > 2 {
 			return errors.New("cannot specify topology or server options with a deployment")
 		}
 		c.deployment = opts.Deployment
@@ -596,7 +624,7 @@ func (c *Client) configureKeyVault(opts *options.AutoEncryptionOptions) error {
 
 func (c *Client) configureMongocryptd(opts *options.AutoEncryptionOptions) error {
 	var err error
-	c.mongocryptd, err = newMcryptClient(opts.ExtraOptions)
+	c.mongocryptd, err = newMcryptClient(opts)
 	return err
 }
 
@@ -645,13 +673,15 @@ func (c *Client) Database(name string, opts ...*options.DatabaseOptions) *Databa
 	return newDatabase(c, name, opts...)
 }
 
-// ListDatabases performs a listDatabases operation and returns the result.
+// ListDatabases executes a listDatabases command and returns the result.
 //
-// The filter parameter should be a document containing query operatiors and can be used to select which
+// The filter parameter must be a document containing query operators and can be used to select which
 // databases are included in the result. It cannot be nil. An empty document (e.g. bson.D{}) should be used to include
 // all databases.
 //
 // The opts paramter can be used to specify options for this operation (see the options.ListDatabasesOptions documentation).
+//
+// For more information about the command, see https://docs.mongodb.com/manual/reference/command/listDatabases/.
 func (c *Client) ListDatabases(ctx context.Context, filter interface{}, opts ...*options.ListDatabasesOptions) (ListDatabasesResult, error) {
 	if ctx == nil {
 		ctx = context.Background()
@@ -688,9 +718,14 @@ func (c *Client) ListDatabases(ctx context.Context, filter interface{}, opts ...
 	op := operation.NewListDatabases(filterDoc).
 		Session(sess).ReadPreference(c.readPreference).CommandMonitor(c.monitor).
 		ServerSelector(selector).ClusterClock(c.clock).Database("admin").Deployment(c.deployment).Crypt(c.crypt)
+
 	if ldo.NameOnly != nil {
 		op = op.NameOnly(*ldo.NameOnly)
 	}
+	if ldo.AuthorizedDatabases != nil {
+		op = op.AuthorizedDatabases(*ldo.AuthorizedDatabases)
+	}
+
 	retry := driver.RetryNone
 	if c.retryReads {
 		retry = driver.RetryOncePerCommand
@@ -705,12 +740,17 @@ func (c *Client) ListDatabases(ctx context.Context, filter interface{}, opts ...
 	return newListDatabasesResultFromOperation(op.Result()), nil
 }
 
-// ListDatabaseNames performs a listDatabases operation and returns a slice containing the names of all of the databases
+// ListDatabaseNames executes a listDatabases command and returns a slice containing the names of all of the databases
 // on the server.
 //
-// The filter parameter should be a document containing query operators and can be used to select which databases
+// The filter parameter must be a document containing query operators and can be used to select which databases
 // are included in the result. It cannot be nil. An empty document (e.g. bson.D{}) should be used to include all
 // databases.
+//
+// The opts parameter can be used to specify options for this operation (see the options.ListDatabasesOptions
+// documentation.)
+//
+// For more information about the command, see https://docs.mongodb.com/manual/reference/command/listDatabases/.
 func (c *Client) ListDatabaseNames(ctx context.Context, filter interface{}, opts ...*options.ListDatabasesOptions) ([]string, error) {
 	opts = append(opts, options.ListDatabases().SetNameOnly(true))
 
@@ -727,38 +767,30 @@ func (c *Client) ListDatabaseNames(ctx context.Context, filter interface{}, opts
 	return names, nil
 }
 
-// WithSession allows a user to start a session themselves and manage
-// its lifetime. The only way to provide a session to a CRUD method is
-// to invoke that CRUD method with the mongo.SessionContext within the
-// closure. The mongo.SessionContext can be used as a regular context,
-// so methods like context.WithDeadline and context.WithTimeout are
-// supported.
+// WithSession creates a new SessionContext from the ctx and sess parameters and uses it to call the fn callback. The
+// SessionContext must be used as the Context parameter for any operations in the fn callback that should be executed
+// under the session.
 //
-// If the context.Context already has a mongo.Session attached, that
-// mongo.Session will be replaced with the one provided.
+// If the ctx parameter already contains a Session, that Session will be replaced with the one provided.
 //
-// Errors returned from the closure are transparently returned from
-// this function.
+// Any error returned by the fn callback will be returned without any modifications.
 func WithSession(ctx context.Context, sess Session, fn func(SessionContext) error) error {
-	return fn(contextWithSession(ctx, sess))
+	return fn(NewSessionContext(ctx, sess))
 }
 
-// UseSession creates a new session that is only valid for the
-// lifetime of the fn callback. No cleanup outside of closing the session
-// is done upon exiting the closure. This means that an outstanding
-// transaction will be aborted, even if the closure returns an error.
+// UseSession creates a new Session and uses it to create a new SessionContext, which is used to call the fn callback.
+// The SessionContext parameter must be used as the Context parameter for any operations in the fn callback that should
+// be executed under a session. After the callback returns, the created Session is ended, meaning that any in-progress
+// transactions started by fn will be aborted even if fn returns an error.
 //
-// If ctx already contains a mongo.Session, that mongo.Session will be
-// replaced with the newly created one.
+// If the ctx parameter already contains a Session, that Session will be replaced with the newly created one.
 //
-// Errors returned from the closure are transparently returned from
-// this method.
+// Any error returned by the fn callback will be returned without any modifications.
 func (c *Client) UseSession(ctx context.Context, fn func(SessionContext) error) error {
 	return c.UseSessionWithOptions(ctx, options.Session(), fn)
 }
 
-// UseSessionWithOptions works like UseSession but allows the caller
-// to specify the options used to create the session.
+// UseSessionWithOptions operates like UseSession but uses the given SessionOptions to create the Session.
 func (c *Client) UseSessionWithOptions(ctx context.Context, opts *options.SessionOptions, fn func(SessionContext) error) error {
 	defaultSess, err := c.StartSession(opts)
 	if err != nil {
@@ -766,24 +798,19 @@ func (c *Client) UseSessionWithOptions(ctx context.Context, opts *options.Sessio
 	}
 
 	defer defaultSess.EndSession(ctx)
-
-	sessCtx := sessionContext{
-		Context: context.WithValue(ctx, sessionKey{}, defaultSess),
-		Session: defaultSess,
-	}
-
-	return fn(sessCtx)
+	return fn(NewSessionContext(ctx, defaultSess))
 }
 
-// Watch returns a change stream for all changes on the connected deployment. See https://docs.mongodb.com/manual/changeStreams/
-// for more information about change streams.
+// Watch returns a change stream for all changes on the deployment. See
+// https://docs.mongodb.com/manual/changeStreams/ for more information about change streams.
 //
 // The client must be configured with read concern majority or no read concern for a change stream to be created
 // successfully.
 //
-// The pipeline parameter should be an array of documents, each representing a pipeline stage. See
-// https://docs.mongodb.com/manual/changeStreams/ for a list of pipeline stages that can be used with change streams.
-// For a pipeline of bson.D documents, the mongo.Pipeline{} type can be used.
+// The pipeline parameter must be an array of documents, each representing a pipeline stage. The pipeline cannot be
+// nil or empty. The stage documents must all be non-nil. See https://docs.mongodb.com/manual/changeStreams/ for a list
+// of pipeline stages that can be used with change streams. For a pipeline of bson.D documents, the mongo.Pipeline{}
+// type can be used.
 //
 // The opts parameter can be used to specify options for change stream creation (see the options.ChangeStreamOptions
 // documentation).

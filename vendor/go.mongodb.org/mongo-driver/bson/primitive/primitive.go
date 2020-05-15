@@ -40,9 +40,30 @@ type Undefined struct{}
 // DateTime represents the BSON datetime value.
 type DateTime int64
 
+var _ json.Marshaler = DateTime(0)
+var _ json.Unmarshaler = (*DateTime)(nil)
+
 // MarshalJSON marshal to time type
 func (d DateTime) MarshalJSON() ([]byte, error) {
 	return json.Marshal(d.Time())
+}
+
+// UnmarshalJSON creates a primitive.DateTime from a JSON string.
+func (d *DateTime) UnmarshalJSON(data []byte) error {
+	// Ignore "null" to keep parity with the time.Time type and the standard library. Decoding "null" into a non-pointer
+	// DateTime field will leave the field unchanged. For pointer values, the encoding/json will set the pointer to nil
+	// and will not defer to the UnmarshalJSON hook.
+	if string(data) == "null" {
+		return nil
+	}
+
+	var tempTime time.Time
+	if err := json.Unmarshal(data, &tempTime); err != nil {
+		return err
+	}
+
+	*d = NewDateTimeFromTime(tempTime)
+	return nil
 }
 
 // Time returns the date as a time type.
@@ -70,7 +91,7 @@ func (rp Regex) String() string {
 
 // Equal compares rp to rp2 and returns true is the are equal.
 func (rp Regex) Equal(rp2 Regex) bool {
-	return rp.Pattern == rp2.Pattern && rp.Options == rp.Options
+	return rp.Pattern == rp2.Pattern && rp.Options == rp2.Options
 }
 
 // IsZero returns if rp is the empty Regex
@@ -156,16 +177,12 @@ type MinKey struct{}
 // MaxKey represents the BSON maxkey value.
 type MaxKey struct{}
 
-// D represents a BSON Document. This type can be used to represent BSON in a concise and readable
-// manner. It should generally be used when serializing to BSON. For deserializing, the Raw or
-// Document types should be used.
+// D is an ordered representation of a BSON document. This type should be used when the order of the elements matters,
+// such as MongoDB command documents. If the order of the elements does not matter, an M should be used instead.
 //
 // Example usage:
 //
-// 		primitive.D{{"foo", "bar"}, {"hello", "world"}, {"pi", 3.14159}}
-//
-// This type should be used in situations where order matters, such as MongoDB commands. If the
-// order is not important, a map is more comfortable and concise.
+// 		bson.D{{"foo", "bar"}, {"hello", "world"}, {"pi", 3.14159}}
 type D []E
 
 // Map creates a map from the elements of the D.
@@ -183,24 +200,18 @@ type E struct {
 	Value interface{}
 }
 
-// M is an unordered, concise representation of a BSON Document. It should generally be used to
-// serialize BSON when the order of the elements of a BSON document do not matter. If the element
-// order matters, use a D instead.
+// M is an unordered representation of a BSON document. This type should be used when the order of the elements does not
+// matter. This type is handled as a regular map[string]interface{} when encoding and decoding. Elements will be
+// serialized in an undefined, random order. If the order of the elements matters, a D should be used instead.
 //
 // Example usage:
 //
-// 		primitive.M{"foo": "bar", "hello": "world", "pi": 3.14159}
-//
-// This type is handled in the encoders as a regular map[string]interface{}. The elements will be
-// serialized in an undefined, random order, and the order will be different each time.
+// 		bson.M{"foo": "bar", "hello": "world", "pi": 3.14159}.
 type M map[string]interface{}
 
-// An A represents a BSON array. This type can be used to represent a BSON array in a concise and
-// readable manner. It should generally be used when serializing to BSON. For deserializing, the
-// RawArray or Array types should be used.
+// An A is an ordered representation of a BSON array.
 //
 // Example usage:
 //
-// 		primitive.A{"bar", "world", 3.14159, primitive.D{{"qux", 12345}}}
-//
+// 		bson.A{"bar", "world", 3.14159, bson.D{{"qux", 12345}}}
 type A []interface{}
