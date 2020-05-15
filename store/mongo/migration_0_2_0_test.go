@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"sort"
 	"testing"
+	"time"
 
 	"github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
@@ -29,6 +30,14 @@ import (
 	"github.com/mendersoftware/inventory/model"
 )
 
+type legacyDevice struct {
+	ID         model.DeviceID                   `bson:"_id"`
+	Attributes map[string]model.DeviceAttribute `bson:",omitempty"`
+	Group      string                           `bson:"group,omitempty"`
+	CreatedTs  time.Time                        `bson:"created_ts,omitempty"`
+	UpdatedTs  time.Time                        `bson:"updated_ts,omitempty"`
+}
+
 func TestMigration_0_2_0(t *testing.T) {
 	cases := map[string]struct {
 		inDevs  []interface{}
@@ -37,86 +46,161 @@ func TestMigration_0_2_0(t *testing.T) {
 	}{
 		"single dev": {
 			inDevs: []interface{}{
-				model.Device{
+				legacyDevice{
 					ID: model.DeviceID("1"),
 					Attributes: map[string]model.DeviceAttribute{
-						"foo": {Name: "foo", Value: "val3", Description: strPtr("desc")},
-						"bar": {Name: "bar", Value: 3.0, Description: strPtr("desc")},
+						"foo": {
+							Name:        "foo",
+							Value:       "val3",
+							Description: strPtr("desc"),
+						},
+						"bar": {
+							Name:        "bar",
+							Value:       3.0,
+							Description: strPtr("desc"),
+						},
 					},
 				},
 			},
 			outDevs: []model.Device{
 				{
 					ID: model.DeviceID("1"),
-					Attributes: map[string]model.DeviceAttribute{
-						"inventory-foo": {Name: "foo", Value: "val3", Description: strPtr("desc"), Scope: model.AttrScopeInventory},
-						"inventory-bar": {Name: "bar", Value: 3.0, Description: strPtr("desc"), Scope: model.AttrScopeInventory},
-					},
-				},
-			},
+					Attributes: model.DeviceAttributes{{
+						Name:        "foo",
+						Value:       "val3",
+						Description: strPtr("desc"),
+						Scope:       model.AttrScopeInventory,
+					}, {
+						Name:        "bar",
+						Value:       3.0,
+						Description: strPtr("desc"),
+						Scope:       model.AttrScopeInventory,
+					}},
+				}},
 		},
 		"a couple devs, same attributes": {
 			inDevs: []interface{}{
-				model.Device{
+				legacyDevice{
 					ID: model.DeviceID("1"),
 					Attributes: map[string]model.DeviceAttribute{
-						"foo": {Name: "foo", Value: "val3", Description: strPtr("desc")},
-						"bar": {Name: "bar", Value: 3.0, Description: strPtr("desc")},
-					},
+						"foo": {
+							Name:        "foo",
+							Value:       "val3",
+							Description: strPtr("desc"),
+						},
+						"bar": {
+							Name:        "bar",
+							Value:       3.0,
+							Description: strPtr("desc"),
+						}},
 				},
-				model.Device{
+				legacyDevice{
 					ID: model.DeviceID("2"),
 					Attributes: map[string]model.DeviceAttribute{
-						"foo": {Name: "foo2", Value: "val32", Description: strPtr("desc2")},
-						"bar": {Name: "bar2", Value: 2.0, Description: strPtr("desc2")},
+						"foo2": {
+							Name:        "foo2",
+							Value:       "val32",
+							Description: strPtr("desc2"),
+						},
+						"bar2": {
+							Name:        "bar2",
+							Value:       2.0,
+							Description: strPtr("desc2"),
+						},
 					},
 				},
 			},
 			outDevs: []model.Device{
 				{
 					ID: model.DeviceID("1"),
-					Attributes: map[string]model.DeviceAttribute{
-						"inventory-foo": {Name: "foo", Value: "val3", Description: strPtr("desc"), Scope: model.AttrScopeInventory},
-						"inventory-bar": {Name: "bar", Value: 3.0, Description: strPtr("desc"), Scope: model.AttrScopeInventory},
+					Attributes: model.DeviceAttributes{
+						{
+							Name:        "foo",
+							Value:       "val3",
+							Description: strPtr("desc"),
+							Scope:       model.AttrScopeInventory,
+						},
+						{
+							Name:        "bar",
+							Value:       3.0,
+							Description: strPtr("desc"),
+							Scope:       model.AttrScopeInventory,
+						},
 					},
 				},
 				{
 					ID: model.DeviceID("2"),
-					Attributes: map[string]model.DeviceAttribute{
-						"inventory-foo": {Name: "foo2", Value: "val32", Description: strPtr("desc2"), Scope: model.AttrScopeInventory},
-						"inventory-bar": {Name: "bar2", Value: 2.0, Description: strPtr("desc2"), Scope: model.AttrScopeInventory},
+					Attributes: model.DeviceAttributes{
+						{
+							Name:        "foo2",
+							Value:       "val32",
+							Description: strPtr("desc2"),
+							Scope:       model.AttrScopeInventory,
+						},
+						{
+							Name:        "bar2",
+							Value:       2.0,
+							Description: strPtr("desc2"),
+							Scope:       model.AttrScopeInventory,
+						},
 					},
 				},
 			},
 		},
 		"a couple devs, diff attributes": {
 			inDevs: []interface{}{
-				model.Device{
+				legacyDevice{
 					ID: model.DeviceID("1"),
 					Attributes: map[string]model.DeviceAttribute{
-						"foo": {Name: "foo", Value: "val3", Description: strPtr("desc")},
-						"bar": {Name: "bar", Value: 3.0, Description: strPtr("desc")},
+						"foo": {
+							Name:        "foo",
+							Value:       "val3",
+							Description: strPtr("desc"),
+						},
+						"bar": {
+							Name:        "bar",
+							Value:       3.0,
+							Description: strPtr("desc"),
+						},
 					},
 				},
-				model.Device{
+				legacyDevice{
 					ID: model.DeviceID("2"),
 					Attributes: map[string]model.DeviceAttribute{
-						"baz": {Name: "baz", Value: "val", Description: strPtr("desc")},
+						"baz": {
+							Name:        "baz",
+							Value:       "val",
+							Description: strPtr("desc"),
+						},
 					},
 				},
 			},
 			outDevs: []model.Device{
 				{
 					ID: model.DeviceID("1"),
-					Attributes: map[string]model.DeviceAttribute{
-						"inventory-foo": {Name: "foo", Value: "val3", Description: strPtr("desc"), Scope: model.AttrScopeInventory},
-						"inventory-bar": {Name: "bar", Value: 3.0, Description: strPtr("desc"), Scope: model.AttrScopeInventory},
+					Attributes: model.DeviceAttributes{
+						{
+							Name:        "foo",
+							Value:       "val3",
+							Description: strPtr("desc"),
+							Scope:       model.AttrScopeInventory,
+						}, {
+							Name:        "bar",
+							Value:       3.0,
+							Description: strPtr("desc"),
+							Scope:       model.AttrScopeInventory,
+						},
 					},
 				},
 				{
 					ID: model.DeviceID("2"),
-					Attributes: map[string]model.DeviceAttribute{
-						"inventory-baz": {Name: "baz", Value: "val", Description: strPtr("desc"), Scope: model.AttrScopeInventory},
+					Attributes: model.DeviceAttributes{
+						{
+							Name:        "baz",
+							Value:       "val",
+							Description: strPtr("desc"),
+							Scope:       model.AttrScopeInventory,
+						},
 					},
 				},
 			},

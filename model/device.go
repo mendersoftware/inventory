@@ -15,15 +15,23 @@ package model
 
 import (
 	"encoding/json"
-	"errors"
+	"reflect"
 	"time"
 
 	"github.com/go-ozzo/ozzo-validation"
+	"github.com/pkg/errors"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/bsontype"
 )
 
 const (
 	AttrScopeInventory = "inventory"
 	AttrScopeIdentity  = "identity"
+	AttrScopeSystem    = "system"
+
+	AttrNameGroup   = "group"
+	AttrNameUpdated = "updated_ts"
+	AttrNameCreated = "created_ts"
 )
 
 type DeviceID string
@@ -42,36 +50,62 @@ type DeviceAttribute struct {
 func (da DeviceAttribute) Validate() error {
 	return validation.ValidateStruct(&da,
 		validation.Field(&da.Name, validation.Required, validation.Length(1, 1024)),
+		validation.Field(&da.Scope, validation.Required, validation.Length(1, 1024)),
 		validation.Field(&da.Value, validation.By(validateDeviceAttrVal)),
 	)
 }
 
 func validateDeviceAttrVal(i interface{}) error {
-	switch v := i.(type) {
-	case float64, string:
-		return nil
-	case []interface{}:
-		return validateDeviceAttrValArray(v)
-	default:
+	if i == nil {
 		return errors.New("supported types are string, float64, and arrays thereof")
 	}
+	rType := reflect.TypeOf(i)
+	if rType.Kind() == reflect.Interface {
+		rType = rType.Elem()
+	}
+
+	switch rType.Kind() {
+	case reflect.Float64, reflect.String:
+		return nil
+	case reflect.Slice:
+		elemKind := rType.Elem().Kind()
+		if elemKind == reflect.Float64 || elemKind == reflect.String {
+			return nil
+		} else if elemKind == reflect.Interface {
+			return validateDeviceAttrValArray(i)
+		}
+	}
+	return errors.New("supported types are string, float64, and arrays thereof")
 }
 
-func validateDeviceAttrValArray(arr []interface{}) error {
-	var firstValueString, firstValueFloat64 bool
-	for i, v := range arr {
-		_, isstring := v.(string)
-		_, isfloat64 := v.(float64)
-		if i == 0 {
-			if isstring {
-				firstValueString = true
-			} else if isfloat64 {
-				firstValueFloat64 = true
-			} else {
-				return errors.New("array values must be either string or float64")
-			}
-		} else if (firstValueString && !isstring) || (firstValueFloat64 && !isfloat64) {
-			return errors.New("array values must be of consistent type (string or float64)")
+func validateDeviceAttrValArray(arr interface{}) error {
+	rVal := reflect.ValueOf(arr)
+	rLen := rVal.Len()
+	if rLen == 0 {
+		return nil
+	}
+	elem := rVal.Index(0)
+	kind := elem.Kind()
+	if elem.Kind() == reflect.Interface {
+		elem = elem.Elem()
+		kind = elem.Kind()
+	}
+	if kind != reflect.String && kind != reflect.Float64 {
+		return errors.New(
+			"array values must be either string or float64, not: " +
+				kind.String())
+	}
+	for i := 1; i < rLen; i++ {
+		elem = rVal.Index(i)
+		elemKind := elem.Kind()
+		if elemKind == reflect.Interface {
+			elemKind = elem.Elem().Kind()
+		}
+		if elemKind != kind {
+			return errors.New(
+				"array values must be of consistent type: " +
+					"string or float64",
+			)
 		}
 	}
 	return nil
@@ -93,6 +127,44 @@ type Device struct {
 	UpdatedTs time.Time `json:"updated_ts" bson:"updated_ts,omitempty"`
 }
 
+// internalDevice is only used internally to avoid recursive type-loops for
+// member functions.
+type internalDevice Device
+
+func (d *Device) UnmarshalBSON(b []byte) error {
+	if err := bson.Unmarshal(b, (*internalDevice)(d)); err != nil {
+		return err
+	}
+	for _, attr := range d.Attributes {
+		if attr.Scope == AttrScopeSystem {
+			switch attr.Name {
+			case AttrNameGroup:
+				group, _ := attr.Value.(string)
+				d.Group = GroupName(group)
+			case AttrNameUpdated:
+				d.UpdatedTs, _ = attr.Value.(time.Time)
+			case AttrNameCreated:
+				d.CreatedTs, _ = attr.Value.(time.Time)
+			}
+		}
+	}
+	return nil
+}
+
+func (d Device) MarshalBSON() ([]byte, error) {
+	if err := d.Validate(); err != nil {
+		return nil, err
+	}
+	if d.Group != "" {
+		d.Attributes = append(d.Attributes, DeviceAttribute{
+			Scope: AttrScopeSystem,
+			Name:  AttrNameGroup,
+			Value: d.Group,
+		})
+	}
+	return bson.Marshal(internalDevice(d))
+}
+
 func (d Device) Validate() error {
 	return validation.ValidateStruct(&d,
 		validation.Field(&d.ID, validation.Required, validation.Length(1, 1024)),
@@ -109,41 +181,67 @@ func (gn GroupName) String() string {
 }
 
 // wrapper for device attributes names and values
-type DeviceAttributes map[string]DeviceAttribute
+type DeviceAttributes []DeviceAttribute
 
 func (d *DeviceAttributes) UnmarshalJSON(b []byte) error {
-	var attrsArray []DeviceAttribute
-	err := json.Unmarshal(b, &attrsArray)
+	err := json.Unmarshal(b, (*[]DeviceAttribute)(d))
 	if err != nil {
 		return err
 	}
-	if len(attrsArray) > 0 {
-		*d = DeviceAttributes{}
-		for _, attr := range attrsArray {
-			if attr.Scope == "" {
-				attr.Scope = AttrScopeInventory
-			}
-			(*d)[attr.Name] = attr
+	for i := range *d {
+		if (*d)[i].Scope == "" {
+			(*d)[i].Scope = AttrScopeInventory
 		}
 	}
 
 	return nil
 }
 
+// MarshalJSON ensures that an empty array is returned if DeviceAttributes is
+// empty.
 func (d DeviceAttributes) MarshalJSON() ([]byte, error) {
-	attrsArray := make([]DeviceAttribute, 0, len(d))
+	if d == nil {
+		return json.Marshal([]DeviceAttribute{})
+	}
+	return json.Marshal([]DeviceAttribute(d))
+}
 
-	for a, v := range d {
-		nv := v
-		if v.Name == "" {
-			v.Name = a
+func (d DeviceAttributes) Validate() error {
+	for _, a := range d {
+		if err := a.Validate(); err != nil {
+			return err
 		}
-		nv.Name = v.Name
-		if nv.Scope == "" {
-			nv.Scope = AttrScopeInventory
+	}
+	return nil
+}
+
+// UnmarshalBSONValue correctly unmarshals DeviceAttributes from Device
+// documents stored in the DB.
+func (d *DeviceAttributes) UnmarshalBSONValue(t bsontype.Type, b []byte) error {
+	raw := bson.Raw(b)
+	elems, err := raw.Elements()
+	if err != nil {
+		return err
+	}
+	*d = make(DeviceAttributes, len(elems))
+	for i, elem := range elems {
+		err = elem.Value().Unmarshal(&(*d)[i])
+		if err != nil {
+			return err
 		}
-		attrsArray = append(attrsArray, nv)
 	}
 
-	return json.Marshal(attrsArray)
+	return nil
+}
+
+// MarshalBSONValue marshals the DeviceAttributes to a mongo-compatible
+// document. That is, each attribute is given a unique field consisting of
+// "<scope>-<name>".
+func (d DeviceAttributes) MarshalBSONValue() (bsontype.Type, []byte, error) {
+	attrs := make(bson.D, len(d))
+	for i := range d {
+		attrs[i].Key = d[i].Scope + "-" + d[i].Name
+		attrs[i].Value = &d[i]
+	}
+	return bson.MarshalValue(attrs)
 }

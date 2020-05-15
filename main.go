@@ -29,6 +29,14 @@ func main() {
 	doMain(os.Args)
 }
 
+const maintenanceDescription = `Run migrations in maintenance mode.
+   WARNING: All external endpoints modifying state in the database must be
+            temporarily disabled while maintenance is in progress:
+       - PUT    /api/management/v1/inventory/devices/{id}/group
+       - DELETE /api/management/v1/inventory/devices/{id}
+       - DELETE /api/management/v1/inventory/devices/{id}/group/{name}
+       - PATCH  /api/devices/v1/inventory/devices/attributes`
+
 func doMain(args []string) {
 	var configPath string
 	var debug bool
@@ -78,6 +86,26 @@ func doMain(args []string) {
 			},
 
 			Action: cmdMigrate,
+		},
+		{
+			Name:        "maintenance",
+			Description: maintenanceDescription,
+			Flags: []cli.Flag{
+				cli.StringSliceFlag{
+					Name: "tenant, t",
+					Usage: "Takes ID of specific " +
+						"tenant(s) to migrate. " +
+						"Flag can be provided " +
+						"multiple times.",
+				},
+				cli.StringFlag{
+					Name:  "version",
+					Usage: "Target version to migrate",
+					Value: mongo.DbVersion,
+				},
+			},
+
+			Action: cmdMaintenence,
 		},
 	}
 
@@ -187,6 +215,40 @@ func cmdMigrate(args *cli.Context) error {
 	} else {
 		err = db.Migrate(ctx, mongo.DbVersion)
 	}
+	if err != nil {
+		return cli.NewExitError(
+			fmt.Sprintf("failed to run migrations: %v", err),
+			3)
+	}
+
+	return nil
+}
+
+func cmdMaintenence(args *cli.Context) error {
+	tenantIDs := args.StringSlice("tenant")
+	version := args.String("version")
+
+	l := log.New(log.Ctx{})
+
+	if len(tenantIDs) > 0 {
+		l.Infof("performing maintenence for tenants: %v", tenantIDs)
+	} else {
+		l.Info("performing maintenance for all the tenants")
+	}
+	db, err := mongo.NewDataStoreMongo(makeDataStoreConfig())
+
+	if err != nil {
+		return cli.NewExitError(
+			fmt.Sprintf("failed to connect to db: %v", err),
+			3)
+	}
+
+	// we want to apply migrations
+	db = db.WithAutomigrate()
+
+	ctx := context.Background()
+
+	err = db.Maintenance(ctx, version, tenantIDs...)
 	if err != nil {
 		return cli.NewExitError(
 			fmt.Sprintf("failed to run migrations: %v", err),

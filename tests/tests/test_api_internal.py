@@ -13,62 +13,72 @@
 #    See the License for the specific language governing permissions and
 #    limitations under the License.
 import os
-from common import internal_client, management_client, mongo, clean_db, inventory_attributes
+from common import (
+    internal_client,
+    management_client,
+    mongo,
+    clean_db,
+    inventory_attributes,
+)
 import bravado
 import pytest
+
 
 class TestInternalApiTenantCreate:
     def test_create_ok(self, internal_client, clean_db):
 
-        _, r = internal_client.create_tenant('foobar')
+        _, r = internal_client.create_tenant("foobar")
         assert r.status_code == 201
 
-        assert 'inventory-foobar' in clean_db.database_names()
-        assert 'migration_info' in clean_db['inventory-foobar'].collection_names()
+        assert "inventory-foobar" in clean_db.database_names()
+        assert "migration_info" in clean_db["inventory-foobar"].collection_names()
 
     def test_create_twice(self, internal_client, clean_db):
 
-        _, r = internal_client.create_tenant('foobar')
+        _, r = internal_client.create_tenant("foobar")
         assert r.status_code == 201
 
         # creating once more should not fail
-        _, r = internal_client.create_tenant('foobar')
+        _, r = internal_client.create_tenant("foobar")
         assert r.status_code == 201
-
 
     def test_create_empty(self, internal_client):
         try:
-            _, r = internal_client.create_tenant('')
+            _, r = internal_client.create_tenant("")
         except bravado.exception.HTTPError as e:
             assert e.response.status_code == 400
 
 
 class TestInternalApiDeviceCreate:
-    def test_create_ok(self, internal_client, management_client, clean_db, inventory_attributes):
-        devid = "".join([ format(i, "02x") for i in os.urandom(128)])
-        _, r = internal_client.create_device(device_id = devid,
-                                             attributes=inventory_attributes)
+    def test_create_ok(
+        self, internal_client, management_client, clean_db, inventory_attributes,
+    ):
+        devid = "".join([format(i, "02x") for i in os.urandom(128)])
+        _, r = internal_client.create_device(
+            device_id=devid, attributes=inventory_attributes
+        )
         assert r.status_code == 201
 
-        r, _ = management_client.client.devices.get_devices_id(id=devid,
-                                                               Authorization="foo").result()
+        r, _ = management_client.client.devices.get_devices_id(
+            id=devid, Authorization="foo"
+        ).result()
 
-        self._verify_inventory(inventory_attributes,
-                              [internal_client.Attribute(name=attr.name,
-                                                         value=attr.value,
-                                                         description=attr.description) for attr in r.attributes])
+        self._verify_inventory(inventory_attributes, r.attributes)
 
-    def test_create_twice_ok(self, internal_client, management_client, clean_db, inventory_attributes):
+    def test_create_twice_ok(
+        self, internal_client, management_client, clean_db, inventory_attributes,
+    ):
         # insert first device
-        devid = "".join([ format(i, "02x") for i in os.urandom(128)])
-        _, r = internal_client.create_device(device_id = devid,
-                                             attributes=inventory_attributes)
+        devid = "".join([format(i, "02x") for i in os.urandom(128)])
+        _, r = internal_client.create_device(
+            device_id=devid, attributes=inventory_attributes
+        )
         assert r.status_code == 201
 
         # add extra attribute, modify existing
-        new_attr = internal_client.Attribute(name="new attr",
-                                             value="new value",
-                                              description="desc")
+        new_attr = management_client.inventoryAttribute(
+            name="new attr", value="new value", scope="inventory", description="desc",
+        )
 
         existing = inventory_attributes[0]
         existing.value = "newval"
@@ -80,20 +90,31 @@ class TestInternalApiDeviceCreate:
         inventory_attributes.append(new_attr)
 
         # insert 'the same' device
-        _, r = internal_client.create_device(device_id = devid,
-                                             attributes=new_attrs)
+        _, r = internal_client.create_device(device_id=devid, attributes=new_attrs)
         assert r.status_code == 201
 
         # verify update
-        r, _ = management_client.client.devices.get_devices_id(id=devid,
-                                                               Authorization="foo").result()
+        r, _ = management_client.client.devices.get_devices_id(
+            id=devid, Authorization="foo"
+        ).result()
 
         self._verify_inventory(inventory_attributes, r.attributes)
 
     def _verify_inventory(self, expected, inventory):
-         assert len(inventory) == len(expected)
-
-         print("inventory:\n", inventory, "expected:\n", expected)
-         for e in expected:
-            found = [f for f in inventory if (f.name == e.name and f.value == e.value and f.description==e.description)]
-            assert len(found)==1, "Inventory data is incorrect"
+        # Filter only attributes within the inventory scope
+        expected_inventory = list(filter(lambda a: a.scope == "inventory", expected))
+        inventory = list(filter(lambda a: a.scope == "inventory", inventory))
+        assert len(inventory) == len(
+            expected_inventory
+        ), "expected: %s / actual: %s" % (inventory, expected_inventory)
+        for e in expected_inventory:
+            found = [
+                f
+                for f in inventory
+                if (
+                    f.name == e.name
+                    and f.value == e.value
+                    and f.description == e.description
+                )
+            ]
+            assert len(found) == 1, "Inventory data is incorrect"

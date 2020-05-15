@@ -21,7 +21,24 @@ import (
 	"go.mongodb.org/mongo-driver/x/mongo/driver/wiremessage"
 )
 
-// Parse parses the provided uri and returns a URI object.
+// ParseAndValidate parses the provided URI into a ConnString object.
+// It check that all values are valid.
+func ParseAndValidate(s string) (ConnString, error) {
+	p := parser{dnsResolver: dns.DefaultResolver}
+	err := p.parse(s)
+	if err != nil {
+		return p.ConnString, internal.WrapErrorf(err, "error parsing uri")
+	}
+	err = p.ConnString.Validate()
+	if err != nil {
+		return p.ConnString, internal.WrapErrorf(err, "error validating uri")
+	}
+	return p.ConnString, nil
+}
+
+// Parse parses the provided URI into a ConnString object
+// but does not check that all values are valid. Use `ConnString.Validate()`
+// to run the validation checks separately.
 func Parse(s string) (ConnString, error) {
 	p := parser{dnsResolver: dns.DefaultResolver}
 	err := p.parse(s)
@@ -37,7 +54,9 @@ type ConnString struct {
 	AppName                            string
 	AuthMechanism                      string
 	AuthMechanismProperties            map[string]string
+	AuthMechanismPropertiesSet         bool
 	AuthSource                         string
+	AuthSourceSet                      bool
 	Compressors                        []string
 	Connect                            ConnectMode
 	ConnectSet                         bool
@@ -64,6 +83,8 @@ type ConnString struct {
 	ReadPreferenceTagSets              []map[string]string
 	RetryWrites                        bool
 	RetryWritesSet                     bool
+	RetryReads                         bool
+	RetryReadsSet                      bool
 	MaxStaleness                       time.Duration
 	MaxStalenessSet                    bool
 	ReplicaSet                         string
@@ -78,10 +99,16 @@ type ConnString struct {
 	SSLClientCertificateKeyFileSet     bool
 	SSLClientCertificateKeyPassword    func() string
 	SSLClientCertificateKeyPasswordSet bool
+	SSLCertificateFile                 string
+	SSLCertificateFileSet              bool
+	SSLPrivateKeyFile                  string
+	SSLPrivateKeyFileSet               bool
 	SSLInsecure                        bool
 	SSLInsecureSet                     bool
 	SSLCaFile                          string
 	SSLCaFileSet                       bool
+	SSLDisableOCSPEndpointCheck        bool
+	SSLDisableOCSPEndpointCheckSet     bool
 	WString                            string
 	WNumber                            int
 	WNumberSet                         bool
@@ -101,6 +128,23 @@ type ConnString struct {
 
 func (u *ConnString) String() string {
 	return u.Original
+}
+
+// HasAuthParameters returns true if this ConnString has any authentication parameters set and therefore represents
+// a request for authentication.
+func (u *ConnString) HasAuthParameters() bool {
+	// Check all auth parameters except for AuthSource because an auth source without other credentials is semantically
+	// valid and must not be interpreted as a request for authentication.
+	return u.AuthMechanism != "" || u.AuthMechanismProperties != nil || u.Username != "" || u.PasswordSet
+}
+
+// Validate checks that the Auth and SSL parameters are valid values.
+func (u *ConnString) Validate() error {
+	p := parser{
+		dnsResolver: dns.DefaultResolver,
+		ConnString:  *u,
+	}
+	return p.validate()
 }
 
 // ConnectMode informs the driver on how to connect
@@ -245,19 +289,29 @@ func (p *parser) parse(original string) error {
 		return err
 	}
 
+	// If WTimeout was set from manual options passed in, set WTImeoutSet to true.
+	if p.WTimeoutSetFromOption {
+		p.WTimeoutSet = true
+	}
+
+	return nil
+}
+
+func (p *parser) validate() error {
+	var err error
+
 	err = p.validateAuth()
 	if err != nil {
+		return err
+	}
+
+	if err = p.validateSSL(); err != nil {
 		return err
 	}
 
 	// Check for invalid write concern (i.e. w=0 and j=true)
 	if p.WNumberSet && p.WNumber == 0 && p.JSet && p.J {
 		return writeconcern.ErrInconsistent
-	}
-
-	// If WTimeout was set from manual options passed in, set WTImeoutSet to true.
-	if p.WTimeoutSetFromOption {
-		p.WTimeoutSet = true
 	}
 
 	return nil
@@ -281,7 +335,7 @@ func (p *parser) setDefaultAuthParams(dbName string) error {
 			p.AuthMechanismProperties["SERVICE_NAME"] = "mongodb"
 		}
 		fallthrough
-	case "mongodb-x509":
+	case "mongodb-aws", "mongodb-x509":
 		if p.AuthSource == "" {
 			p.AuthSource = "$external"
 		} else if p.AuthSource != "$external" {
@@ -299,6 +353,7 @@ func (p *parser) setDefaultAuthParams(dbName string) error {
 			}
 		}
 	case "":
+		// Only set auth source if there is a request for authentication via non-empty credentials.
 		if p.AuthSource == "" && (p.AuthMechanismProperties != nil || p.Username != "" || p.PasswordSet) {
 			p.AuthSource = dbName
 			if p.AuthSource == "" {
@@ -329,6 +384,23 @@ func (p *parser) validateAuth() error {
 		}
 		if p.AuthMechanismProperties != nil {
 			return fmt.Errorf("MONGO-X509 cannot have mechanism properties")
+		}
+	case "mongodb-aws":
+		if p.Username != "" && p.Password == "" {
+			return fmt.Errorf("username without password is invalid for MONGODB-AWS")
+		}
+		if p.Username == "" && p.Password != "" {
+			return fmt.Errorf("password without username is invalid for MONGODB-AWS")
+		}
+		var token bool
+		for k := range p.AuthMechanismProperties {
+			if k != "AWS_SESSION_TOKEN" {
+				return fmt.Errorf("invalid auth property for MONGODB-AWS")
+			}
+			token = true
+		}
+		if token && p.Username == "" && p.Password == "" {
+			return fmt.Errorf("token without username and password is invalid for MONGODB-AWS")
 		}
 	case "gssapi":
 		if p.Username == "" {
@@ -370,11 +442,34 @@ func (p *parser) validateAuth() error {
 			return fmt.Errorf("SCRAM-SHA-256 cannot have mechanism properties")
 		}
 	case "":
-		if p.Username == "" && p.AuthSource != "" {
-			return fmt.Errorf("authsource without username is invalid")
-		}
 	default:
 		return fmt.Errorf("invalid auth mechanism")
+	}
+	return nil
+}
+
+func (p *parser) validateSSL() error {
+	if !p.SSL {
+		return nil
+	}
+
+	if p.SSLClientCertificateKeyFileSet {
+		if p.SSLCertificateFileSet || p.SSLPrivateKeyFileSet {
+			return errors.New("the sslClientCertificateKeyFile/tlsCertificateKeyFile URI option cannot be provided " +
+				"along with tlsCertificateFile or tlsPrivateKeyFile")
+		}
+		return nil
+	}
+	if p.SSLCertificateFileSet && !p.SSLPrivateKeyFileSet {
+		return errors.New("the tlsPrivateKeyFile URI option must be provided if the tlsCertificateFile option is specified")
+	}
+	if p.SSLPrivateKeyFileSet && !p.SSLCertificateFileSet {
+		return errors.New("the tlsCertificateFile URI option must be provided if the tlsPrivateKeyFile option is specified")
+	}
+
+	if p.SSLInsecureSet && p.SSLDisableOCSPEndpointCheckSet {
+		return errors.New("the sslInsecure/tlsInsecure URI option cannot be provided along with " +
+			"tlsDisableOCSPEndpointCheck ")
 	}
 	return nil
 }
@@ -442,8 +537,10 @@ func (p *parser) addOption(pair string) error {
 			}
 			p.AuthMechanismProperties[kv[0]] = kv[1]
 		}
+		p.AuthMechanismPropertiesSet = true
 	case "authsource":
 		p.AuthSource = value
+		p.AuthSourceSet = true
 	case "compressors":
 		compressors := strings.Split(value, ",")
 		if len(compressors) < 1 {
@@ -553,6 +650,17 @@ func (p *parser) addOption(pair string) error {
 		}
 
 		p.RetryWritesSet = true
+	case "retryreads":
+		switch value {
+		case "true":
+			p.RetryReads = true
+		case "false":
+			p.RetryReads = false
+		default:
+			return fmt.Errorf("invalid value for %s: %s", key, value)
+		}
+
+		p.RetryReadsSet = true
 	case "serverselectiontimeoutms":
 		n, err := strconv.Atoi(value)
 		if err != nil || n < 0 {
@@ -592,6 +700,16 @@ func (p *parser) addOption(pair string) error {
 	case "sslclientcertificatekeypassword", "tlscertificatekeyfilepassword":
 		p.SSLClientCertificateKeyPassword = func() string { return value }
 		p.SSLClientCertificateKeyPasswordSet = true
+	case "tlscertificatefile":
+		p.SSL = true
+		p.SSLSet = true
+		p.SSLCertificateFile = value
+		p.SSLCertificateFileSet = true
+	case "tlsprivatekeyfile":
+		p.SSL = true
+		p.SSLSet = true
+		p.SSLPrivateKeyFile = value
+		p.SSLPrivateKeyFileSet = true
 	case "sslinsecure", "tlsinsecure":
 		switch value {
 		case "true":
@@ -608,6 +726,19 @@ func (p *parser) addOption(pair string) error {
 		p.SSLSet = true
 		p.SSLCaFile = value
 		p.SSLCaFileSet = true
+	case "tlsdisableocspendpointcheck":
+		p.SSL = true
+		p.SSLSet = true
+
+		switch value {
+		case "true":
+			p.SSLDisableOCSPEndpointCheck = true
+		case "false":
+			p.SSLDisableOCSPEndpointCheck = false
+		default:
+			return fmt.Errorf("invalid value for %s: %s", key, value)
+		}
+		p.SSLDisableOCSPEndpointCheckSet = true
 	case "w":
 		if w, err := strconv.Atoi(value); err == nil {
 			if w < 0 {
