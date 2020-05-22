@@ -326,6 +326,7 @@ paths:
           schema:
             $ref: '#/definitions/Error'
 
+
   /groups/{name}/devices:
     get:
       summary: List the devices belonging to a given group
@@ -337,7 +338,9 @@ paths:
           required: true
           type: string
           format: Bearer [token]
-          description: Contains the JWT token issued by the User Administration and Authentication Service.
+          description: |
+            Contains the JWT token issued by the User Administration and
+            Authentication Service.
         - name: page
           in: query
           description: Starting page.
@@ -374,6 +377,127 @@ paths:
               type: string
         400:
           description: Invalid request parameters.
+          schema:
+            $ref: '#/definitions/Error'
+        404:
+          description: The group was not found.
+          schema:
+            $ref: '#/definitions/Error'
+        500:
+          description: Internal server error.
+          schema:
+            $ref: '#/definitions/Error'
+
+    patch:
+      summary: Add devices to group
+      description: |
+        Appends the list of devices in request body to the given group.
+        For devices already present in the group the operation has no effect.
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          type: string
+          format: Bearer [token]
+          description: |
+            Contains the JWT token issued by the User Administration and
+            Authentication Service.
+        - name: name
+          in: path
+          description: Group name.
+          required: true
+          type: string
+        - name: DeviceIDs
+          description: JSON list of device IDs to append to the group.
+          in: body
+          required: true
+          schema:
+            type: array
+            items:
+              type: string
+      responses:
+        200:
+          description: Successful response
+          schema:
+            description: |
+              JSON object listing how many devices were updated.
+            type: object
+            required:
+              - updated_count
+              - matched_count
+            properties:
+              updated_count:
+                type: number
+                description: |
+                  Number of devices listed that changed group.
+              matched_count:
+                type: number
+                description: |
+                  Number of devices listed that matched a valid device id internally.
+          examples:
+            application/json:
+              updated_count: 2
+              matched_count: 3
+        400:
+          description: Invalid request schema.
+          schema:
+            $ref: '#/definitions/Error'
+        404:
+          description: The group was not found.
+          schema:
+            $ref: '#/definitions/Error'
+        500:
+          description: Internal server error.
+          schema:
+            $ref: '#/definitions/Error'
+
+    delete:
+      summary: Clear devices' group
+      description: |
+        Removes a list of devices from their respective groups. This API provides
+        a bulk alternative to DELETE /devices/{id}/group/{name} for managing
+        device groups.
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          type: string
+          format: Bearer [token]
+          description: |
+            Contains the JWT token issued by the User Administration and
+            Authentication Service.
+        - name: name
+          in: path
+          description: Group name.
+          required: true
+          type: string
+        - name: DeviceIDs
+          description: JSON list of device IDs to append to the group.
+          in: body
+          required: true
+          schema:
+            type: array
+            items:
+              type: string
+      responses:
+        200:
+          description: Successful response
+          schema:
+            description: |
+              JSON object listing how many devices were updated.
+            type: object
+            required:
+              - updated_count
+            properties:
+              updated_count:
+                type: number
+                description: |
+                  Number of devices for which the group was cleared sucessfully.
+          examples:
+            application/json:
+              updated_count: 2
+        400:
+          description: Invalid request schema.
           schema:
             $ref: '#/definitions/Error'
         404:
