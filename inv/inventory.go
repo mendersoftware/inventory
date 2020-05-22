@@ -30,7 +30,17 @@ type InventoryApp interface {
 	AddDevice(ctx context.Context, d *model.Device) error
 	UpsertAttributes(ctx context.Context, id model.DeviceID, attrs model.DeviceAttributes) error
 	UnsetDeviceGroup(ctx context.Context, id model.DeviceID, groupName model.GroupName) error
+	UnsetDevicesGroup(
+		ctx context.Context,
+		deviceIDs []model.DeviceID,
+		groupName model.GroupName,
+	) (*model.GroupUpdateResponse, error)
 	UpdateDeviceGroup(ctx context.Context, id model.DeviceID, group model.GroupName) error
+	UpdateDevicesGroup(
+		ctx context.Context,
+		ids []model.DeviceID,
+		group model.GroupName,
+	) (*model.GroupUpdateResponse, error)
 	ListGroups(ctx context.Context) ([]model.GroupName, error)
 	ListDevicesByGroup(ctx context.Context, group model.GroupName, skip int, limit int) ([]model.DeviceID, int, error)
 	GetDeviceGroup(ctx context.Context, id model.DeviceID) (model.GroupName, error)
@@ -113,6 +123,37 @@ func (i *inventory) UpdateDeviceGroup(ctx context.Context, devid model.DeviceID,
 		return errors.Wrap(err, "failed to add device to group")
 	}
 	return nil
+}
+
+func (i *inventory) UpdateDevicesGroup(
+	ctx context.Context,
+	deviceIDs []model.DeviceID,
+	group model.GroupName,
+) (*model.GroupUpdateResponse, error) {
+	matched, updated, err := i.db.UpdateDevicesGroup(ctx, deviceIDs, group)
+	if err != nil {
+		return nil, err
+	}
+	ret := &model.GroupUpdateResponse{
+		MatchedCount: matched,
+		UpdatedCount: updated,
+	}
+	return ret, err
+}
+
+func (i *inventory) UnsetDevicesGroup(
+	ctx context.Context,
+	deviceIDs []model.DeviceID,
+	groupName model.GroupName,
+) (*model.GroupUpdateResponse, error) {
+	deleted, err := i.db.UnsetDevicesGroup(ctx, deviceIDs, groupName)
+	if err != nil {
+		return nil, err
+	}
+	ret := &model.GroupUpdateResponse{
+		UpdatedCount: deleted,
+	}
+	return ret, err
 }
 
 func (i *inventory) ListGroups(ctx context.Context) ([]model.GroupName, error) {

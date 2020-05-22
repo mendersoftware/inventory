@@ -11,11 +11,13 @@
 //    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
+
 package model
 
 import (
 	"encoding/json"
 	"reflect"
+	"regexp"
 	"time"
 
 	"github.com/go-ozzo/ozzo-validation"
@@ -181,6 +183,26 @@ func (did DeviceID) String() string {
 
 func (gn GroupName) String() string {
 	return string(gn)
+}
+
+func (gn GroupName) Validate() error {
+	if len(gn) > 1024 {
+		return errors.New(
+			"Group name can at most have 1024 characters",
+		)
+	} else if len(gn) == 0 {
+		return errors.New(
+			"Group name cannot be blank",
+		)
+	} else if ok, _ := regexp.MatchString(
+		"^[A-Za-z0-9_-]*$", string(gn),
+	); !ok {
+		return errors.New(
+			"Group name can only contain: upper/lowercase " +
+				"alphanum, -(dash), _(underscore)",
+		)
+	}
+	return nil
 }
 
 // wrapper for device attributes names and values
