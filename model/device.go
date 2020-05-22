@@ -22,6 +22,7 @@ import (
 	"github.com/pkg/errors"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/bsontype"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 const (
@@ -139,12 +140,14 @@ func (d *Device) UnmarshalBSON(b []byte) error {
 		if attr.Scope == AttrScopeSystem {
 			switch attr.Name {
 			case AttrNameGroup:
-				group, _ := attr.Value.(string)
+				group := attr.Value.(string)
 				d.Group = GroupName(group)
 			case AttrNameUpdated:
-				d.UpdatedTs, _ = attr.Value.(time.Time)
+				dateTime := attr.Value.(primitive.DateTime)
+				d.UpdatedTs = dateTime.Time()
 			case AttrNameCreated:
-				d.CreatedTs, _ = attr.Value.(time.Time)
+				dateTime := attr.Value.(primitive.DateTime)
+				d.CreatedTs = dateTime.Time()
 			}
 		}
 	}
