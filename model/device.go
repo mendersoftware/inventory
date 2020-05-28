@@ -20,7 +20,7 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/go-ozzo/ozzo-validation"
+	"github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/pkg/errors"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/bsontype"

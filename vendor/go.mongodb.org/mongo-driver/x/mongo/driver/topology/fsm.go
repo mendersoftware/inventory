@@ -15,7 +15,7 @@ import (
 	"go.mongodb.org/mongo-driver/x/mongo/driver/description"
 )
 
-var supportedWireVersions = description.NewVersionRange(2, 9)
+var supportedWireVersions = description.NewVersionRange(2, 8)
 var minSupportedMongoDBVersion = "2.6"
 
 type fsm struct {
@@ -29,13 +29,9 @@ func newFSM() *fsm {
 	return new(fsm)
 }
 
-// apply takes a new server description and modifies the FSM's topology description based on it. It returns the
-// updated topology description as well as a server description. The returned server description is either the same
-// one that was passed in, or a new one in the case that it had to be changed.
-//
-// apply should operation on immutable descriptions so we don't have to lock for the entire time we're applying the
-// server description.
-func (f *fsm) apply(s description.Server) (description.Topology, description.Server, error) {
+// apply should operate on immutable TopologyDescriptions and Descriptions. This way we don't have to
+// lock for the entire time we're applying server description.
+func (f *fsm) apply(s description.Server) (description.Topology, error) {
 
 	newServers := make([]description.Server, len(f.Servers))
 	copy(newServers, f.Servers)
@@ -66,12 +62,12 @@ func (f *fsm) apply(s description.Server) (description.Topology, description.Ser
 	}
 
 	if _, ok := f.findServer(s.Addr); !ok {
-		return f.Topology, s, nil
+		return f.Topology, nil
 	}
 
 	if s.WireVersion != nil {
 		if s.WireVersion.Max < supportedWireVersions.Min {
-			return description.Topology{}, s, fmt.Errorf(
+			return description.Topology{}, fmt.Errorf(
 				"server at %s reports wire version %d, but this version of the Go driver requires "+
 					"at least %d (MongoDB %s)",
 				s.Addr.String(),
@@ -82,7 +78,7 @@ func (f *fsm) apply(s description.Server) (description.Topology, description.Ser
 		}
 
 		if s.WireVersion.Min > supportedWireVersions.Max {
-			return description.Topology{}, s, fmt.Errorf(
+			return description.Topology{}, fmt.Errorf(
 				"server at %s requires wire version %d, but this version of the Go driver only "+
 					"supports up to %d",
 				s.Addr.String(),
@@ -92,24 +88,23 @@ func (f *fsm) apply(s description.Server) (description.Topology, description.Ser
 		}
 	}
 
-	updatedDesc := s
 	switch f.Kind {
 	case description.Unknown:
-		updatedDesc = f.applyToUnknown(s)
+		f.applyToUnknown(s)
 	case description.Sharded:
-		updatedDesc = f.applyToSharded(s)
+		f.applyToSharded(s)
 	case description.ReplicaSetNoPrimary:
-		updatedDesc = f.applyToReplicaSetNoPrimary(s)
+		f.applyToReplicaSetNoPrimary(s)
 	case description.ReplicaSetWithPrimary:
-		updatedDesc = f.applyToReplicaSetWithPrimary(s)
+		f.applyToReplicaSetWithPrimary(s)
 	case description.Single:
-		updatedDesc = f.applyToSingle(s)
+		f.applyToSingle(s)
 	}
 
-	return f.Topology, updatedDesc, nil
+	return f.Topology, nil
 }
 
-func (f *fsm) applyToReplicaSetNoPrimary(s description.Server) description.Server {
+func (f *fsm) applyToReplicaSetNoPrimary(s description.Server) {
 	switch s.Kind {
 	case description.Standalone, description.Mongos:
 		f.removeServerByAddr(s.Addr)
@@ -120,11 +115,9 @@ func (f *fsm) applyToReplicaSetNoPrimary(s description.Server) description.Serve
 	case description.Unknown, description.RSGhost:
 		f.replaceServer(s)
 	}
-
-	return s
 }
 
-func (f *fsm) applyToReplicaSetWithPrimary(s description.Server) description.Server {
+func (f *fsm) applyToReplicaSetWithPrimary(s description.Server) {
 	switch s.Kind {
 	case description.Standalone, description.Mongos:
 		f.removeServerByAddr(s.Addr)
@@ -137,53 +130,39 @@ func (f *fsm) applyToReplicaSetWithPrimary(s description.Server) description.Ser
 		f.replaceServer(s)
 		f.checkIfHasPrimary()
 	}
-
-	return s
 }
 
-func (f *fsm) applyToSharded(s description.Server) description.Server {
+func (f *fsm) applyToSharded(s description.Server) {
 	switch s.Kind {
 	case description.Mongos, description.Unknown:
 		f.replaceServer(s)
 	case description.Standalone, description.RSPrimary, description.RSSecondary, description.RSArbiter, description.RSMember, description.RSGhost:
 		f.removeServerByAddr(s.Addr)
 	}
-
-	return s
 }
 
-func (f *fsm) applyToSingle(s description.Server) description.Server {
+func (f *fsm) applyToSingle(s description.Server) {
 	switch s.Kind {
 	case description.Unknown:
 		f.replaceServer(s)
 	case description.Standalone, description.Mongos:
 		if f.SetName != "" {
 			f.removeServerByAddr(s.Addr)
-			return s
+			return
 		}
 
 		f.replaceServer(s)
 	case description.RSPrimary, description.RSSecondary, description.RSArbiter, description.RSMember, description.RSGhost:
-		// A replica set name can be provided when creating a direct connection. In this case, if the set name returned
-		// by the isMaster response doesn't match up with the one provided during configuration, the server description
-		// is replaced with a default Unknown description.
-		//
-		// We create a new server description rather than doing s.Kind = description.Unknown because the other fields,
-		// such as RTT, need to be cleared for Unknown descriptions as well.
 		if f.SetName != "" && f.SetName != s.SetName {
-			s = description.Server{
-				Addr: s.Addr,
-				Kind: description.Unknown,
-			}
+			f.removeServerByAddr(s.Addr)
+			return
 		}
 
 		f.replaceServer(s)
 	}
-
-	return s
 }
 
-func (f *fsm) applyToUnknown(s description.Server) description.Server {
+func (f *fsm) applyToUnknown(s description.Server) {
 	switch s.Kind {
 	case description.Mongos:
 		f.setKind(description.Sharded)
@@ -198,8 +177,6 @@ func (f *fsm) applyToUnknown(s description.Server) description.Server {
 	case description.Unknown, description.RSGhost:
 		f.replaceServer(s)
 	}
-
-	return s
 }
 
 func (f *fsm) checkIfHasPrimary() {
