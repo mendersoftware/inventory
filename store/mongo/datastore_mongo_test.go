@@ -31,6 +31,7 @@ import (
 	"github.com/mendersoftware/go-lib-micro/identity"
 
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
+	"github.com/mendersoftware/go-lib-micro/mongo/oid"
 	mstore "github.com/mendersoftware/go-lib-micro/store"
 	"github.com/pkg/errors"
 )
@@ -2692,6 +2693,233 @@ func TestMongoSearchDevices(t *testing.T) {
 			}
 		}
 
+	}
+}
+
+func TestUpdateDevicesGroup(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping TestUpdateDevicesGroup in short mode.")
+	}
+
+	deviceSet := bson.A{
+		model.Device{
+			ID: model.DeviceID(oid.NewUUIDv5("1").String()),
+			Attributes: model.DeviceAttributes{{
+				Name:  "foo",
+				Scope: "bar",
+				Value: "baz",
+			}},
+		},
+		model.Device{
+			ID:    model.DeviceID(oid.NewUUIDv5("2").String()),
+			Group: "foo",
+		},
+		model.Device{
+			ID:    model.DeviceID(oid.NewUUIDv5("3").String()),
+			Group: "bar",
+		},
+		model.Device{
+			ID:    model.DeviceID(oid.NewUUIDv5("4").String()),
+			Group: "baz",
+		},
+	}
+
+	testCases := []struct {
+		Name string
+
+		Tenant    string
+		DeviceIDs []model.DeviceID
+		model.GroupName
+
+		ExpectedMatches int64
+		ExpectedUpdates int64
+		MongoError      bool
+	}{{
+		Name: "ok, all matched updated",
+
+		DeviceIDs: []model.DeviceID{
+			model.DeviceID(oid.NewUUIDv5("1").String()),
+			model.DeviceID(oid.NewUUIDv5("2").String()),
+			model.DeviceID(oid.NewUUIDv5("3").String()),
+		},
+		GroupName:       "baz",
+		ExpectedUpdates: 3,
+		ExpectedMatches: 3,
+	}, {
+		Name: "ok, partial update (tenant)",
+
+		Tenant: oid.NewBSONID().String(),
+		DeviceIDs: []model.DeviceID{
+			model.DeviceID(oid.NewUUIDv5("1").String()),
+			model.DeviceID(oid.NewUUIDv5("2").String()),
+			model.DeviceID(oid.NewUUIDv5("3").String()),
+			model.DeviceID(oid.NewUUIDv5("4").String()),
+			model.DeviceID(oid.NewUUIDv5("5").String()),
+		},
+		GroupName:       "baz",
+		ExpectedUpdates: 3,
+		ExpectedMatches: 4,
+	}, {
+		Name: "ok, no match",
+
+		DeviceIDs: []model.DeviceID{
+			model.DeviceID(oid.NewUUIDv5("10").String()),
+			model.DeviceID(oid.NewUUIDv5("11").String()),
+			model.DeviceID(oid.NewUUIDv5("12").String()),
+			model.DeviceID(oid.NewUUIDv5("13").String()),
+		},
+		GroupName:       "foo",
+		ExpectedMatches: 0,
+		ExpectedUpdates: 0,
+	}, {
+		Name: "error, nil array - internal mongo error",
+
+		DeviceIDs:       nil,
+		GroupName:       "foo",
+		ExpectedMatches: -1,
+		ExpectedUpdates: -1,
+		MongoError:      true,
+	}}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.Name, func(t *testing.T) {
+			db.Wipe()
+			ctx := context.Background()
+			client := db.Client()
+			store := NewDataStoreMongoWithSession(client)
+			if testCase.Tenant != "" {
+				ctx = identity.WithContext(
+					ctx, &identity.Identity{
+						Tenant: testCase.Tenant,
+					},
+				)
+			}
+			collDevs := client.
+				Database(mstore.DbFromContext(ctx, DbName)).
+				Collection(DbDevicesColl)
+			if _, err := collDevs.InsertMany(ctx, deviceSet); err != nil {
+				t.Fatalf("Failed to initialize test context, error: %v", err)
+			}
+			matched, updated, err := store.UpdateDevicesGroup(
+				ctx, testCase.DeviceIDs, testCase.GroupName,
+			)
+
+			assert.Equal(t, testCase.ExpectedMatches, matched)
+			assert.Equal(t, testCase.ExpectedUpdates, updated)
+			if testCase.MongoError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestClearDevicesGroup(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping TestClearDevicesGroup in short mode.")
+	}
+
+	deviceSet := bson.A{
+		model.Device{
+			ID:    model.DeviceID(oid.NewUUIDv5("1").String()),
+			Group: "foo",
+		},
+		model.Device{
+			ID:    model.DeviceID(oid.NewUUIDv5("2").String()),
+			Group: "foo",
+		},
+		model.Device{
+			ID:    model.DeviceID(oid.NewUUIDv5("3").String()),
+			Group: "bar",
+		},
+		model.Device{
+			ID:    model.DeviceID(oid.NewUUIDv5("4").String()),
+			Group: "baz",
+		},
+	}
+
+	testCases := []struct {
+		Name string
+
+		Tenant    string
+		DeviceIDs []model.DeviceID
+		model.GroupName
+
+		ExpectedMatches int64
+		ExpectedUpdates int64
+		MongoError      bool
+	}{{
+		Name: "ok, all matched updated",
+
+		DeviceIDs: []model.DeviceID{
+			model.DeviceID(oid.NewUUIDv5("1").String()),
+			model.DeviceID(oid.NewUUIDv5("2").String()),
+		},
+		GroupName:       "foo",
+		ExpectedUpdates: 2,
+	}, {
+		Name: "ok, partial update (tenant)",
+
+		Tenant: oid.NewBSONID().String(),
+		DeviceIDs: []model.DeviceID{
+			model.DeviceID(oid.NewUUIDv5("1").String()),
+			model.DeviceID(oid.NewUUIDv5("2").String()),
+			model.DeviceID(oid.NewUUIDv5("3").String()),
+			model.DeviceID(oid.NewUUIDv5("4").String()),
+		},
+		GroupName:       "baz",
+		ExpectedUpdates: 1,
+	}, {
+		Name: "ok, no match",
+
+		DeviceIDs: []model.DeviceID{
+			model.DeviceID(oid.NewUUIDv5("10").String()),
+			model.DeviceID(oid.NewUUIDv5("11").String()),
+			model.DeviceID(oid.NewUUIDv5("12").String()),
+			model.DeviceID(oid.NewUUIDv5("13").String()),
+		},
+		GroupName:       "foo",
+		ExpectedUpdates: 0,
+	}, {
+		Name: "error, nil array - internal mongo error",
+
+		DeviceIDs:       nil,
+		GroupName:       "foo",
+		ExpectedUpdates: -1,
+		MongoError:      true,
+	}}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.Name, func(t *testing.T) {
+			db.Wipe()
+			ctx := context.Background()
+			client := db.Client()
+			store := NewDataStoreMongoWithSession(client)
+			if testCase.Tenant != "" {
+				ctx = identity.WithContext(
+					ctx, &identity.Identity{
+						Tenant: testCase.Tenant,
+					},
+				)
+			}
+			collDevs := client.
+				Database(mstore.DbFromContext(ctx, DbName)).
+				Collection(DbDevicesColl)
+			if _, err := collDevs.InsertMany(ctx, deviceSet); err != nil {
+				t.Fatalf("Failed to initialize test context, error: %v", err)
+			}
+			updated, err := store.UnsetDevicesGroup(
+				ctx, testCase.DeviceIDs, testCase.GroupName,
+			)
+
+			assert.Equal(t, testCase.ExpectedUpdates, updated)
+			if testCase.MongoError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
 	}
 }
 

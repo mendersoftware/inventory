@@ -1016,7 +1016,7 @@ func TestApiInventoryAddDeviceToGroup(t *testing.T) {
 				InventoryApiGroup{}),
 			JSONResponseParams: utils.JSONResponseParams{
 				OutputStatus:     http.StatusBadRequest,
-				OutputBodyObject: RestError("group: cannot be blank."),
+				OutputBodyObject: RestError("Group name cannot be blank"),
 			},
 			inventoryErr: nil,
 		},
@@ -1425,7 +1425,6 @@ func TestApiDeleteDevice(t *testing.T) {
 
 	for name, tc := range tcases {
 		t.Run(fmt.Sprintf("test case: %s", name), func(t *testing.T) {
-			t.Parallel()
 
 			inv := minventory.InventoryApp{}
 
@@ -1438,6 +1437,255 @@ func TestApiDeleteDevice(t *testing.T) {
 			apih := makeMockApiHandler(t, &inv)
 
 			runTestRequest(t, apih, tc.inReq, tc.JSONResponseParams)
+		})
+	}
+}
+
+func TestAPIClearDevicesGroup(t *testing.T) {
+	testCases := []struct {
+		Name string
+
+		Devices []model.DeviceID
+		model.GroupName
+		*http.Request
+		utils.JSONResponseParams
+		InventoryErr error
+	}{{
+		Name: "ok, some devices",
+
+		Request: test.MakeSimpleRequest(
+			"DELETE",
+			"http://localhost/api/0.1.0/groups/foo/devices",
+			[]model.DeviceID{"1", "2", "3"},
+		),
+		GroupName: "foo",
+		Devices:   []model.DeviceID{"1", "2", "3"},
+		JSONResponseParams: utils.JSONResponseParams{
+			OutputStatus: http.StatusOK,
+			OutputBodyObject: &model.GroupUpdateResponse{
+				UpdatedCount: 3,
+			},
+		},
+	}, {
+		Name: "error, empty device list",
+
+		Request: test.MakeSimpleRequest(
+			"DELETE",
+			"http://localhost/api/0.1.0/groups/foo/devices",
+			[]model.DeviceID{},
+		),
+		Devices:   []model.DeviceID{},
+		GroupName: "foo",
+		JSONResponseParams: utils.JSONResponseParams{
+			OutputStatus: http.StatusBadRequest,
+			OutputBodyObject: map[string]interface{}{
+				"error":      "no device IDs present in payload",
+				"request_id": "test",
+			},
+		},
+	}, {
+		Name: "error, invalid schema",
+
+		Request: test.MakeSimpleRequest(
+			"DELETE",
+			"http://localhost/api/0.1.0/groups/foo/devices",
+			map[string]string{"foo": "bar"},
+		),
+		GroupName: "foo",
+		JSONResponseParams: utils.JSONResponseParams{
+			OutputStatus: http.StatusBadRequest,
+			OutputBodyObject: map[string]interface{}{
+				"error": "invalid payload schema: json: " +
+					"cannot unmarshal object into Go " +
+					"value of type []model.DeviceID",
+				"request_id": "test",
+			},
+		},
+	}, {
+		Name: "internal error",
+
+		Request: test.MakeSimpleRequest(
+			"DELETE",
+			"http://localhost/api/0.1.0/groups/foo/devices",
+			[]model.DeviceID{"1", "2", "3"},
+		),
+		GroupName: "foo",
+		Devices:   []model.DeviceID{"1", "2", "3"},
+		JSONResponseParams: utils.JSONResponseParams{
+			OutputStatus: http.StatusInternalServerError,
+			OutputBodyObject: map[string]interface{}{
+				"error":      "internal error",
+				"request_id": "test",
+			},
+		},
+		InventoryErr: errors.New("unknown error"),
+	}, {
+		Name: "error, invalid group name",
+
+		Request: test.MakeSimpleRequest(
+			"DELETE",
+			"http://localhost/api/0.1.0/groups/illegal$group$name/devices",
+			[]model.DeviceID{"1", "2", "3"},
+		),
+		JSONResponseParams: utils.JSONResponseParams{
+			OutputStatus: http.StatusBadRequest,
+			OutputBodyObject: map[string]interface{}{
+				"error": "Group name can only contain: upper/lowercase " +
+					"alphanum, -(dash), _(underscore)",
+				"request_id": "test",
+			},
+		},
+	}}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.Name, func(t *testing.T) {
+			inv := minventory.InventoryApp{}
+			ctx := contextMatcher()
+			apih := makeMockApiHandler(t, &inv)
+
+			var ret *model.GroupUpdateResponse
+			if rsp, ok := testCase.JSONResponseParams.
+				OutputBodyObject.(*model.
+				GroupUpdateResponse); ok {
+				ret = rsp
+			}
+			inv.On("UnsetDevicesGroup",
+				ctx,
+				testCase.Devices,
+				testCase.GroupName,
+			).Return(
+				ret,
+				testCase.InventoryErr,
+			)
+			runTestRequest(t, apih,
+				testCase.Request,
+				testCase.JSONResponseParams,
+			)
+		})
+	}
+}
+
+func TestAPIPatchGroupDevices(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		Name string
+
+		Devices []model.DeviceID
+		model.GroupName
+		InventoryErr error
+
+		*http.Request
+		utils.JSONResponseParams
+	}{{
+		Name: "ok, all device IDs match",
+
+		Request: test.MakeSimpleRequest(
+			"PATCH",
+			"http://localhost/api/0.1.0/groups/foo/devices",
+			[]model.DeviceID{"1", "2", "3"},
+		),
+		Devices:   []model.DeviceID{"1", "2", "3"},
+		GroupName: "foo",
+		JSONResponseParams: utils.JSONResponseParams{
+			OutputStatus: http.StatusOK,
+			OutputBodyObject: &model.GroupUpdateResponse{
+				MatchedCount: 3,
+				UpdatedCount: 3,
+			},
+		},
+	}, {
+		Name: "error, invalid JSON schema",
+
+		Request: test.MakeSimpleRequest(
+			"PATCH",
+			"http://localhost/api/0.1.0/groups/foo/devices",
+			map[string][]string{"devices": {"foo", "bar", "baz"}},
+		),
+		JSONResponseParams: utils.JSONResponseParams{
+			OutputStatus: http.StatusBadRequest,
+			OutputBodyObject: map[string]interface{}{
+				"error": "invalid payload schema: json: " +
+					"cannot unmarshal object into Go " +
+					"value of type []model.DeviceID",
+				"request_id": "test",
+			},
+		},
+	}, {
+		Name: "error, empty devices list",
+
+		Request: test.MakeSimpleRequest(
+			"PATCH",
+			"http://localhost/api/0.1.0/groups/foo/devices",
+			[]model.DeviceID{}),
+		JSONResponseParams: utils.JSONResponseParams{
+			OutputStatus: http.StatusBadRequest,
+			OutputBodyObject: map[string]interface{}{
+				"error":      "no device IDs present in payload",
+				"request_id": "test",
+			},
+		},
+	}, {
+		Name: "error, invalid group name",
+
+		Request: test.MakeSimpleRequest(
+			"PATCH",
+			"http://localhost/api/0.1.0/groups/deeeåååhh/devices",
+			[]model.DeviceID{"1", "2"},
+		),
+		JSONResponseParams: utils.JSONResponseParams{
+			OutputStatus: http.StatusBadRequest,
+			OutputBodyObject: map[string]interface{}{
+				"error": "Group name can only contain: " +
+					"upper/lowercase alphanum, " +
+					"-(dash), _(underscore)",
+				"request_id": "test",
+			},
+		},
+	}, {
+		Name: "error, internal error",
+
+		Request: test.MakeSimpleRequest(
+			"PATCH",
+			"http://localhost/api/0.1.0/groups/foo/devices",
+			[]model.DeviceID{"1", "2"},
+		),
+		Devices:      []model.DeviceID{"1", "2"},
+		GroupName:    "foo",
+		InventoryErr: errors.New("unknown error"),
+		JSONResponseParams: utils.JSONResponseParams{
+			OutputStatus: http.StatusInternalServerError,
+			OutputBodyObject: map[string]interface{}{
+				"error":      "internal error",
+				"request_id": "test",
+			},
+		},
+	}}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.Name, func(t *testing.T) {
+			inv := minventory.InventoryApp{}
+			ctx := contextMatcher()
+			apih := makeMockApiHandler(t, &inv)
+
+			var ret *model.GroupUpdateResponse
+			if rsp, ok := testCase.JSONResponseParams.
+				OutputBodyObject.(*model.
+				GroupUpdateResponse); ok {
+				ret = rsp
+			}
+			inv.On("UpdateDevicesGroup",
+				ctx,
+				testCase.Devices,
+				testCase.GroupName,
+			).Return(
+				ret,
+				testCase.InventoryErr,
+			)
+			runTestRequest(t, apih,
+				testCase.Request,
+				testCase.JSONResponseParams,
+			)
 		})
 	}
 }
@@ -1704,13 +1952,13 @@ func TestApiInventorySearchDevices(t *testing.T) {
 					Page:    4,
 					PerPage: 5,
 					Filters: []model.FilterPredicate{
-						model.FilterPredicate{
+						{
 							Scope:     "inventory",
 							Attribute: "foo",
 							Type:      "$eq",
 							Value:     "bar",
 						},
-						model.FilterPredicate{
+						{
 							Scope:     "inventory",
 							Attribute: "foo1",
 							Type:      "$eq",
@@ -1718,12 +1966,12 @@ func TestApiInventorySearchDevices(t *testing.T) {
 						},
 					},
 					Sort: []model.SortCriteria{
-						model.SortCriteria{
+						{
 							Scope:     "inventory",
 							Attribute: "foo",
 							Order:     "asc",
 						},
-						model.SortCriteria{
+						{
 							Scope:     "inventory",
 							Attribute: "foo1",
 							Order:     "desc",
@@ -1749,8 +1997,8 @@ func TestApiInventorySearchDevices(t *testing.T) {
 					Page:    4,
 					PerPage: 5,
 					Filters: []model.FilterPredicate{
-						model.FilterPredicate{},
-						model.FilterPredicate{
+						{},
+						{
 							Scope:     "inventory",
 							Attribute: "foo1",
 							Type:      "$eq",
@@ -1758,12 +2006,12 @@ func TestApiInventorySearchDevices(t *testing.T) {
 						},
 					},
 					Sort: []model.SortCriteria{
-						model.SortCriteria{
+						{
 							Scope:     "inventory",
 							Attribute: "foo",
 							Order:     "asc",
 						},
-						model.SortCriteria{
+						{
 							Scope:     "inventory",
 							Attribute: "foo1",
 							Order:     "desc",
@@ -1787,13 +2035,13 @@ func TestApiInventorySearchDevices(t *testing.T) {
 					Page:    4,
 					PerPage: 5,
 					Filters: []model.FilterPredicate{
-						model.FilterPredicate{
+						{
 							Scope:     "inventory",
 							Attribute: "foo",
 							Type:      "$eq",
 							Value:     "bar",
 						},
-						model.FilterPredicate{
+						{
 							Scope:     "inventory",
 							Attribute: "foo1",
 							Type:      "$eq",
@@ -1801,8 +2049,8 @@ func TestApiInventorySearchDevices(t *testing.T) {
 						},
 					},
 					Sort: []model.SortCriteria{
-						model.SortCriteria{},
-						model.SortCriteria{
+						{},
+						{
 							Scope:     "inventory",
 							Attribute: "foo1",
 							Order:     "desc",
@@ -1826,13 +2074,13 @@ func TestApiInventorySearchDevices(t *testing.T) {
 					Page:    4,
 					PerPage: 5,
 					Filters: []model.FilterPredicate{
-						model.FilterPredicate{
+						{
 							Scope:     "inventory",
 							Attribute: "foo",
 							Type:      "$eq",
 							Value:     "bar",
 						},
-						model.FilterPredicate{
+						{
 							Scope:     "inventory",
 							Attribute: "foo1",
 							Type:      "$eq",
@@ -1840,12 +2088,12 @@ func TestApiInventorySearchDevices(t *testing.T) {
 						},
 					},
 					Sort: []model.SortCriteria{
-						model.SortCriteria{
+						{
 							Scope:     "inventory",
 							Attribute: "foo",
 							Order:     "asc",
 						},
-						model.SortCriteria{
+						{
 							Scope:     "inventory",
 							Attribute: "foo1",
 							Order:     "desc",
@@ -1869,13 +2117,13 @@ func TestApiInventorySearchDevices(t *testing.T) {
 					Page:    4,
 					PerPage: 5,
 					Filters: []model.FilterPredicate{
-						model.FilterPredicate{
+						{
 							Scope:     "inventory",
 							Attribute: "foo",
 							Type:      "$eq",
 							Value:     "bar",
 						},
-						model.FilterPredicate{
+						{
 							Scope:     "inventory",
 							Attribute: "foo1",
 							Type:      "$eq",
@@ -1883,12 +2131,12 @@ func TestApiInventorySearchDevices(t *testing.T) {
 						},
 					},
 					Sort: []model.SortCriteria{
-						model.SortCriteria{
+						{
 							Scope:     "inventory",
 							Attribute: "foo",
 							Order:     "asc",
 						},
-						model.SortCriteria{
+						{
 							Scope:     "inventory",
 							Attribute: "foo1",
 							Order:     "desc",
@@ -1912,13 +2160,13 @@ func TestApiInventorySearchDevices(t *testing.T) {
 					Page:    4,
 					PerPage: 5,
 					Filters: []model.FilterPredicate{
-						model.FilterPredicate{
+						{
 							Scope:     "inventory",
 							Attribute: "foo",
 							Type:      "$eq",
 							Value:     "bar",
 						},
-						model.FilterPredicate{
+						{
 							Scope:     "inventory",
 							Attribute: "foo1",
 							Type:      "$eq",
@@ -1926,12 +2174,12 @@ func TestApiInventorySearchDevices(t *testing.T) {
 						},
 					},
 					Sort: []model.SortCriteria{
-						model.SortCriteria{
+						{
 							Scope:     "inventory",
 							Attribute: "foo",
 							Order:     "asc",
 						},
-						model.SortCriteria{
+						{
 							Scope:     "inventory",
 							Attribute: "foo1",
 							Order:     "desc",
@@ -1981,13 +2229,13 @@ func TestApiParseSearchParams(t *testing.T) {
 					Page:    4,
 					PerPage: 5,
 					Filters: []model.FilterPredicate{
-						model.FilterPredicate{
+						{
 							Scope:     "inventory",
 							Attribute: "foo",
 							Type:      "$eq",
 							Value:     "bar",
 						},
-						model.FilterPredicate{
+						{
 							Scope:     "inventory",
 							Attribute: "foo1",
 							Type:      "$eq",
@@ -1995,12 +2243,12 @@ func TestApiParseSearchParams(t *testing.T) {
 						},
 					},
 					Sort: []model.SortCriteria{
-						model.SortCriteria{
+						{
 							Scope:     "inventory",
 							Attribute: "foo",
 							Order:     "asc",
 						},
-						model.SortCriteria{
+						{
 							Scope:     "inventory",
 							Attribute: "foo1",
 							Order:     "desc",
@@ -2012,13 +2260,13 @@ func TestApiParseSearchParams(t *testing.T) {
 				Page:    4,
 				PerPage: 5,
 				Filters: []model.FilterPredicate{
-					model.FilterPredicate{
+					{
 						Scope:     "inventory",
 						Attribute: "foo",
 						Type:      "$eq",
 						Value:     "bar",
 					},
-					model.FilterPredicate{
+					{
 						Scope:     "inventory",
 						Attribute: "foo1",
 						Type:      "$eq",
@@ -2026,12 +2274,12 @@ func TestApiParseSearchParams(t *testing.T) {
 					},
 				},
 				Sort: []model.SortCriteria{
-					model.SortCriteria{
+					{
 						Scope:     "inventory",
 						Attribute: "foo",
 						Order:     "asc",
 					},
-					model.SortCriteria{
+					{
 						Scope:     "inventory",
 						Attribute: "foo1",
 						Order:     "desc",
@@ -2046,13 +2294,13 @@ func TestApiParseSearchParams(t *testing.T) {
 					Page:    4,
 					PerPage: 5,
 					Filters: []model.FilterPredicate{
-						model.FilterPredicate{
+						{
 							Scope:     "inventory",
 							Attribute: "foo",
 							Type:      "$eq",
 							Value:     "bar",
 						},
-						model.FilterPredicate{
+						{
 							Scope:     "inventory",
 							Attribute: "foo1",
 							Type:      "$eq",
@@ -2060,12 +2308,12 @@ func TestApiParseSearchParams(t *testing.T) {
 						},
 					},
 					Sort: []model.SortCriteria{
-						model.SortCriteria{
+						{
 							Scope:     "inventory",
 							Attribute: "foo",
 							Order:     "asc",
 						},
-						model.SortCriteria{
+						{
 							Scope:     "inventory",
 							Attribute: "foo1",
 							Order:     "desc",
@@ -2077,13 +2325,13 @@ func TestApiParseSearchParams(t *testing.T) {
 				Page:    4,
 				PerPage: 5,
 				Filters: []model.FilterPredicate{
-					model.FilterPredicate{
+					{
 						Scope:     "inventory",
 						Attribute: "foo",
 						Type:      "$eq",
 						Value:     "bar",
 					},
-					model.FilterPredicate{
+					{
 						Scope:     "inventory",
 						Attribute: "foo1",
 						Type:      "$eq",
@@ -2091,12 +2339,12 @@ func TestApiParseSearchParams(t *testing.T) {
 					},
 				},
 				Sort: []model.SortCriteria{
-					model.SortCriteria{
+					{
 						Scope:     "inventory",
 						Attribute: "foo",
 						Order:     "asc",
 					},
-					model.SortCriteria{
+					{
 						Scope:     "inventory",
 						Attribute: "foo1",
 						Order:     "desc",
@@ -2111,7 +2359,7 @@ func TestApiParseSearchParams(t *testing.T) {
 					Page:    -3,
 					PerPage: 0,
 					Filters: []model.FilterPredicate{
-						model.FilterPredicate{
+						{
 							Scope:     "inventory",
 							Attribute: "foo",
 							Type:      "$eq",
@@ -2119,7 +2367,7 @@ func TestApiParseSearchParams(t *testing.T) {
 						},
 					},
 					Sort: []model.SortCriteria{
-						model.SortCriteria{
+						{
 							Scope:     "inventory",
 							Attribute: "foo",
 							Order:     "asc",
@@ -2131,7 +2379,7 @@ func TestApiParseSearchParams(t *testing.T) {
 				Page:    utils.PageDefault,
 				PerPage: utils.PerPageDefault,
 				Filters: []model.FilterPredicate{
-					model.FilterPredicate{
+					{
 						Scope:     "inventory",
 						Attribute: "foo",
 						Type:      "$eq",
@@ -2139,7 +2387,7 @@ func TestApiParseSearchParams(t *testing.T) {
 					},
 				},
 				Sort: []model.SortCriteria{
-					model.SortCriteria{
+					{
 						Scope:     "inventory",
 						Attribute: "foo",
 						Order:     "asc",
@@ -2154,12 +2402,12 @@ func TestApiParseSearchParams(t *testing.T) {
 					Page:    4,
 					PerPage: 5,
 					Sort: []model.SortCriteria{
-						model.SortCriteria{
+						{
 							Scope:     "inventory",
 							Attribute: "foo",
 							Order:     "foo",
 						},
-						model.SortCriteria{
+						{
 							Scope:     "inventory",
 							Attribute: "foo1",
 							Order:     "desc",
@@ -2176,13 +2424,13 @@ func TestApiParseSearchParams(t *testing.T) {
 					Page:    4,
 					PerPage: 5,
 					Filters: []model.FilterPredicate{
-						model.FilterPredicate{
+						{
 							Scope:     "inventory",
 							Attribute: "foo",
 							Type:      "$eq",
 							Value:     "bar",
 						},
-						model.FilterPredicate{
+						{
 							Scope:     "inventory",
 							Attribute: "foo1",
 							Type:      "$neq",
@@ -2240,13 +2488,13 @@ func TestApiInventoryInternalSearchDevices(t *testing.T) {
 					Page:    4,
 					PerPage: 5,
 					Filters: []model.FilterPredicate{
-						model.FilterPredicate{
+						{
 							Scope:     "inventory",
 							Attribute: "foo",
 							Type:      "$eq",
 							Value:     "bar",
 						},
-						model.FilterPredicate{
+						{
 							Scope:     "inventory",
 							Attribute: "foo1",
 							Type:      "$eq",
@@ -2254,12 +2502,12 @@ func TestApiInventoryInternalSearchDevices(t *testing.T) {
 						},
 					},
 					Sort: []model.SortCriteria{
-						model.SortCriteria{
+						{
 							Scope:     "inventory",
 							Attribute: "foo",
 							Order:     "asc",
 						},
-						model.SortCriteria{
+						{
 							Scope:     "inventory",
 							Attribute: "foo1",
 							Order:     "desc",
@@ -2285,8 +2533,8 @@ func TestApiInventoryInternalSearchDevices(t *testing.T) {
 					Page:    4,
 					PerPage: 5,
 					Filters: []model.FilterPredicate{
-						model.FilterPredicate{},
-						model.FilterPredicate{
+						{},
+						{
 							Scope:     "inventory",
 							Attribute: "foo1",
 							Type:      "$eq",
@@ -2294,12 +2542,12 @@ func TestApiInventoryInternalSearchDevices(t *testing.T) {
 						},
 					},
 					Sort: []model.SortCriteria{
-						model.SortCriteria{
+						{
 							Scope:     "inventory",
 							Attribute: "foo",
 							Order:     "asc",
 						},
-						model.SortCriteria{
+						{
 							Scope:     "inventory",
 							Attribute: "foo1",
 							Order:     "desc",
@@ -2323,13 +2571,13 @@ func TestApiInventoryInternalSearchDevices(t *testing.T) {
 					Page:    4,
 					PerPage: 5,
 					Filters: []model.FilterPredicate{
-						model.FilterPredicate{
+						{
 							Scope:     "inventory",
 							Attribute: "foo",
 							Type:      "$eq",
 							Value:     "bar",
 						},
-						model.FilterPredicate{
+						{
 							Scope:     "inventory",
 							Attribute: "foo1",
 							Type:      "$eq",
@@ -2337,12 +2585,12 @@ func TestApiInventoryInternalSearchDevices(t *testing.T) {
 						},
 					},
 					Sort: []model.SortCriteria{
-						model.SortCriteria{
+						{
 							Scope:     "inventory",
 							Attribute: "foo",
 							Order:     "asc",
 						},
-						model.SortCriteria{
+						{
 							Scope:     "inventory",
 							Attribute: "foo1",
 							Order:     "desc",
@@ -2366,13 +2614,13 @@ func TestApiInventoryInternalSearchDevices(t *testing.T) {
 					Page:    4,
 					PerPage: 5,
 					Filters: []model.FilterPredicate{
-						model.FilterPredicate{
+						{
 							Scope:     "inventory",
 							Attribute: "foo",
 							Type:      "$eq",
 							Value:     "bar",
 						},
-						model.FilterPredicate{
+						{
 							Scope:     "inventory",
 							Attribute: "foo1",
 							Type:      "$eq",
@@ -2380,12 +2628,12 @@ func TestApiInventoryInternalSearchDevices(t *testing.T) {
 						},
 					},
 					Sort: []model.SortCriteria{
-						model.SortCriteria{
+						{
 							Scope:     "inventory",
 							Attribute: "foo",
 							Order:     "asc",
 						},
-						model.SortCriteria{
+						{
 							Scope:     "inventory",
 							Attribute: "foo1",
 							Order:     "desc",
@@ -2409,13 +2657,13 @@ func TestApiInventoryInternalSearchDevices(t *testing.T) {
 					Page:    4,
 					PerPage: 5,
 					Filters: []model.FilterPredicate{
-						model.FilterPredicate{
+						{
 							Scope:     "inventory",
 							Attribute: "foo",
 							Type:      "$eq",
 							Value:     "bar",
 						},
-						model.FilterPredicate{
+						{
 							Scope:     "inventory",
 							Attribute: "foo1",
 							Type:      "$eq",
@@ -2423,12 +2671,12 @@ func TestApiInventoryInternalSearchDevices(t *testing.T) {
 						},
 					},
 					Sort: []model.SortCriteria{
-						model.SortCriteria{
+						{
 							Scope:     "inventory",
 							Attribute: "foo",
 							Order:     "asc",
 						},
-						model.SortCriteria{
+						{
 							Scope:     "inventory",
 							Attribute: "foo1",
 							Order:     "desc",
