@@ -16,6 +16,7 @@ package model
 import (
 	"encoding/json"
 	"reflect"
+	"strings"
 	"time"
 
 	"github.com/go-ozzo/ozzo-validation"
@@ -242,7 +243,9 @@ func (d *DeviceAttributes) UnmarshalBSONValue(t bsontype.Type, b []byte) error {
 // "<scope>-<name>".
 func (d DeviceAttributes) MarshalBSONValue() (bsontype.Type, []byte, error) {
 	attrs := make(bson.D, len(d))
+	replacer := strings.NewReplacer(".", "_", "$", "_S_")
 	for i := range d {
+		d[i].Name = replacer.Replace(d[i].Name)
 		attrs[i].Key = d[i].Scope + "-" + d[i].Name
 		attrs[i].Value = &d[i]
 	}

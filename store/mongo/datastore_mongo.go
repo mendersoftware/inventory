@@ -353,6 +353,7 @@ func makeAttrField(attrName, attrScope string, subFields ...string) string {
 func makeAttrUpsert(attrs model.DeviceAttributes) (bson.M, error) {
 	var fieldName string
 	upsert := make(bson.M)
+	replacer := strings.NewReplacer(".", "_", "$", "_S_")
 
 	for i := range attrs {
 		if attrs[i].Name == "" {
@@ -362,6 +363,7 @@ func makeAttrUpsert(attrs model.DeviceAttributes) (bson.M, error) {
 			// Default to inventory scope
 			attrs[i].Scope = model.AttrScopeInventory
 		}
+		attrs[i].Name = replacer.Replace(attrs[i].Name)
 
 		fieldName = makeAttrField(
 			attrs[i].Name,
