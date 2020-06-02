@@ -1,0 +1,16 @@
+module github.com/mendersoftware/inventory
+
+go 1.14
+
+require (
+	github.com/ant0ine/go-json-rest v3.3.3-0.20170913041208-ebb33769ae01+incompatible
+	github.com/asaskevich/govalidator v0.0.0-20200428143746-21a406dcc535 // indirect
+	github.com/go-ozzo/ozzo-validation/v4 v4.2.1
+	github.com/mendersoftware/go-lib-micro v0.0.0-20200528131836-534d39cafcf4
+	github.com/mendersoftware/mendertesting v0.0.0-20200528113222-083aca144cb7
+	github.com/pkg/errors v0.9.1
+	github.com/spf13/viper v1.7.0
+	github.com/stretchr/testify v1.5.1
+	github.com/urfave/cli v1.22.4
+	go.mongodb.org/mongo-driver v1.3.3
+)

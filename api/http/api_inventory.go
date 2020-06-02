@@ -17,12 +17,11 @@ package http
 import (
 	"context"
 	"net/http"
-	"regexp"
 	"strconv"
 	"strings"
 
 	"github.com/ant0ine/go-json-rest/rest"
-	"github.com/go-ozzo/ozzo-validation"
+	"github.com/go-ozzo/ozzo-validation/v4"
 	midentity "github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/log"
 	u "github.com/mendersoftware/go-lib-micro/rest_utils"
@@ -70,13 +69,11 @@ const (
 
 // model of device's group name response at /devices/:id/group endpoint
 type InventoryApiGroup struct {
-	Group string `json:"group"`
+	Group model.GroupName `json:"group"`
 }
 
 func (g InventoryApiGroup) Validate() error {
-	return validation.ValidateStruct(&g,
-		validation.Field(&g.Group, validation.Required),
-	)
+	return g.Group.Validate()
 }
 
 type inventoryHandlers struct {
@@ -96,8 +93,10 @@ func (i *inventoryHandlers) GetApp() (rest.App, error) {
 		rest.Get(uriDevice, i.GetDeviceHandler),
 		rest.Delete(uriDevice, i.DeleteDeviceHandler),
 		rest.Delete(uriDeviceGroup, i.DeleteDeviceGroupHandler),
+		rest.Delete(uriGroupsDevices, i.ClearDevicesGroup),
 		rest.Patch(uriAttributes, i.PatchDeviceAttributesHandler),
 		rest.Put(uriDeviceGroups, i.AddDeviceToGroupHandler),
+		rest.Patch(uriGroupsDevices, i.AppendDevicesToGroup),
 		rest.Get(uriDeviceGroups, i.GetDeviceGroupHandler),
 		rest.Get(uriGroups, i.GetGroupsHandler),
 		rest.Get(uriGroupsDevices, i.GetDevicesByGroup),
@@ -425,11 +424,6 @@ func (i *inventoryHandlers) AddDeviceToGroupHandler(w rest.ResponseWriter, r *re
 		return
 	}
 
-	if !regexp.MustCompile("^[A-Za-z0-9_-]*$").MatchString(group.Group) {
-		u.RestErrWithLog(w, r, l, errors.New("Group name can only contain: upper/lowercase alphanum, -(dash), _(underscore)"), http.StatusBadRequest)
-		return
-	}
-
 	err = i.inventory.UpdateDeviceGroup(ctx, model.DeviceID(devId), model.GroupName(group.Group))
 	if err != nil {
 		if cause := errors.Cause(err); cause != nil && cause == store.ErrDevNotFound {
@@ -475,6 +469,73 @@ func (i *inventoryHandlers) GetDevicesByGroup(w rest.ResponseWriter, r *rest.Req
 	// the response writer will ensure the header name is in Kebab-Pascal-Case
 	w.Header().Add("X-Total-Count", strconv.Itoa(totalCount))
 	w.WriteJson(ids)
+}
+
+func (i *inventoryHandlers) AppendDevicesToGroup(w rest.ResponseWriter, r *rest.Request) {
+	var deviceIDs []model.DeviceID
+	ctx := r.Context()
+	l := log.FromContext(ctx)
+	groupName := model.GroupName(r.PathParam("name"))
+	if err := groupName.Validate(); err != nil {
+		u.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
+		return
+	}
+
+	if err := r.DecodeJsonPayload(&deviceIDs); err != nil {
+		u.RestErrWithLog(w, r, l,
+			errors.Wrap(err, "invalid payload schema"),
+			http.StatusBadRequest,
+		)
+		return
+	} else if len(deviceIDs) == 0 {
+		u.RestErrWithLog(w, r, l,
+			errors.New("no device IDs present in payload"),
+			http.StatusBadRequest,
+		)
+		return
+	}
+	updated, err := i.inventory.UpdateDevicesGroup(
+		ctx, deviceIDs, groupName,
+	)
+	if err != nil {
+		u.RestErrWithLogInternal(w, r, l, err)
+		return
+	}
+	w.WriteJson(updated)
+}
+
+func (i *inventoryHandlers) ClearDevicesGroup(w rest.ResponseWriter, r *rest.Request) {
+	var deviceIDs []model.DeviceID
+	ctx := r.Context()
+	l := log.FromContext(ctx)
+
+	groupName := model.GroupName(r.PathParam("name"))
+	if err := groupName.Validate(); err != nil {
+		u.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
+		return
+	}
+
+	if err := r.DecodeJsonPayload(&deviceIDs); err != nil {
+		u.RestErrWithLog(w, r, l,
+			errors.Wrap(err, "invalid payload schema"),
+			http.StatusBadRequest,
+		)
+		return
+	} else if len(deviceIDs) == 0 {
+		u.RestErrWithLog(w, r, l,
+			errors.New("no device IDs present in payload"),
+			http.StatusBadRequest,
+		)
+		return
+	}
+
+	updated, err := i.inventory.UnsetDevicesGroup(ctx, deviceIDs, groupName)
+	if err != nil {
+		u.RestErrWithLogInternal(w, r, l, err)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	w.WriteJson(updated)
 }
 
 func parseDevice(r *rest.Request) (*model.Device, error) {

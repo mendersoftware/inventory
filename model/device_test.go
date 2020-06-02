@@ -241,3 +241,17 @@ func TestValidateDeviceAttributes(t *testing.T) {
 	}
 
 }
+
+func TestValidateGroupName(t *testing.T) {
+	t.Parallel()
+	group1 := GroupName(make([]byte, 1025))
+	assert.EqualError(t, group1.Validate(), "Group name can at most have "+
+		"1024 characters")
+	group2 := GroupName("totally.legit")
+	assert.EqualError(t, group2.Validate(), "Group name can only contain: "+
+		"upper/lowercase alphanum, -(dash), _(underscore)")
+	group3 := GroupName("")
+	assert.EqualError(t, group3.Validate(), "Group name cannot be blank")
+	group4 := GroupName("test")
+	assert.NoError(t, group4.Validate())
+}

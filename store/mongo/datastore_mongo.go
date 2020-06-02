@@ -462,6 +462,58 @@ func (db *DataStoreMongo) UpdateDeviceGroup(ctx context.Context, devId model.Dev
 	} // to check the update count
 }
 
+func (db *DataStoreMongo) UpdateDevicesGroup(
+	ctx context.Context,
+	devIDs []model.DeviceID,
+	group model.GroupName,
+) (int64, int64, error) {
+	database := db.client.Database(mstore.DbFromContext(ctx, DbName))
+	collDevs := database.Collection(DbDevicesColl)
+
+	filter := bson.M{
+		DbDevId: bson.M{"$in": devIDs},
+	}
+	update := bson.M{
+		"$set": bson.M{
+			DbDevAttributesGroup: model.DeviceAttribute{
+				Scope: model.AttrScopeSystem,
+				Name:  DbDevGroup,
+				Value: group,
+			},
+		},
+	}
+	res, err := collDevs.UpdateMany(ctx, filter, update)
+	if err != nil {
+		return -1, -1, err
+	}
+	return res.MatchedCount, res.ModifiedCount, nil
+}
+
+func (db *DataStoreMongo) UnsetDevicesGroup(
+	ctx context.Context,
+	deviceIDs []model.DeviceID,
+	group model.GroupName,
+) (int64, error) {
+	database := db.client.Database(mstore.DbFromContext(ctx, DbName))
+	collDevs := database.Collection(DbDevicesColl)
+
+	filter := bson.D{
+		{Key: DbDevId, Value: bson.M{"$in": deviceIDs}},
+		{Key: DbDevAttributesGroupValue, Value: group},
+	}
+	update := bson.M{
+		"$unset": bson.M{
+			DbDevAttributesGroup: "",
+		},
+	}
+	res, err := collDevs.UpdateMany(ctx, filter, update)
+	if err != nil {
+		return -1, err
+	}
+	return res.ModifiedCount, nil
+
+}
+
 func (db *DataStoreMongo) ListGroups(ctx context.Context) ([]model.GroupName, error) {
 	c := db.client.
 		Database(mstore.DbFromContext(ctx, DbName)).

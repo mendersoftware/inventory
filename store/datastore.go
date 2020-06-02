@@ -60,6 +60,20 @@ type DataStore interface {
 	// Updates device group
 	UpdateDeviceGroup(ctx context.Context, devid model.DeviceID, group model.GroupName) error
 
+	// UpdateDevicesGroup updates multiple devices' group, returning number
+	// of matching devices, the number devices that changed group and error,
+	// if any.
+	UpdateDevicesGroup(
+		ctx context.Context, devIDs []model.DeviceID, group model.GroupName,
+	) (int64, int64, error)
+
+	// UnsetDevicesGroup removes a list of deices from their respective
+	// groups returning the number of devices that were modified or an
+	// error if any, respectively.
+	UnsetDevicesGroup(
+		ctx context.Context, deviceIDs []model.DeviceID, group model.GroupName,
+	) (int64, error)
+
 	// List groups
 	ListGroups(ctx context.Context) ([]model.GroupName, error)
 

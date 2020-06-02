@@ -241,6 +241,59 @@ func (_m *InventoryApp) UnsetDeviceGroup(ctx context.Context, id model.DeviceID,
 	return r0
 }
 
+func (_m *InventoryApp) UnsetDevicesGroup(
+	ctx context.Context,
+	deviceIDs []model.DeviceID,
+	groupName model.GroupName,
+) (*model.GroupUpdateResponse, error) {
+	ret := _m.Called(ctx, deviceIDs, groupName)
+
+	var r0 *model.GroupUpdateResponse
+	if rf, ok := ret.Get(0).(func(
+		context.Context, []model.DeviceID, model.GroupName,
+	) *model.GroupUpdateResponse); ok {
+		r0 = rf(ctx, deviceIDs, groupName)
+	} else {
+		r0 = ret.Get(0).(*model.GroupUpdateResponse)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, []model.DeviceID, model.GroupName) error); ok {
+		r1 = rf(ctx, deviceIDs, groupName)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+func (_m *InventoryApp) UpdateDevicesGroup(
+	ctx context.Context,
+	deviceIDs []model.DeviceID,
+	groupName model.GroupName,
+) (*model.GroupUpdateResponse, error) {
+	ret := _m.Called(ctx, deviceIDs, groupName)
+
+	var r0 *model.GroupUpdateResponse
+	if rf, ok := ret.Get(0).(func(
+		context.Context, []model.DeviceID, model.GroupName,
+	) *model.GroupUpdateResponse); ok {
+		r0 = rf(ctx, deviceIDs, groupName)
+	} else {
+		r0 = ret.Get(0).(*model.GroupUpdateResponse)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, []model.DeviceID, model.GroupName) error); ok {
+		r1 = rf(ctx, deviceIDs, groupName)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+
+}
+
 // UpdateDeviceGroup provides a mock function with given fields: ctx, id, group
 func (_m *InventoryApp) UpdateDeviceGroup(ctx context.Context, id model.DeviceID, group model.GroupName) error {
 	ret := _m.Called(ctx, id, group)

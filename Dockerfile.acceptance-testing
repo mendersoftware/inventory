@@ -13,4 +13,4 @@ COPY  --from=builder /go/src/github.com/mendersoftware/inventory/inventory-test 
 COPY ./config.yaml /usr/bin/
 STOPSIGNAL SIGINT
 
-ENTRYPOINT ["/usr/bin/inventory-test", "-test.coverprofile=/testing/coverage-acceptance.txt", "-acceptance-tests", "-test.run=TestRunMain", "-cli-args=server --automigrate"]
+ENTRYPOINT ["/usr/bin/inventory-test", "-test.coverprofile=/testing/coverage-acceptance.txt", "-acceptance-tests", "-test.run=TestMain", "-cli-args=server --automigrate"]

@@ -22,7 +22,6 @@ import (
 	"go.mongodb.org/mongo-driver/x/mongo/driver"
 	"go.mongodb.org/mongo-driver/x/mongo/driver/address"
 	"go.mongodb.org/mongo-driver/x/mongo/driver/description"
-	"go.mongodb.org/mongo-driver/x/mongo/driver/ocsp"
 	"go.mongodb.org/mongo-driver/x/mongo/driver/wiremessage"
 )
 
@@ -113,11 +112,7 @@ func (c *connection) connect(ctx context.Context) {
 
 		// store the result of configureTLS in a separate variable than c.nc to avoid overwriting c.nc with nil in
 		// error cases.
-		ocspOpts := &ocsp.VerifyOptions{
-			Cache:                   c.config.ocspCache,
-			DisableEndpointChecking: c.config.disableOCSPEndpointCheck,
-		}
-		tlsNc, err := configureTLS(ctx, c.nc, c.addr, tlsConfig, ocspOpts)
+		tlsNc, err := configureTLS(ctx, c.nc, c.addr, tlsConfig)
 		if err != nil {
 			if c.nc != nil {
 				_ = c.nc.Close()
@@ -507,7 +502,7 @@ func (c *Connection) LocalAddress() address.Address {
 var notMasterCodes = []int32{10107, 13435}
 var recoveringCodes = []int32{11600, 11602, 13436, 189, 91}
 
-func configureTLS(ctx context.Context, nc net.Conn, addr address.Address, config *tls.Config, ocspOpts *ocsp.VerifyOptions) (net.Conn, error) {
+func configureTLS(ctx context.Context, nc net.Conn, addr address.Address, config *tls.Config) (net.Conn, error) {
 	if !config.InsecureSkipVerify {
 		hostname := addr.String()
 		colonPos := strings.LastIndex(hostname, ":")
@@ -530,15 +525,6 @@ func configureTLS(ctx context.Context, nc net.Conn, addr address.Address, config
 	case err := <-errChan:
 		if err != nil {
 			return nil, err
-		}
-
-		// Only do OCSP verification if TLS verification is requested.
-		if config.InsecureSkipVerify {
-			break
-		}
-
-		if ocspErr := ocsp.Verify(ctx, client.ConnectionState(), ocspOpts); ocspErr != nil {
-			return nil, ocspErr
 		}
 	case <-ctx.Done():
 		return nil, errors.New("server connection cancelled/timeout during TLS handshake")
