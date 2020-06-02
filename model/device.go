@@ -38,6 +38,8 @@ const (
 	AttrNameCreated = "created_ts"
 )
 
+var validGroupNameRegex = regexp.MustCompile("^[A-Za-z0-9_-]*$")
+
 type DeviceID string
 
 var NilDeviceID DeviceID //TODO: how to make it NilDeviceID:=DeviceID(primitive.NilObjectID)
@@ -195,9 +197,7 @@ func (gn GroupName) Validate() error {
 		return errors.New(
 			"Group name cannot be blank",
 		)
-	} else if ok, _ := regexp.MatchString(
-		"^[A-Za-z0-9_-]*$", string(gn),
-	); !ok {
+	} else if !validGroupNameRegex.MatchString(string(gn)) {
 		return errors.New(
 			"Group name can only contain: upper/lowercase " +
 				"alphanum, -(dash), _(underscore)",
