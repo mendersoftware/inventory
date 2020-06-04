@@ -926,6 +926,333 @@ func strPtr(s string) *string {
 	return &s
 }
 
+func TestApiInventoryUpsertAttributesInternal(t *testing.T) {
+	t.Parallel()
+
+	rest.ErrorFieldName = "error"
+
+	testCases := map[string]struct {
+		tenantId string
+		deviceId string
+		scope    string
+		inReq    *http.Request
+		inHdrs   map[string]string
+		payload  interface{}
+
+		inventoryErr error
+
+		resp             utils.JSONResponseParams
+		deviceAttributes model.DeviceAttributes
+	}{
+		"empty body": {
+			tenantId: "3456355",
+			deviceId: "sdfg435fgs-gs-dgsfgdfs-3456dgsf",
+			scope:    "inventory",
+
+			inHdrs: map[string]string{
+				"Authorization": makeDeviceAuthHeader(`{"sub": "fakeid"}`),
+			},
+			inventoryErr: nil,
+			resp: utils.JSONResponseParams{
+				OutputStatus:     http.StatusBadRequest,
+				OutputBodyObject: RestError("failed to decode request body: JSON payload is empty"),
+			},
+		},
+
+		"missing device id": {
+			tenantId: "3456355",
+			scope:    "inventory",
+			payload: []model.DeviceAttribute{
+				{
+					Name:        "name1",
+					Value:       []interface{}{"foo", "bar"},
+					Description: strPtr("descr1"),
+				},
+				{
+					Name:        "name2",
+					Value:       []interface{}{1, 2, 3},
+					Description: strPtr("descr2"),
+				},
+			},
+
+			inHdrs: map[string]string{
+				"Authorization": makeDeviceAuthHeader(`{"sub": "fakeid"}`),
+			},
+			inventoryErr: nil,
+			resp: utils.JSONResponseParams{
+				OutputStatus:     http.StatusBadRequest,
+				OutputBodyObject: RestError("device id cannot be empty"),
+			},
+		},
+
+		"garbled body": {
+			tenantId: "3456355",
+			deviceId: "sdfg435fgs-gs-dgsfgdfs-3456dgsf",
+			scope:    "inventory",
+
+			payload: `{"foo": "bar"}`,
+			inHdrs: map[string]string{
+				"Authorization": makeDeviceAuthHeader(`{"sub": "fakeid"}`),
+			},
+			inventoryErr: nil,
+			resp: utils.JSONResponseParams{
+				OutputStatus:     http.StatusBadRequest,
+				OutputBodyObject: RestError("failed to decode request body: json: cannot unmarshal string into Go value of type []model.DeviceAttribute"),
+			},
+		},
+
+		"body formatted ok, attribute name missing": {
+			tenantId: "3456355",
+			deviceId: "sdfg435fgs-gs-dgsfgdfs-3456dgsf",
+			scope:    "inventory",
+
+			payload: []model.DeviceAttribute{
+				{
+					Name:        "name1",
+					Value:       "value1",
+					Description: strPtr("descr1"),
+				},
+				{
+					Value:       2,
+					Description: strPtr("descr2"),
+				},
+			},
+			inHdrs: map[string]string{
+				"Authorization": makeDeviceAuthHeader(`{"sub": "fakeid"}`),
+			},
+			inventoryErr: nil,
+			resp: utils.JSONResponseParams{
+				OutputStatus:     http.StatusBadRequest,
+				OutputBodyObject: RestError("name: cannot be blank."),
+			},
+		},
+
+		"body formatted ok, attribute value missing": {
+			tenantId: "3456355",
+			deviceId: "sdfg435fgs-gs-dgsfgdfs-3456dgsf",
+			scope:    "inventory",
+
+			payload: []model.DeviceAttribute{
+				{
+					Name:        "name1",
+					Description: strPtr("descr1"),
+				},
+			},
+			inHdrs: map[string]string{
+				"Authorization": makeDeviceAuthHeader(`{"sub": "fakeid"}`),
+			},
+			inventoryErr: nil,
+			resp: utils.JSONResponseParams{
+				OutputStatus:     http.StatusBadRequest,
+				OutputBodyObject: RestError("value: supported types are string, float64, and arrays thereof."),
+			},
+		},
+
+		"body formatted ok, attributes ok (all fields)": {
+			tenantId: "3456355",
+			deviceId: "sdfg435fgs-gs-dgsfgdfs-3456dgsf",
+			scope:    "inventory",
+
+			payload: []model.DeviceAttribute{
+				{
+					Name:        "name1",
+					Value:       "value1",
+					Description: strPtr("descr1"),
+				},
+				{
+					Name:        "name2",
+					Value:       2,
+					Description: strPtr("descr2"),
+				},
+			},
+			inHdrs: map[string]string{
+				"Authorization": makeDeviceAuthHeader(`{"sub": "fakeid"}`),
+			},
+			inventoryErr: nil,
+			resp: utils.JSONResponseParams{
+				OutputStatus:     http.StatusOK,
+				OutputBodyObject: nil,
+			},
+			deviceAttributes: model.DeviceAttributes{
+				{Name: "name1", Value: "value1", Description: strPtr("descr1"), Scope: model.AttrScopeInventory},
+				{Name: "name2", Value: float64(2), Description: strPtr("descr2"), Scope: model.AttrScopeInventory},
+			},
+		},
+
+		"body formatted ok, attributes ok (all fields), with scope": {
+			tenantId: "3456355",
+			deviceId: "sdfg435fgs-gs-dgsfgdfs-3456dgsf",
+			scope:    "inventory",
+
+			payload: []model.DeviceAttribute{
+				{
+					Name:        "name1",
+					Value:       "value1",
+					Description: strPtr("descr1"),
+					Scope:       model.AttrScopeInventory,
+				},
+				{
+					Name:        "name2",
+					Value:       2,
+					Description: strPtr("descr2"),
+					Scope:       model.AttrScopeInventory,
+				},
+			},
+			inHdrs: map[string]string{
+				"Authorization": makeDeviceAuthHeader(`{"sub": "fakeid"}`),
+			},
+			inventoryErr: nil,
+			resp: utils.JSONResponseParams{
+				OutputStatus:     http.StatusOK,
+				OutputBodyObject: nil,
+			},
+			deviceAttributes: model.DeviceAttributes{
+				{Name: "name1", Value: "value1", Description: strPtr("descr1"), Scope: model.AttrScopeInventory},
+				{Name: "name2", Value: float64(2), Description: strPtr("descr2"), Scope: model.AttrScopeInventory},
+			},
+		},
+
+		"body formatted ok, attributes ok (all fields, arrays)": {
+			tenantId: "3456355",
+			deviceId: "sdfg435fgs-gs-dgsfgdfs-3456dgsf",
+			scope:    "inventory",
+
+			payload: []model.DeviceAttribute{
+				{
+					Name:        "name1",
+					Value:       []interface{}{"foo", "bar"},
+					Description: strPtr("descr1"),
+				},
+				{
+					Name:        "name2",
+					Value:       []interface{}{1, 2, 3},
+					Description: strPtr("descr2"),
+				},
+			},
+			inHdrs: map[string]string{
+				"Authorization": makeDeviceAuthHeader(`{"sub": "fakeid"}`),
+			},
+			inventoryErr: nil,
+			resp: utils.JSONResponseParams{
+				OutputStatus:     http.StatusOK,
+				OutputBodyObject: nil,
+			},
+		},
+
+		"body formatted ok, attributes ok (values only)": {
+			tenantId: "3456355",
+			deviceId: "sdfg435fgs-gs-dgsfgdfs-3456dgsf",
+			scope:    "inventory",
+
+			payload: []model.DeviceAttribute{
+				{
+					Name:  "name1",
+					Value: "value1",
+				},
+				{
+					Name:  "name2",
+					Value: 2,
+				},
+			},
+			inHdrs: map[string]string{
+				"Authorization": makeDeviceAuthHeader(`{"sub": "fakeid"}`),
+			},
+			inventoryErr: nil,
+			resp: utils.JSONResponseParams{
+				OutputStatus:     http.StatusOK,
+				OutputBodyObject: nil,
+			},
+		},
+
+		"body formatted ok, attributes ok, but values are empty": {
+			tenantId: "3456355",
+			deviceId: "sdfg435fgs-gs-dgsfgdfs-3456dgsf",
+			scope:    "inventory",
+
+			payload: []model.DeviceAttribute{
+				{
+					Name:  "name1",
+					Value: "",
+				},
+				{
+					Name:  "name2",
+					Value: "",
+				},
+			},
+			inHdrs: map[string]string{
+				"Authorization": makeDeviceAuthHeader(`{"sub": "fakeid"}`),
+			},
+			inventoryErr: nil,
+			resp: utils.JSONResponseParams{
+				OutputStatus:     http.StatusOK,
+				OutputBodyObject: nil,
+			},
+		},
+
+		"body formatted ok, attributes ok (all fields), inventory err": {
+			tenantId: "3456355",
+			deviceId: "sdfg435fgs-gs-dgsfgdfs-3456dgsf",
+			scope:    "inventory",
+
+			payload: []model.DeviceAttribute{
+				{
+					Name:        "name1",
+					Value:       "value1",
+					Description: strPtr("descr1"),
+				},
+				{
+					Name:        "name2",
+					Value:       2,
+					Description: strPtr("descr2"),
+				},
+			},
+			inHdrs: map[string]string{
+				"Authorization": makeDeviceAuthHeader(`{"sub": "fakeid"}`),
+			},
+			inventoryErr: errors.New("internal error"),
+			resp: utils.JSONResponseParams{
+				OutputStatus:     http.StatusInternalServerError,
+				OutputBodyObject: RestError("internal error"),
+			},
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Logf("test case: %s", name)
+		tc.inReq = test.MakeSimpleRequest("PATCH",
+			"http://1.2.3.4/api/internal/v1/inventory/tenants/"+tc.tenantId+"/device/"+tc.deviceId+"/attribute/scope/"+tc.scope,
+			tc.payload)
+		inv := minventory.InventoryApp{}
+
+		ctx := contextMatcher()
+
+		inv.On("UpsertAttributes",
+			ctx,
+			mock.AnythingOfType("model.DeviceID"),
+			mock.MatchedBy(
+				func(attrs model.DeviceAttributes) bool {
+					if tc.deviceAttributes != nil {
+						if !reflect.DeepEqual(tc.deviceAttributes, attrs) {
+							assert.FailNow(t, "", "attributes not equal: %v \n%v\n", tc.deviceAttributes, attrs)
+						}
+					}
+					return true
+				},
+			),
+		).Return(tc.inventoryErr)
+
+		apih := makeMockApiHandler(t, &inv)
+
+		rest.ErrorFieldName = "error"
+
+		for k, v := range tc.inHdrs {
+			tc.inReq.Header.Set(k, v)
+		}
+
+		runTestRequest(t, apih, tc.inReq, tc.resp)
+	}
+}
+
 func TestApiInventoryDeleteDeviceGroup(t *testing.T) {
 	rest.ErrorFieldName = "error"
 

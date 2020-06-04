@@ -46,6 +46,7 @@ const (
 	uriInternalTenants       = "/api/internal/v1/inventory/tenants"
 	uriInternalDevices       = "/api/internal/v1/inventory/devices"
 	urlInternalDevicesStatus = "/api/internal/v1/inventory/tenants/:tenant_id/devices/:status"
+	urlInternalAttributes    = "/api/internal/v1/inventory/tenants/:tenant_id/device/:did/attribute/scope/:scope"
 	apiUrlManagementV2       = "/api/management/v2/inventory"
 	urlFiltersSearch         = apiUrlManagementV2 + "/filters/search"
 
@@ -95,6 +96,7 @@ func (i *inventoryHandlers) GetApp() (rest.App, error) {
 		rest.Delete(uriDeviceGroup, i.DeleteDeviceGroupHandler),
 		rest.Delete(uriGroupsDevices, i.ClearDevicesGroup),
 		rest.Patch(uriAttributes, i.PatchDeviceAttributesHandler),
+		rest.Patch(urlInternalAttributes, i.PatchDeviceAttributesInternalHandler),
 		rest.Put(uriDeviceGroups, i.AddDeviceToGroupHandler),
 		rest.Patch(uriGroupsDevices, i.AppendDevicesToGroup),
 		rest.Get(uriDeviceGroups, i.GetDeviceGroupHandler),
@@ -365,6 +367,44 @@ func (i *inventoryHandlers) PatchDeviceAttributesHandler(w rest.ResponseWriter, 
 
 	//upsert the attributes
 	err = i.inventory.UpsertAttributes(ctx, model.DeviceID(idata.Subject), attrs)
+	cause := errors.Cause(err)
+	switch cause {
+	case store.ErrNoAttrName:
+		u.RestErrWithLog(w, r, l, cause, http.StatusBadRequest)
+		return
+	}
+	if err != nil {
+		u.RestErrWithLogInternal(w, r, l, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+func (i *inventoryHandlers) PatchDeviceAttributesInternalHandler(w rest.ResponseWriter, r *rest.Request) {
+	ctx := r.Context()
+	tenantId := r.PathParam("tenant_id")
+	ctx = getTenantContext(ctx, tenantId)
+
+	l := log.FromContext(ctx)
+
+	deviceId := r.PathParam("did")
+	if len(deviceId)<1 {
+		u.RestErrWithLog(w, r, l, errors.New("device id cannot be empty"), http.StatusBadRequest)
+		return
+	}
+	//extract attributes from body
+	attrs, err := parseAttributes(r)
+	if err != nil {
+		u.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
+		return
+	}
+	for _, a := range attrs {
+		a.Scope = r.PathParam("scope")
+	}
+
+	//upsert the attributes
+	err = i.inventory.UpsertAttributes(ctx, model.DeviceID(deviceId), attrs)
 	cause := errors.Cause(err)
 	switch cause {
 	case store.ErrNoAttrName:
