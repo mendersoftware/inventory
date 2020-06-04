@@ -388,18 +388,23 @@ func (i *inventoryHandlers) PatchDeviceAttributesInternalHandler(w rest.Response
 
 	l := log.FromContext(ctx)
 
+	deviceId := r.PathParam("did")
+	if len(deviceId)<1 {
+		u.RestErrWithLog(w, r, l, errors.New("device id cannot be empty"), http.StatusBadRequest)
+		return
+	}
 	//extract attributes from body
 	attrs, err := parseAttributes(r)
 	if err != nil {
 		u.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
 		return
 	}
-	for _,a := range attrs {
-		a.Scope=r.PathParam("scope")
+	for _, a := range attrs {
+		a.Scope = r.PathParam("scope")
 	}
 
 	//upsert the attributes
-	err = i.inventory.UpsertAttributes(ctx, model.DeviceID(r.PathParam("did")), attrs)
+	err = i.inventory.UpsertAttributes(ctx, model.DeviceID(deviceId), attrs)
 	cause := errors.Cause(err)
 	switch cause {
 	case store.ErrNoAttrName:
