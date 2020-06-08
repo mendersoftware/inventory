@@ -389,7 +389,7 @@ func (i *inventoryHandlers) PatchDeviceAttributesInternalHandler(w rest.Response
 	l := log.FromContext(ctx)
 
 	deviceId := r.PathParam("did")
-	if len(deviceId)<1 {
+	if len(deviceId) < 1 {
 		u.RestErrWithLog(w, r, l, errors.New("device id cannot be empty"), http.StatusBadRequest)
 		return
 	}
@@ -802,8 +802,13 @@ func (i *inventoryHandlers) InternalDevicesStatusHandler(w rest.ResponseWriter, 
 				Scope:       model.AttrScopeIdentity,
 			},
 		}
-		//upsert the attributes
-		err = i.inventory.UpsertAttributes(ctx, model.DeviceID(id), attrs)
+
+		if status == "decommissioned" {
+			err = i.inventory.DeleteDevice(ctx, model.DeviceID(id))
+		} else {
+			//upsert the attributes
+			err = i.inventory.UpsertAttributes(ctx, model.DeviceID(id), attrs)
+		}
 		if err != nil {
 			u.RestErrWithLogInternal(w, r, l, err)
 			return
