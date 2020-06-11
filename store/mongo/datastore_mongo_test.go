@@ -2624,6 +2624,38 @@ func TestMongoSearchDevices(t *testing.T) {
 				},
 			},
 		},
+		"one filter, id": {
+			expected: []model.Device{inputDevs[0]},
+			devTotal: 1,
+			searchParams: model.SearchParams{
+				Page:    1,
+				PerPage: 5,
+				Filters: []model.FilterPredicate{
+					{
+						Scope:     "identity",
+						Attribute: "id",
+						Type:      "$eq",
+						Value:     "0",
+					},
+				},
+			},
+		},
+		"one filter, id not found": {
+			expected: []model.Device{},
+			devTotal: 0,
+			searchParams: model.SearchParams{
+				Page:    1,
+				PerPage: 5,
+				Filters: []model.FilterPredicate{
+					{
+						Scope:     "identity",
+						Attribute: "id",
+						Type:      "$eq",
+						Value:     "not found",
+					},
+				},
+			},
+		},
 		"$in, bad value": {
 			expected: []model.Device{inputDevs[2], inputDevs[3]},
 			devTotal: 5,
