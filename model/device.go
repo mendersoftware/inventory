@@ -33,6 +33,7 @@ const (
 	AttrScopeIdentity  = "identity"
 	AttrScopeSystem    = "system"
 
+	AttrNameID      = "id"
 	AttrNameGroup   = "group"
 	AttrNameUpdated = "updated_ts"
 	AttrNameCreated = "created_ts"

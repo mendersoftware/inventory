@@ -147,11 +147,6 @@ func NewDataStoreMongo(config DataStoreMongoConfig) (store.DataStore, error) {
 	return db, nil
 }
 
-type internalDeviceResult struct {
-	Devices    []model.Device `bson:"results"`
-	TotalCount int            `bson:"totalCount"`
-}
-
 func (db *DataStoreMongo) GetDevices(ctx context.Context, q store.ListQuery) ([]model.Device, int, error) {
 	c := db.client.Database(mstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
 
@@ -629,8 +624,13 @@ func (db *DataStoreMongo) SearchDevices(ctx context.Context, searchParams model.
 	queryFilters := make([]bson.M, 0)
 	for _, filter := range searchParams.Filters {
 		op := filter.Type
-		name := fmt.Sprintf("%s-%s", filter.Scope, filter.Attribute)
-		field := fmt.Sprintf("%s.%s.%s", DbDevAttributes, name, DbDevAttributesValue)
+		var field string
+		if filter.Scope == model.AttrScopeIdentity && filter.Attribute == model.AttrNameID {
+			field = DbDevId
+		} else {
+			name := fmt.Sprintf("%s-%s", filter.Scope, filter.Attribute)
+			field = fmt.Sprintf("%s.%s.%s", DbDevAttributes, name, DbDevAttributesValue)
+		}
 		queryFilters = append(queryFilters, bson.M{field: bson.M{op: filter.Value}})
 	}
 
