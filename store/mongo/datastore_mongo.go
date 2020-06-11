@@ -172,35 +172,35 @@ func (db *DataStoreMongo) GetDevices(ctx context.Context, q store.ListQuery) ([]
 			}
 		}
 	}
-	findQuery := bson.M{}
-	if len(queryFilters) > 0 {
-		findQuery["$and"] = queryFilters
-	}
-	groupFilter := bson.M{}
 	if q.GroupName != "" {
-		groupFilter = bson.M{DbDevAttributesGroupValue: q.GroupName}
+		groupFilter := bson.M{DbDevAttributesGroupValue: q.GroupName}
+		queryFilters = append(queryFilters, groupFilter)
 	}
-	groupExistenceFilter := bson.M{}
+	if q.GroupName != "" {
+		groupFilter := bson.M{DbDevAttributesGroupValue: q.GroupName}
+		queryFilters = append(queryFilters, groupFilter)
+	}
 	if q.HasGroup != nil {
-		groupExistenceFilter = bson.M{
+		groupExistenceFilter := bson.M{
 			DbDevAttributesGroup: bson.M{
 				"$exists": *q.HasGroup,
 			},
 		}
-	}
-	filter := bson.M{
-		"$match": bson.M{
-			"$and": []bson.M{
-				groupFilter,
-				groupExistenceFilter,
-				findQuery,
-			},
-		},
+		queryFilters = append(queryFilters, groupExistenceFilter)
 	}
 
-	// since the sorting step will have to be executable we have to use a noop here instead of just
-	// an empty query object, as unsorted queries would fail otherwise
-	sortQuery := bson.M{"$skip": 0}
+	findQuery := bson.M{}
+	if len(queryFilters) > 0 {
+		findQuery["$and"] = queryFilters
+	}
+
+	findOptions := mopts.Find()
+	if q.Skip > 0 {
+		findOptions.SetSkip(int64(q.Skip))
+	}
+	if q.Limit > 0 {
+		findOptions.SetLimit(int64(q.Limit))
+	}
 	if q.Sort != nil {
 		name := fmt.Sprintf("%s-%s", q.Sort.AttrScope, q.Sort.AttrName)
 		sortField := fmt.Sprintf("%s.%s.%s", DbDevAttributes, name, DbDevAttributesValue)
@@ -209,54 +209,26 @@ func (db *DataStoreMongo) GetDevices(ctx context.Context, q store.ListQuery) ([]
 		if !q.Sort.Ascending {
 			sortFieldQuery[sortField] = -1
 		}
-		sortQuery = bson.M{"$sort": sortFieldQuery}
-	}
-	limitQuery := bson.M{"$skip": 0}
-	// exchange the limit query only if limit is set, as limits need to be positive in an aggregation pipeline
-	if q.Limit > 0 {
-		limitQuery = bson.M{"$limit": q.Limit}
-	}
-	combinedQuery := bson.M{
-		"$facet": bson.M{
-			"results": []bson.M{
-				sortQuery,
-				{"$skip": q.Skip},
-				limitQuery,
-			},
-			"totalCount": []bson.M{
-				{"$count": "count"},
-			},
-		},
-	}
-	resultMap := bson.M{
-		"$project": bson.M{
-			"results": 1,
-			"totalCount": bson.M{
-				"$ifNull": []interface{}{
-					bson.M{
-						"$arrayElemAt": []interface{}{"$totalCount.count", 0},
-					},
-					0,
-				},
-			},
-		},
+		findOptions.SetSort(sortFieldQuery)
 	}
 
-	cursor, err := c.Aggregate(ctx, []bson.M{
-		filter,
-		combinedQuery,
-		resultMap,
-	})
+	cursor, err := c.Find(ctx, findQuery, findOptions)
+	if err != nil {
+		return nil, -1, errors.Wrap(err, "failed to search devices")
+	}
 	defer cursor.Close(ctx)
 
-	if !cursor.Next(ctx) {
-		return nil, 0, nil
+	devices := []model.Device{}
+	if err = cursor.All(ctx, &devices); err != nil {
+		return nil, -1, errors.Wrap(err, "failed to search devices")
 	}
-	res := internalDeviceResult{}
-	if err = cursor.Decode(&res); err != nil {
-		return nil, -1, errors.Wrap(err, "failed to fetch device list")
+
+	count, err := c.CountDocuments(ctx, findQuery)
+	if err != nil {
+		return nil, -1, errors.Wrap(err, "failed to count devices")
 	}
-	return res.Devices, res.TotalCount, nil
+
+	return devices, int(count), nil
 }
 
 func (db *DataStoreMongo) GetDevice(
