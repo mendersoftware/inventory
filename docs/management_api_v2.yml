@@ -13,7 +13,7 @@ info:
     * use the results to create and manage device groups for deployment scheduling
 
 basePath: '/api/management/v2/inventory'
-host: 'docker.mender.io'
+host: 'hosted.mender.io'
 schemes:
   - https
 
