@@ -8,7 +8,7 @@ info:
     Devices can upload vendor-specific attributes (software/hardware info, health checks, metrics, etc.) of various data types to the backend.
 
 basePath: '/api/devices/v1/inventory'
-host: 'docker.mender.io'
+host: 'hosted.mender.io'
 schemes:
   - https
 
