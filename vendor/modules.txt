@@ -55,7 +55,7 @@ github.com/mendersoftware/go-lib-micro/rest_utils
 github.com/mendersoftware/go-lib-micro/store
 github.com/mendersoftware/go-lib-micro/strings
 github.com/mendersoftware/go-lib-micro/testing
-# github.com/mendersoftware/mendertesting v0.0.0-20200528113222-083aca144cb7
+# github.com/mendersoftware/mendertesting v0.0.1
 ## explicit
 github.com/mendersoftware/mendertesting
 # github.com/mitchellh/mapstructure v1.1.2
@@ -89,7 +89,7 @@ github.com/spf13/pflag
 github.com/spf13/viper
 # github.com/stretchr/objx v0.1.1
 github.com/stretchr/objx
-# github.com/stretchr/testify v1.5.1
+# github.com/stretchr/testify v1.6.1
 ## explicit
 github.com/stretchr/testify/assert
 github.com/stretchr/testify/mock
@@ -150,5 +150,9 @@ golang.org/x/text/unicode/norm
 gopkg.in/ini.v1
 # gopkg.in/tomb.v2 v2.0.0-20161208151619-d5d1b5820637
 gopkg.in/tomb.v2
-# gopkg.in/yaml.v2 v2.2.4
+# gopkg.in/yaml.v2 v2.3.0
+## explicit
 gopkg.in/yaml.v2
+# gopkg.in/yaml.v3 v3.0.0-20200615113413-eeeca48fe776
+## explicit
+gopkg.in/yaml.v3
