@@ -59,11 +59,9 @@ class TestInternalApiDeviceCreate:
         )
         assert r.status_code == 201
 
-        r, _ = management_client.client.devices.get_devices_id(
-            id=devid, Authorization="foo"
-        ).result()
+        dev = management_client.getDevice(device_id=devid)
 
-        self._verify_inventory(inventory_attributes, r.attributes)
+        self._verify_inventory(inventory_attributes, dev.attributes)
 
     def test_create_twice_ok(
         self, internal_client, management_client, clean_db, inventory_attributes,
@@ -94,11 +92,9 @@ class TestInternalApiDeviceCreate:
         assert r.status_code == 201
 
         # verify update
-        r, _ = management_client.client.devices.get_devices_id(
-            id=devid, Authorization="foo"
-        ).result()
+        dev = management_client.getDevice(devid)
 
-        self._verify_inventory(inventory_attributes, r.attributes)
+        self._verify_inventory(inventory_attributes, dev.attributes)
 
     def _verify_inventory(self, expected, inventory):
         # Filter only attributes within the inventory scope
