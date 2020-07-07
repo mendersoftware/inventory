@@ -17,10 +17,29 @@ host: 'hosted.mender.io'
 schemes:
   - https
 
+consumes:
+  - application/json
+produces:
+  - application/json
+
+securityDefinitions:
+  ManagementJWT:
+    type: apiKey
+    in: header
+    name: Authorization
+    description: |
+      API token issued by User Authentication service.
+      Format: 'Bearer [JWT]'
+
 paths:
   /devices:
     get:
-      summary: List devices
+      operationId: List Device Inventories
+      tags:
+        - Management API
+      security:
+        - ManagementJWT: []
+      summary: List devices inventories
       description:  |
         Returns a paged collection of devices and their attributes.
         Accepts optional search and sort parameters.
@@ -28,19 +47,8 @@ paths:
         **Searching**
         Searching by attributes values is accomplished by appending attribute
         name/value pairs to the query string, e.g.:
-
-        ```
-        GET /devices?attr_name_1=foo&
-                     attr_name_2=100&
-                     ...
-        ```
+        `GET /devices?attr_name_1=foo&attr_name_2=100`
       parameters:
-        - name: Authorization
-          in: header
-          required: true
-          type: string
-          format: Bearer [token]
-          description: Contains the JWT token issued by the User Administration and Authentication Service.
         - name: page
           in: query
           description: Starting page.
@@ -58,69 +66,68 @@ paths:
         - name: sort
           in: query
           description: |
-            Supports sorting the device list by attribute values.
+            Sort devices by attribute.
+            The parameter is formatted as a comma-separated list of attribute
+            names and sort order.
 
-            The parameter is formatted as a list of attribute names and sort directions, e.g.:
+            The order direction (`ord`) must be either `asc` or `desc` for
+            ascending and descending respectively.
+            Defaults to `desc` if not specified.
 
-            '?sort=attr1:asc, attr2:desc'
-
-            will sort by 'attr1' ascending, and then by 'attr2' descending. 'desc' is the default
-            sort direction, and can be omitted.
+            For example: `?sort=attr1:asc,attr2:desc`
+            will sort by 'attr1' ascending, and then by 'attr2' descending.
           required: false
           type: string
+          format: "attr[:ord][,attr[:ord]...]"
         - name: has_group
           in: query
-          description: If present, limits the results only to devices assigned/not assigned to a group.
+          description: Limit result to devices assigned to a group.
           required: false
           type: boolean
         - name: group
           in: query
-          description: If present, limits the results only to devices belonging to the given group.
+          description: Limits result to devices in the given group.
           required: false
           type: string
-
       responses:
         200:
           description: Successful response.
           headers:
             Link:
               type: string
-              description: |
-                Standard header, used for page navigation.
-
-                Supported relation types are 'first', 'next' and 'prev'.
+              description: >
+                Standard page navigation header,
+                supported relations: 'first', 'next', and 'prev'.
             X-Total-Count:
               type: string
-              description: Custom header indicating the total number of devices for the given query parameters
+              description: Total number of devices found
           schema:
             title: ListOfDevices
             type: array
             items:
-              $ref: '#/definitions/Device'
+              $ref: '#/definitions/DeviceInventory'
           examples:
             application/json:
               - id: "291ae0e5956c69c2267489213df4459d19ed48a806603def19d417d004a4b67e"
                 attributes:
                   - name: "ip_addr"
+                    scope: "inventory"
                     value: "1.2.3.4"
                     description: "IP address"
                   - name: "mac_addr"
+                    scope: "inventory"
                     value: "00.01:02:03:04:05"
                     description: "MAC address"
-                  - name: "ports"
-                    value:
-                      - "8080"
-                      - "8081"
-                    description: "Open ports"
                 updated_ts: "2016-10-03T16:58:51.639Z"
               - id: "76f40e5956c699e327489213df4459d1923e1a806603def19d417d004a4a3ef"
                 attributes:
                   - name: "mac"
+                    scope: "inventory"
                     value: "00:01:02:03:04:05"
                     description: "MAC address"
                 updated_ts: "2016-10-04T18:24:21.432Z"
         400:
-          description: Missing or malformed request parameters. See error for details.
+          description: Missing or malformed request parameters.
           schema:
             $ref: '#/definitions/Error'
         500:
@@ -129,15 +136,13 @@ paths:
             $ref: '#/definitions/Error'
   /devices/{id}:
     get:
-      summary: Get a selected device
-      description: Returns the details of the selected devices, including its attributes.
+      operationId: Get Device Inventory
+      tags:
+        - Management API
+      security:
+        - ManagementJWT: []
+      summary: Get a selected device's inventory
       parameters:
-        - name: Authorization
-          in: header
-          required: true
-          type: string
-          format: Bearer [token]
-          description: Contains the JWT token issued by the User Administration and Authentication Service.
         - name: id
           in: path
           description: Device identifier.
@@ -147,22 +152,19 @@ paths:
         200:
           description: Successful response - the device was found.
           schema:
-            $ref: "#/definitions/Device"
+            $ref: "#/definitions/DeviceInventory"
           examples:
             application/json:
               id: "291ae0e5956c69c2267489213df4459d19ed48a806603def19d417d004a4b67e"
               attributes:
                 - name: "ip_addr"
+                  scope: "inventory"
                   value: "1.2.3.4"
                   description: "IP address"
                 - name: "mac_addr"
+                  scope: "inventory"
                   value: "00.01:02:03:04:05"
                   description: "MAC address"
-                - name: "ports"
-                  value:
-                    - "8080"
-                    - "8081"
-                  description: "Open ports"
               updated_ts: "2016-10-03T16:58:51.639Z"
         404:
           description: The device was not found.
@@ -173,15 +175,13 @@ paths:
           schema:
             $ref: "#/definitions/Error"
     delete:
-      summary: Remove selected device
-      description: Deletes all information concerning the device, including its attributes.
+      operationId: Delete Device Inventory
+      tags:
+        - Management API
+      security:
+        - ManagementJWT: []
+      summary: Remove selected device's inventory
       parameters:
-        - name: Authorization
-          in: header
-          required: true
-          type: string
-          format: Bearer [token]
-          description: Contains the JWT token issued by the User Administration and Authentication Service.
         - name: id
           in: path
           description: Device identifier.
@@ -197,14 +197,13 @@ paths:
 
   /devices/{id}/group:
     get:
+      operationId: Get Device Group
+      tags:
+        - Management API
+      security:
+        - ManagementJWT: []
       summary: Get a selected device's group
       parameters:
-        - name: Authorization
-          in: header
-          required: true
-          type: string
-          format: Bearer [token]
-          description: Contains the JWT token issued by the User Administration and Authentication Service.
         - name: id
           in: path
           description: Device identifier.
@@ -212,15 +211,12 @@ paths:
           type: string
       responses:
         200:
-          description: |
+          description: >
             Successful response.
-
-            If the device is not assigned to any group, the 'group' field will be set to 'null'.
+            If the device is not assigned to any group,
+            the 'group' field will be set to 'null'.
           schema:
             $ref: "#/definitions/Group"
-          examples:
-            application/json:
-              group: "testing"
         400:
           description: Missing or malformed request params or body. See the error message for details.
         404:
@@ -232,6 +228,11 @@ paths:
           schema:
             $ref: "#/definitions/Error"
     put:
+      operationId: Assign Group
+      tags:
+        - Management API
+      security:
+        - ManagementJWT: []
       summary: Add a device to a group
       description: |
         Adds a device to a group.
@@ -240,12 +241,6 @@ paths:
         If a device already belongs to some group, it will be moved
         to the selected one.
       parameters:
-        - name: Authorization
-          in: header
-          required: true
-          type: string
-          format: Bearer [token]
-          description: Contains the JWT token issued by the User Administration and Authentication Service.
         - name: id
           in: path
           description: Device identifier.
@@ -272,16 +267,15 @@ paths:
             $ref: "#/definitions/Error"
   /devices/{id}/group/{name}:
     delete:
+      operationId: Clear Group
+      tags:
+        - Management API
+      security:
+        - ManagementJWT: []
       summary: Remove a device from a group
       description: |
         Removes the device with identifier 'id' from the group 'group'.
       parameters:
-        - name: Authorization
-          in: header
-          required: true
-          type: string
-          format: Bearer [token]
-          description: Contains the JWT token issued by the User Administration and Authentication Service.
         - name: id
           in: path
           description: Device identifier.
@@ -305,8 +299,12 @@ paths:
             $ref: '#/definitions/Error'
   /groups:
     get:
-      summary: List groups
-      description: Returns a collection of all defined device groups.
+      operationId: List Groups
+      tags:
+        - Management API
+      security:
+        - ManagementJWT: []
+      summary: List all groups existing device groups
       responses:
         200:
           description: Successful response.
@@ -329,31 +327,24 @@ paths:
 
   /groups/{name}/devices:
     get:
+      operationId: Get Devices in Group
+      tags:
+        - Management API
+      security:
+        - ManagementJWT: []
       summary: List the devices belonging to a given group
-      description: |
-        Returns a paged collection of device IDs.
       parameters:
-        - name: Authorization
-          in: header
-          required: true
-          type: string
-          format: Bearer [token]
-          description: |
-            Contains the JWT token issued by the User Administration and
-            Authentication Service.
         - name: page
           in: query
           description: Starting page.
           required: false
-          type: number
-          format: integer
+          type: integer
           default: 1
         - name: per_page
           in: query
           description: Maximum number of results per page.
           required: false
-          type: number
-          format: integer
+          type: integer
           default: 10
         - name: name
           in: path
@@ -389,19 +380,16 @@ paths:
             $ref: '#/definitions/Error'
 
     patch:
+      operationId: Add Devices to Group
+      tags:
+        - Management API
+      security:
+        - ManagementJWT: []
       summary: Add devices to group
       description: |
-        Appends the list of devices in request body to the given group.
+        Appends the list of devices in the request body to the given group.
         For devices already present in the group the operation has no effect.
       parameters:
-        - name: Authorization
-          in: header
-          required: true
-          type: string
-          format: Bearer [token]
-          description: |
-            Contains the JWT token issued by the User Administration and
-            Authentication Service.
         - name: name
           in: path
           description: Group name.
@@ -452,20 +440,17 @@ paths:
             $ref: '#/definitions/Error'
 
     delete:
+      operationId: Remove Devices from Group
+      tags:
+        - Management API
+      security:
+        - ManagementJWT: []
       summary: Clear devices' group
       description: |
         Removes a list of devices from their respective groups. This API provides
         a bulk alternative to DELETE /devices/{id}/group/{name} for managing
         device groups.
       parameters:
-        - name: Authorization
-          in: header
-          required: true
-          type: string
-          format: Bearer [token]
-          description: |
-            Contains the JWT token issued by the User Administration and
-            Authentication Service.
         - name: name
           in: path
           description: Group name.
@@ -531,18 +516,18 @@ definitions:
 
             Attribute type is implicit, inferred from the JSON type.
 
-            Supported types: number, string, array of numbers, array of strings. Mixed arrays are not allowed.
+            Supported types: number, string, array of numbers, array of strings.
+            Mixed type arrays are not allowed.
     example:
-      application/json:
-        name: "cpu_load"
-        description: "The current CPU load."
-        value: 42
-  Device:
+      name: "ip_addr_eth"
+      description: "Device IP address on ethernet interface"
+      value: "127.0.0.1"
+  DeviceInventory:
     type: object
     properties:
       id:
         type: string
-        description: Mender-assigned unique ID.
+        description: Mender-assigned unique device ID.
       updated_ts:
         type: string
         description: Timestamp of the most recent attribute update.
@@ -552,32 +537,25 @@ definitions:
           $ref: '#/definitions/Attribute'
         description: A list of attribute descriptors.
     example:
-      application/json:
-        id: "291ae0e5956c69c2267489213df4459d19ed48a806603def19d417d004a4b67e"
-        attributes:
-          - name: "ip_addr"
-            value: "1.2.3.4"
-            description: "IP address"
-          - name: "mac_addr"
-            value: "00.01:02:03:04:05"
-            description: "MAC address"
-          - name: "ports"
-            value:
-              - "8080"
-              - "8081"
-            description: "Open ports"
-        updated_ts: "2016-10-03T16:58:51.639Z"
+      id: "291ae0e5956c69c2267489213df4459d19ed48a806603def19d417d004a4b67e"
+      attributes:
+        - name: "ip_addr"
+          value: "1.2.3.4"
+          description: "IP address"
+        - name: "mac_addr"
+          value: "00.01:02:03:04:05"
+          description: "MAC address"
+      updated_ts: "2016-10-03T16:58:51.639Z"
   Group:
-    description: Device group.
     type: object
     properties:
       group:
         type: string
+        description: Device group.
     required:
       - group
     example:
-      application/json:
-        group: "staging"
+      group: "staging"
   Error:
     description: Error descriptor.
     type: object
@@ -589,6 +567,5 @@ definitions:
         description: Request ID (same as in X-MEN-RequestID header).
         type: string
     example:
-      application/json:
-          error: "failed to decode device group data: JSON payload is empty"
-          request_id: "f7881e82-0492-49fb-b459-795654e7188a"
+      error: "failed to decode device group data: JSON payload is empty"
+      request_id: "f7881e82-0492-49fb-b459-795654e7188a"
