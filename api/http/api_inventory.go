@@ -693,6 +693,10 @@ func (i *inventoryHandlers) InternalDevicesStatusHandler(w rest.ResponseWriter, 
 	}
 
 	for _, id := range ids {
+		if status == "rejected" {
+			i.inventory.DeleteDevice(ctx, model.DeviceID(id))
+			continue
+		}
 		attrs := model.DeviceAttributes{
 			{
 				Name:        "status",
