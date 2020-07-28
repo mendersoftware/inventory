@@ -1789,7 +1789,7 @@ func TestAPIClearDevicesGroup(t *testing.T) {
 		Devices:   []model.DeviceID{"1", "2", "3"},
 		JSONResponseParams: utils.JSONResponseParams{
 			OutputStatus: http.StatusOK,
-			OutputBodyObject: &model.GroupUpdateResponse{
+			OutputBodyObject: &model.UpdateResult{
 				UpdatedCount: 3,
 			},
 		},
@@ -1870,10 +1870,10 @@ func TestAPIClearDevicesGroup(t *testing.T) {
 			ctx := contextMatcher()
 			apih := makeMockApiHandler(t, &inv)
 
-			var ret *model.GroupUpdateResponse
+			var ret *model.UpdateResult
 			if rsp, ok := testCase.JSONResponseParams.
 				OutputBodyObject.(*model.
-				GroupUpdateResponse); ok {
+				UpdateResult); ok {
 				ret = rsp
 			}
 			inv.On("UnsetDevicesGroup",
@@ -1916,7 +1916,7 @@ func TestAPIPatchGroupDevices(t *testing.T) {
 		GroupName: "foo",
 		JSONResponseParams: utils.JSONResponseParams{
 			OutputStatus: http.StatusOK,
-			OutputBodyObject: &model.GroupUpdateResponse{
+			OutputBodyObject: &model.UpdateResult{
 				MatchedCount: 3,
 				UpdatedCount: 3,
 			},
@@ -1995,10 +1995,10 @@ func TestAPIPatchGroupDevices(t *testing.T) {
 			ctx := contextMatcher()
 			apih := makeMockApiHandler(t, &inv)
 
-			var ret *model.GroupUpdateResponse
+			var ret *model.UpdateResult
 			if rsp, ok := testCase.JSONResponseParams.
 				OutputBodyObject.(*model.
-				GroupUpdateResponse); ok {
+				UpdateResult); ok {
 				ret = rsp
 			}
 			inv.On("UpdateDevicesGroup",
@@ -2120,6 +2120,7 @@ func TestApiInventoryInternalDevicesStatus(t *testing.T) {
 		tenantId         string
 		status           string
 		inReq            *http.Request
+		*model.UpdateResult
 
 		inventoryErr error
 
@@ -2130,12 +2131,20 @@ func TestApiInventoryInternalDevicesStatus(t *testing.T) {
 			deviceId:         deviceID,
 			tenantId:         tenantId,
 			status:           acceptedStatus,
+			UpdateResult: &model.UpdateResult{
+				MatchedCount: 1,
+				UpdatedCount: 1,
+			},
 			inReq: test.MakeSimpleRequest("POST",
 				"http://1.2.3.4/api/internal/v1/inventory/tenants/"+tenantId+"/devices/"+acceptedStatus,
 				[]string{deviceID.String()},
 			),
 			resp: utils.JSONResponseParams{
 				OutputStatus: http.StatusOK,
+				OutputBodyObject: &model.UpdateResult{
+					MatchedCount: 1,
+					UpdatedCount: 1,
+				},
 			},
 		},
 
@@ -2144,12 +2153,20 @@ func TestApiInventoryInternalDevicesStatus(t *testing.T) {
 			deviceId:         deviceID,
 			tenantId:         emptyTenant,
 			status:           acceptedStatus,
+			UpdateResult: &model.UpdateResult{
+				MatchedCount: 1,
+				UpdatedCount: 1,
+			},
 			inReq: test.MakeSimpleRequest("POST",
 				"http://1.2.3.4/api/internal/v1/inventory/tenants/"+emptyTenant+"/devices/"+acceptedStatus,
 				[]string{deviceID.String()},
 			),
 			resp: utils.JSONResponseParams{
 				OutputStatus: http.StatusOK,
+				OutputBodyObject: &model.UpdateResult{
+					MatchedCount: 1,
+					UpdatedCount: 1,
+				},
 			},
 		},
 
@@ -2179,7 +2196,7 @@ func TestApiInventoryInternalDevicesStatus(t *testing.T) {
 			),
 			resp: utils.JSONResponseParams{
 				OutputStatus:     http.StatusBadRequest,
-				OutputBodyObject: RestError("cant parse device ids: json: cannot unmarshal string into Go value of type []string"),
+				OutputBodyObject: RestError("cant parse device ids: json: cannot unmarshal string into Go value of type []model.DeviceID"),
 			},
 		},
 
@@ -2201,22 +2218,23 @@ func TestApiInventoryInternalDevicesStatus(t *testing.T) {
 	}
 
 	for name, tc := range testCases {
-		t.Logf("test case: %s", name)
-		inv := minventory.InventoryApp{}
+		t.Run(name, func(t *testing.T) {
+			inv := minventory.InventoryApp{}
 
-		ctx := contextMatcher()
+			ctx := contextMatcher()
 
-		inv.On("UpsertAttributes",
-			ctx,
-			deviceID,
-			tc.deviceAttributes,
-		).Return(tc.inventoryErr)
+			inv.On("UpsertDevicesAttributes",
+				ctx,
+				[]model.DeviceID{deviceID},
+				tc.deviceAttributes,
+			).Return(tc.UpdateResult, tc.inventoryErr)
 
-		apih := makeMockApiHandler(t, &inv)
+			apih := makeMockApiHandler(t, &inv)
 
-		rest.ErrorFieldName = "error"
+			rest.ErrorFieldName = "error"
 
-		runTestRequest(t, apih, tc.inReq, tc.resp)
+			runTestRequest(t, apih, tc.inReq, tc.resp)
+		})
 	}
 }
 

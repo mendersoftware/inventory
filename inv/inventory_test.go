@@ -246,27 +246,29 @@ func TestInventoryUpsertAttributes(t *testing.T) {
 	}
 
 	for name, tc := range testCases {
-		t.Logf("test case: %s", name)
+		t.Run(name, func(t *testing.T) {
+			t.Logf("test case: %s", name)
 
-		ctx := context.Background()
+			ctx := context.Background()
 
-		db := &mstore.DataStore{}
-		db.On("UpsertAttributes",
-			ctx,
-			mock.AnythingOfType("model.DeviceID"),
-			mock.AnythingOfType("model.DeviceAttributes")).
-			Return(tc.datastoreError)
-		i := invForTest(db)
+			db := &mstore.DataStore{}
+			db.On("UpsertDeviceAttributes",
+				ctx,
+				mock.AnythingOfType("model.DeviceID"),
+				mock.AnythingOfType("model.DeviceAttributes")).
+				Return(tc.datastoreError)
+			i := invForTest(db)
 
-		err := i.UpsertAttributes(ctx, "devid", model.DeviceAttributes{})
+			err := i.UpsertAttributes(ctx, "devid", model.DeviceAttributes{})
 
-		if tc.outError != nil {
-			if assert.Error(t, err) {
-				assert.EqualError(t, err, tc.outError.Error())
+			if tc.outError != nil {
+				if assert.Error(t, err) {
+					assert.EqualError(t, err, tc.outError.Error())
+				}
+			} else {
+				assert.NoError(t, err)
 			}
-		} else {
-			assert.NoError(t, err)
-		}
+		})
 	}
 }
 
@@ -274,53 +276,71 @@ func TestInventoryUnsetDeviceGroup(t *testing.T) {
 	t.Parallel()
 
 	testCases := map[string]struct {
-		inDeviceID     model.DeviceID
-		inGroupName    model.GroupName
-		datastoreError error
-		outError       error
+		inDeviceID      model.DeviceID
+		inGroupName     model.GroupName
+		datastoreError  error
+		datastoreResult *model.UpdateResult
+		outError        error
 	}{
 		"empty device ID, not found": {
-			inDeviceID:     model.DeviceID(""),
-			inGroupName:    model.GroupName("gr1"),
-			datastoreError: store.ErrDevNotFound,
-			outError:       store.ErrDevNotFound,
+			inDeviceID:  model.DeviceID(""),
+			inGroupName: model.GroupName("gr1"),
+			datastoreResult: &model.UpdateResult{
+				MatchedCount: 0,
+				UpdatedCount: 0,
+			},
+			outError: store.ErrDevNotFound,
 		},
 		"device group name not matching": {
-			inDeviceID:     model.DeviceID("1"),
-			inGroupName:    model.GroupName("not-matching"),
-			datastoreError: store.ErrDevNotFound,
-			outError:       store.ErrDevNotFound,
+			inDeviceID:  model.DeviceID("1"),
+			inGroupName: model.GroupName("not-matching"),
+			datastoreResult: &model.UpdateResult{
+				MatchedCount: 0,
+				UpdatedCount: 0,
+			},
+			outError: store.ErrDevNotFound,
 		},
 		"datastore success": {
-			inDeviceID:     model.DeviceID("1"),
-			inGroupName:    model.GroupName("gr1"),
+			inDeviceID:  model.DeviceID("1"),
+			inGroupName: model.GroupName("gr1"),
+			datastoreResult: &model.UpdateResult{
+				MatchedCount: 1,
+				UpdatedCount: 1,
+			},
 			datastoreError: nil,
 			outError:       nil,
+		},
+		"datastore internal error": {
+			inDeviceID:      model.DeviceID("1"),
+			inGroupName:     model.GroupName("gr1"),
+			datastoreResult: nil,
+			datastoreError:  errors.New("internal error"),
+			outError:        errors.New("failed to unassign group from device: internal error"),
 		},
 	}
 
 	for name, tc := range testCases {
-		t.Logf("test case: %s", name)
+		t.Run(name, func(t *testing.T) {
+			ctx := context.Background()
 
-		ctx := context.Background()
+			db := &mstore.DataStore{}
+			db.On("UnsetDevicesGroup",
+				ctx,
+				mock.AnythingOfType("[]model.DeviceID"),
+				mock.AnythingOfType("model.GroupName")).
+				Return(tc.datastoreResult, tc.datastoreError)
+			i := invForTest(db)
 
-		db := &mstore.DataStore{}
-		db.On("UnsetDeviceGroup",
-			ctx,
-			mock.AnythingOfType("model.DeviceID"),
-			mock.AnythingOfType("model.GroupName")).
-			Return(tc.datastoreError)
-		i := invForTest(db)
+			err := i.UnsetDeviceGroup(ctx, tc.inDeviceID, tc.inGroupName)
 
-		err := i.UnsetDeviceGroup(ctx, tc.inDeviceID, tc.inGroupName)
-
-		if tc.outError != nil {
-			if assert.Error(t, err) {
-				assert.EqualError(t, err, tc.outError.Error())
+			if tc.outError != nil {
+				if assert.Error(t, err) {
+					assert.EqualError(t, err, tc.outError.Error())
+				}
+			} else {
+				assert.NoError(t, err)
 			}
-		} else {
-			assert.NoError(t, err)
-		}
+		})
 	}
 }
 
@@ -328,47 +348,54 @@ func TestInventoryUpdateDeviceGroup(t *testing.T) {
 	t.Parallel()
 
 	testCases := map[string]struct {
-		inDeviceID     model.DeviceID
-		inGroupName    model.GroupName
-		datastoreError error
-		outError       error
+		inDeviceID      model.DeviceID
+		inGroupName     model.GroupName
+		datastoreResult *model.UpdateResult
+		datastoreError  error
+		outError        error
 	}{
 		"empty device ID, not found": {
-			inDeviceID:     model.DeviceID(""),
-			inGroupName:    model.GroupName("gr1"),
-			datastoreError: store.ErrDevNotFound,
-			outError:       errors.New("failed to add device to group: Device not found"),
+			inDeviceID:      model.DeviceID(""),
+			inGroupName:     model.GroupName("gr1"),
+			datastoreResult: &model.UpdateResult{},
+			outError:        errors.New("Device not found"),
 		},
 		"datastore success": {
-			inDeviceID:     model.DeviceID("1"),
-			inGroupName:    model.GroupName("gr1"),
+			inDeviceID:  model.DeviceID("1"),
+			inGroupName: model.GroupName("gr1"),
+			datastoreResult: &model.UpdateResult{
+				MatchedCount: 1,
+				UpdatedCount: 1,
+			},
 			datastoreError: nil,
 			outError:       nil,
 		},
 	}
 
 	for name, tc := range testCases {
-		t.Logf("test case: %s", name)
+		t.Run(name, func(t *testing.T) {
+			t.Logf("test case: %s", name)
 
-		ctx := context.Background()
+			ctx := context.Background()
 
-		db := &mstore.DataStore{}
-		db.On("UpdateDeviceGroup",
-			ctx,
-			mock.AnythingOfType("model.DeviceID"),
-			mock.AnythingOfType("model.GroupName")).
-			Return(tc.datastoreError)
-		i := invForTest(db)
+			db := &mstore.DataStore{}
+			db.On("UpdateDevicesGroup",
+				ctx,
+				mock.AnythingOfType("[]model.DeviceID"),
+				mock.AnythingOfType("model.GroupName")).
+				Return(tc.datastoreResult, tc.datastoreError)
+			i := invForTest(db)
 
-		err := i.UpdateDeviceGroup(ctx, tc.inDeviceID, tc.inGroupName)
+			err := i.UpdateDeviceGroup(ctx, tc.inDeviceID, tc.inGroupName)
 
-		if tc.outError != nil {
-			if assert.Error(t, err) {
-				assert.EqualError(t, err, tc.outError.Error())
+			if tc.outError != nil {
+				if assert.Error(t, err) {
+					assert.EqualError(t, err, tc.outError.Error())
+				}
+			} else {
+				assert.NoError(t, err)
 			}
-		} else {
-			assert.NoError(t, err)
-		}
+		})
 	}
 }
 
@@ -562,16 +589,21 @@ func TestInventoryDeleteDevice(t *testing.T) {
 	t.Parallel()
 
 	testCases := map[string]struct {
-		datastoreError error
-		outError       error
+		datastoreResult *model.UpdateResult
+		datastoreError  error
+		outError        error
 	}{
 		"ok": {
-			datastoreError: nil,
-			outError:       nil,
+			datastoreResult: &model.UpdateResult{
+				DeletedCount: 1,
+			},
+			outError: nil,
 		},
 		"no device": {
-			datastoreError: store.ErrDevNotFound,
-			outError:       store.ErrDevNotFound,
+			datastoreResult: &model.UpdateResult{
+				DeletedCount: 0,
+			},
+			outError: store.ErrDevNotFound,
 		},
 		"datastore error": {
 			datastoreError: errors.New("db connection failed"),
@@ -584,10 +616,10 @@ func TestInventoryDeleteDevice(t *testing.T) {
 			ctx := context.Background()
 
 			db := &mstore.DataStore{}
-			db.On("DeleteDevice",
+			db.On("DeleteDevices",
 				ctx,
-				mock.AnythingOfType("DeviceID"),
-			).Return(tc.datastoreError)
+				mock.AnythingOfType("[]model.DeviceID"),
+			).Return(tc.datastoreResult, tc.datastoreError)
 			i := invForTest(db)
 
 			err := i.DeleteDevice(ctx, model.DeviceID("foo"))
@@ -714,7 +746,7 @@ func TestInventoryUpdateDevicesGroup(t *testing.T) {
 
 		DeviceIDs []model.DeviceID
 		model.GroupName
-		*model.GroupUpdateResponse
+		*model.UpdateResult
 		Err error
 	}{{
 		Name: "ok",
@@ -722,7 +754,7 @@ func TestInventoryUpdateDevicesGroup(t *testing.T) {
 			"1", "2", "3",
 		},
 		GroupName: "foo",
-		GroupUpdateResponse: &model.GroupUpdateResponse{
+		UpdateResult: &model.UpdateResult{
 			UpdatedCount: 2,
 			MatchedCount: 2,
 		},
@@ -739,33 +771,19 @@ func TestInventoryUpdateDevicesGroup(t *testing.T) {
 		t.Run(testCase.Name, func(t *testing.T) {
 			ctx := context.Background()
 			db := &mstore.DataStore{}
-			if testCase.Err != nil {
-				db.On("UpdateDevicesGroup",
-					ctx,
-					testCase.DeviceIDs,
-					testCase.GroupName,
-				).Return(
-					int64(-1),
-					int64(-1),
-					testCase.Err,
-				)
-			} else {
-				db.On("UpdateDevicesGroup",
-					ctx,
-					testCase.DeviceIDs,
-					testCase.GroupName,
-				).Return(
-					testCase.GroupUpdateResponse.MatchedCount,
-					testCase.GroupUpdateResponse.UpdatedCount,
-					testCase.Err,
-				)
-
-			}
+			db.On("UpdateDevicesGroup",
+				ctx,
+				testCase.DeviceIDs,
+				testCase.GroupName,
+			).Return(
+				testCase.UpdateResult,
+				testCase.Err,
+			)
 			i := invForTest(db)
 			rsp, err := i.UpdateDevicesGroup(
 				ctx, testCase.DeviceIDs, testCase.GroupName,
 			)
-			assert.Equal(t, testCase.GroupUpdateResponse, rsp)
+			assert.Equal(t, testCase.UpdateResult, rsp)
 			assert.Equal(t, testCase.Err, err)
 		})
 	}
@@ -778,7 +796,7 @@ func TestInventoryUnsetDevicesGroup(t *testing.T) {
 
 		DeviceIDs []model.DeviceID
 		model.GroupName
-		*model.GroupUpdateResponse
+		*model.UpdateResult
 		Err error
 	}{{
 		Name: "ok",
@@ -786,7 +804,8 @@ func TestInventoryUnsetDevicesGroup(t *testing.T) {
 			"1", "2", "3",
 		},
 		GroupName: "foo",
-		GroupUpdateResponse: &model.GroupUpdateResponse{
+		UpdateResult: &model.UpdateResult{
+			MatchedCount: 2,
 			UpdatedCount: 2,
 		},
 		Err: nil,
@@ -802,31 +821,19 @@ func TestInventoryUnsetDevicesGroup(t *testing.T) {
 		t.Run(testCase.Name, func(t *testing.T) {
 			ctx := context.Background()
 			db := &mstore.DataStore{}
-			if testCase.Err != nil {
-				db.On("UnsetDevicesGroup",
-					ctx,
-					testCase.DeviceIDs,
-					testCase.GroupName,
-				).Return(
-					int64(-1),
-					testCase.Err,
-				)
-			} else {
-				db.On("UnsetDevicesGroup",
-					ctx,
-					testCase.DeviceIDs,
-					testCase.GroupName,
-				).Return(
-					testCase.GroupUpdateResponse.UpdatedCount,
-					testCase.Err,
-				)
-
-			}
+			db.On("UnsetDevicesGroup",
+				ctx,
+				testCase.DeviceIDs,
+				testCase.GroupName,
+			).Return(
+				testCase.UpdateResult,
+				testCase.Err,
+			)
 			i := invForTest(db)
 			rsp, err := i.UnsetDevicesGroup(
 				ctx, testCase.DeviceIDs, testCase.GroupName,
 			)
-			assert.Equal(t, testCase.GroupUpdateResponse, rsp)
+			assert.Equal(t, testCase.UpdateResult, rsp)
 			assert.Equal(t, testCase.Err, err)
 		})
 	}

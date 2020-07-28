@@ -11,6 +11,7 @@
 //    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
+
 package mongo
 
 import (
@@ -742,9 +743,9 @@ func TestNewDataStoreMongo(t *testing.T) {
 	assert.EqualError(t, err, "failed to open mongo-driver session")
 }
 
-func TestMongoUpsertAttributes(t *testing.T) {
+func TestMongoUpsertDeviceAttributes(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping TestMongoUpsertAttributes in short mode.")
+		t.Skip("skipping TestMongoUpsertDeviceAttributes in short mode.")
 	}
 
 	//single create timestamp for all inserted devs
@@ -1311,8 +1312,8 @@ func TestMongoUpsertAttributes(t *testing.T) {
 			assert.NoError(t, err, "failed to setup input data")
 		}
 
-		err := d.UpsertAttributes(ctx, tc.inDevId, tc.inAttrs)
-		assert.NoError(t, err, "UpsertAttributes failed")
+		err := d.UpsertDeviceAttributes(ctx, tc.inDevId, tc.inAttrs)
+		assert.NoError(t, err, "UpsertDeviceAttributes failed")
 
 		//get the device back
 		var dev model.Device
@@ -1340,54 +1341,87 @@ func TestMongoUpdateDeviceGroup(t *testing.T) {
 	}
 
 	testCases := map[string]struct {
-		InputDeviceID  model.DeviceID
+		InputDeviceIDs []model.DeviceID
 		InputGroupName model.GroupName
-		InputDevice    *model.Device
+		InputDevices   []model.Device
 		tenant         string
 		OutputError    error
+		Result         model.UpdateResult
 	}{
 		"update group for device with empty device id": {
-			InputDeviceID:  model.DeviceID(""),
+			InputDeviceIDs: nil,
 			InputGroupName: model.GroupName("abc"),
-			InputDevice:    nil,
-			OutputError:    store.ErrDevNotFound,
+			InputDevices:   nil,
 		},
 		"update group for device with empty device id; with tenant": {
-			InputDeviceID:  model.DeviceID(""),
+			InputDeviceIDs: nil,
 			InputGroupName: model.GroupName("abc"),
-			InputDevice:    nil,
+			InputDevices:   nil,
 			tenant:         "foo",
-			OutputError:    store.ErrDevNotFound,
 		},
 		"update group for device, device not found": {
-			InputDeviceID:  model.DeviceID("2"),
+			InputDeviceIDs: []model.DeviceID{"2"},
 			InputGroupName: model.GroupName("abc"),
-			InputDevice:    nil,
-			OutputError:    store.ErrDevNotFound,
+			InputDevices:   nil,
 		},
 		"update group for device, group exists": {
-			InputDeviceID:  model.DeviceID("1"),
+			InputDeviceIDs: []model.DeviceID{"1"},
 			InputGroupName: model.GroupName("abc"),
-			InputDevice: &model.Device{
+			InputDevices: []model.Device{{
 				ID:    model.DeviceID("1"),
 				Group: model.GroupName("def"),
+			}},
+			Result: model.UpdateResult{
+				MatchedCount: 1,
+				UpdatedCount: 1,
 			},
 		},
 		"update group for device, group exists; with tenant": {
-			InputDeviceID:  model.DeviceID("1"),
+			InputDeviceIDs: []model.DeviceID{"1"},
 			InputGroupName: model.GroupName("abc"),
-			InputDevice: &model.Device{
+			InputDevices: []model.Device{{
 				ID:    model.DeviceID("1"),
 				Group: model.GroupName("def"),
-			},
+			}},
 			tenant: "foo",
+			Result: model.UpdateResult{
+				MatchedCount: 1,
+				UpdatedCount: 1,
+			},
 		},
 		"update group for device, group does not exist": {
-			InputDeviceID:  model.DeviceID("1"),
+			InputDeviceIDs: []model.DeviceID{"1"},
 			InputGroupName: model.GroupName("abc"),
-			InputDevice: &model.Device{
+			InputDevices: []model.Device{{
+				ID: model.DeviceID("1"),
+			}},
+			Result: model.UpdateResult{
+				MatchedCount: 1,
+				UpdatedCount: 1,
+			},
+		},
+		"update group for multiple devices": {
+			InputDeviceIDs: []model.DeviceID{"1", "2", "3", "4", "5"},
+			InputGroupName: model.GroupName("grp2"),
+			InputDevices: []model.Device{{
 				ID:    model.DeviceID("1"),
-				Group: model.GroupName(""),
+				Group: model.GroupName("grp1"),
+			}, {
+				ID:    model.DeviceID("2"),
+				Group: model.GroupName("grp1"),
+			}, {
+				ID:    model.DeviceID("3"),
+				Group: model.GroupName("grp1"),
+			}, {
+				ID:    model.DeviceID("4"),
+				Group: model.GroupName("grp2"),
+			}, {
+				ID:    model.DeviceID("6"),
+				Group: model.GroupName("grp3"),
+			}},
+			Result: model.UpdateResult{
+				MatchedCount: 4,
+				UpdatedCount: 3,
 			},
 		},
 	}
@@ -1412,30 +1446,29 @@ func TestMongoUpdateDeviceGroup(t *testing.T) {
 			})
 		}
 
-		if testCase.InputDevice != nil {
-			client.Database(mstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl).InsertOne(ctx, testCase.InputDevice)
+		if testCase.InputDevices != nil {
+			ins := make(bson.A, len(testCase.InputDevices))
+			for i := range testCase.InputDevices {
+				ins[i] = &testCase.InputDevices[i]
+			}
+			_, err := client.Database(mstore.DbFromContext(ctx, DbName)).
+				Collection(DbDevicesColl).
+				InsertMany(ctx, ins)
+			if err != nil {
+				panic(err)
+			}
 		}
 
-		err := store.UpdateDeviceGroup(ctx, testCase.InputDeviceID, testCase.InputGroupName)
+		result, err := store.UpdateDevicesGroup(
+			ctx, testCase.InputDeviceIDs, testCase.InputGroupName,
+		)
 		if testCase.OutputError != nil {
 			assert.Error(t, err, "expected error")
-
 			assert.EqualError(t, err, testCase.OutputError.Error())
 		} else {
 			assert.NoError(t, err, "expected no error")
-
-			groupsColl := client.Database(mstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
-			cursor, err := groupsColl.Find(ctx, bson.M{
-				DbDevAttributesGroupValue: model.GroupName("abc"),
-			})
-			assert.NoError(t, err, "expected no error")
-
-			count := 0
-			for cursor.Next(db.CTX()) {
-				count++
-			}
-			if !assert.Equal(t, 1, count) {
-				time.Sleep(time.Minute)
+			if assert.NotNil(t, result) {
+				assert.Equal(t, testCase.Result, *result)
 			}
 		}
 	}
@@ -1487,106 +1520,116 @@ func TestMongoUnsetDevicesGroupWithGroupName(t *testing.T) {
 	}
 
 	testCases := map[string]struct {
-		InputDeviceID  model.DeviceID
+		InputDeviceIDs []model.DeviceID
 		InputGroupName model.GroupName
-		InputDevice    *model.Device
+		InputDevices   []model.Device
 		tenant         string
 		OutputError    error
+		Result         model.UpdateResult
 	}{
 		"unset group for device with group id, device not found": {
-			InputDeviceID:  model.DeviceID("1"),
+			InputDeviceIDs: []model.DeviceID{"1"},
 			InputGroupName: model.GroupName("e16c71ec"),
-			InputDevice:    nil,
-			OutputError:    store.ErrDevNotFound,
+			InputDevices:   nil,
 		},
 		"unset group for device with group id, device not found; with tenant": {
-			InputDeviceID:  model.DeviceID("1"),
+			InputDeviceIDs: []model.DeviceID{"1"},
 			InputGroupName: model.GroupName("e16c71ec"),
-			InputDevice:    nil,
+			InputDevices:   nil,
 			tenant:         "foo",
-			OutputError:    store.ErrDevNotFound,
 		},
 		"unset group for device, ok": {
-			InputDeviceID:  model.DeviceID("1"),
+			InputDeviceIDs: []model.DeviceID{"1"},
 			InputGroupName: model.GroupName("e16c71ec"),
-			InputDevice: &model.Device{
+			InputDevices: []model.Device{{
 				ID:    model.DeviceID("1"),
 				Group: model.GroupName("e16c71ec"),
+			}},
+			Result: model.UpdateResult{
+				MatchedCount: 1,
+				UpdatedCount: 1,
 			},
 		},
 		"unset group for device, ok; with tenant": {
-			InputDeviceID:  model.DeviceID("1"),
+			InputDeviceIDs: []model.DeviceID{"1"},
 			InputGroupName: model.GroupName("e16c71ec"),
-			InputDevice: &model.Device{
+			InputDevices: []model.Device{{
 				ID:    model.DeviceID("1"),
 				Group: model.GroupName("e16c71ec"),
-			},
+			}},
 			tenant: "foo",
+			Result: model.UpdateResult{
+				MatchedCount: 1,
+				UpdatedCount: 1,
+			},
 		},
 		"unset group for device with incorrect group name provided": {
-			InputDeviceID:  model.DeviceID("1"),
+			InputDeviceIDs: []model.DeviceID{"1"},
 			InputGroupName: model.GroupName("other-group-name"),
-			InputDevice: &model.Device{
+			InputDevices: []model.Device{{
 				ID:    model.DeviceID("1"),
 				Group: model.GroupName("e16c71ec"),
-			},
-			OutputError: store.ErrDevNotFound,
+			}},
+			Result: model.UpdateResult{},
 		},
 		"unset group for device with incorrect group name provided; with tenant": {
-			InputDeviceID:  model.DeviceID("1"),
+			InputDeviceIDs: []model.DeviceID{"1"},
 			InputGroupName: model.GroupName("other-group-name"),
-			InputDevice: &model.Device{
+			InputDevices: []model.Device{{
 				ID:    model.DeviceID("1"),
 				Group: model.GroupName("e16c71ec"),
-			},
-			tenant:      "foo",
-			OutputError: store.ErrDevNotFound,
+			}},
+			tenant: "foo",
+			Result: model.UpdateResult{},
 		},
 	}
 
 	for name, testCase := range testCases {
-		t.Logf("test case: %s", name)
+		t.Run(name, func(t *testing.T) {
+			t.Logf("test case: %s", name)
 
-		// Make sure we start test with empty database
-		db.Wipe()
+			// Make sure we start test with empty database
+			db.Wipe()
 
-		client := db.Client()
-		store := NewDataStoreMongoWithSession(client)
+			client := db.Client()
+			store := NewDataStoreMongoWithSession(client)
 
-		var ctx context.Context
-		if testCase.tenant != "" {
-			ctx = identity.WithContext(db.CTX(), &identity.Identity{
-				Tenant: testCase.tenant,
-			})
-		} else {
-			ctx = identity.WithContext(db.CTX(), &identity.Identity{
-				Tenant: "",
-			})
-		}
-
-		if testCase.InputDevice != nil {
-			client.Database(mstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl).InsertOne(ctx, testCase.InputDevice)
-		}
-
-		err := store.UnsetDeviceGroup(ctx, testCase.InputDeviceID, testCase.InputGroupName)
-		if testCase.OutputError != nil {
-			assert.Error(t, err, "expected error")
-
-			assert.EqualError(t, err, testCase.OutputError.Error())
-		} else {
-			assert.NoError(t, err, "expected no error")
-
-			groupsColl := client.Database(mstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
-			cursor, err := groupsColl.Find(ctx, bson.M{
-				DbDevAttributesGroupValue: model.GroupName("e16c71ec")})
-			assert.NoError(t, err, "expected no error")
-
-			count := 0
-			for cursor.Next(db.CTX()) {
-				count++
+			var ctx context.Context
+			if testCase.tenant != "" {
+				ctx = identity.WithContext(db.CTX(), &identity.Identity{
+					Tenant: testCase.tenant,
+				})
+			} else {
+				ctx = identity.WithContext(db.CTX(), &identity.Identity{
+					Tenant: "",
+				})
 			}
-			assert.Equal(t, 0, count)
-		}
+
+			if testCase.InputDevices != nil {
+				ins := make(bson.A, len(testCase.InputDevices))
+				for i := range testCase.InputDevices {
+					ins[i] = &testCase.InputDevices[i]
+				}
+				_, err := client.Database(mstore.DbFromContext(ctx, DbName)).
+					Collection(DbDevicesColl).
+					InsertMany(ctx, ins)
+				if err != nil {
+					panic(err)
+				}
+			}
+
+			res, err := store.UnsetDevicesGroup(ctx, testCase.InputDeviceIDs, testCase.InputGroupName)
+			if testCase.OutputError != nil {
+				assert.Error(t, err, "expected error")
+
+				assert.EqualError(t, err, testCase.OutputError.Error())
+			} else {
+				assert.NoError(t, err, "expected no error")
+				if assert.NotNil(t, res) {
+					assert.Equal(t, testCase.Result, *res)
+				}
+			}
+		})
 	}
 }
 
@@ -2352,8 +2395,7 @@ func TestMigrate(t *testing.T) {
 	}
 }
 
-// test funcs
-func TestMongoDeleteDevice(t *testing.T) {
+func TestMongoDeleteDevices(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping TestMongoDeleteDevice in short mode.")
 	}
@@ -2364,66 +2406,78 @@ func TestMongoDeleteDevice(t *testing.T) {
 	}
 
 	testCases := map[string]struct {
-		inputId  model.DeviceID
+		inputIDs []model.DeviceID
 		expected []model.Device
 		err      error
+		result   model.UpdateResult
 	}{
 		"existing 1": {
-			inputId: model.DeviceID("0"),
+			inputIDs: []model.DeviceID{"0"},
 			expected: []model.Device{
 				{ID: model.DeviceID("1")},
 			},
 			err: nil,
-		},
-		"existing 2": {
-			inputId: model.DeviceID("1"),
-			expected: []model.Device{
-				{ID: model.DeviceID("0")},
+			result: model.UpdateResult{
+				DeletedCount: 1,
 			},
-			err: nil,
+		},
+		"delete all": {
+			inputIDs: []model.DeviceID{"0", "1"},
+			expected: []model.Device(nil),
+			err:      nil,
+			result: model.UpdateResult{
+				DeletedCount: 2,
+			},
 		},
 		"doesn't exist": {
-			inputId: model.DeviceID("3"),
+			inputIDs: []model.DeviceID{"3"},
 			expected: []model.Device{
 				{ID: model.DeviceID("0")},
 				{ID: model.DeviceID("1")},
 			},
-			err: store.ErrDevNotFound,
+			result: model.UpdateResult{
+				DeletedCount: 0,
+			},
 		},
 	}
 
 	for name, tc := range testCases {
 		t.Logf("test case: %s", name)
+		t.Run(name, func(t *testing.T) {
 
-		// Make sure we start test with empty database
-		db.Wipe()
+			// Make sure we start test with empty database
+			db.Wipe()
 
-		client := db.Client()
+			client := db.Client()
 
-		for _, d := range inputDevs {
-			_, err := client.Database(DbName).Collection(DbDevicesColl).InsertOne(db.CTX(), d)
-			assert.NoError(t, err, "failed to setup input data")
-		}
-
-		store := NewDataStoreMongoWithSession(client)
-
-		//test
-		err := store.DeleteDevice(db.CTX(), tc.inputId)
-		if tc.err != nil {
-			assert.EqualError(t, err, tc.err.Error())
-		} else {
-			assert.NoError(t, err, "failed to delete device")
-
-			var outDevs []model.Device
-			cursor, err := client.Database(DbName).Collection(DbDevicesColl).Find(db.CTX(), bson.M{})
-			assert.NoError(t, err, "failed to verify devices")
-			for cursor.Next(db.CTX()) {
-				var d model.Device
-				cursor.Decode(&d)
-				outDevs = append(outDevs, d)
+			for _, d := range inputDevs {
+				_, err := client.Database(DbName).
+					Collection(DbDevicesColl).
+					InsertOne(db.CTX(), d)
+				assert.NoError(t, err, "failed to setup input data")
 			}
-			assert.True(t, reflect.DeepEqual(tc.expected, outDevs))
-		}
+
+			store := NewDataStoreMongoWithSession(client)
+
+			//test
+			result, err := store.DeleteDevices(db.CTX(), tc.inputIDs)
+			if tc.err != nil {
+				assert.EqualError(t, err, tc.err.Error())
+			} else {
+				assert.NoError(t, err, "failed to delete device")
+				if assert.NotNil(t, result) {
+					assert.Equal(t, tc.result, *result)
+				}
+
+				var outDevs []model.Device
+				cursor, err := client.Database(DbName).
+					Collection(DbDevicesColl).
+					Find(db.CTX(), bson.M{})
+				assert.NoError(t, err, "failed to verify devices")
+				cursor.All(nil, &outDevs)
+				assert.Equal(t, tc.expected, outDevs)
+			}
+		})
 	}
 }
 
@@ -2763,9 +2817,8 @@ func TestUpdateDevicesGroup(t *testing.T) {
 		DeviceIDs []model.DeviceID
 		model.GroupName
 
-		ExpectedMatches int64
-		ExpectedUpdates int64
-		MongoError      bool
+		Result     model.UpdateResult
+		MongoError bool
 	}{{
 		Name: "ok, all matched updated",
 
@@ -2774,9 +2827,11 @@ func TestUpdateDevicesGroup(t *testing.T) {
 			model.DeviceID(oid.NewUUIDv5("2").String()),
 			model.DeviceID(oid.NewUUIDv5("3").String()),
 		},
-		GroupName:       "baz",
-		ExpectedUpdates: 3,
-		ExpectedMatches: 3,
+		GroupName: "baz",
+		Result: model.UpdateResult{
+			UpdatedCount: 3,
+			MatchedCount: 3,
+		},
 	}, {
 		Name: "ok, partial update (tenant)",
 
@@ -2788,9 +2843,11 @@ func TestUpdateDevicesGroup(t *testing.T) {
 			model.DeviceID(oid.NewUUIDv5("4").String()),
 			model.DeviceID(oid.NewUUIDv5("5").String()),
 		},
-		GroupName:       "baz",
-		ExpectedUpdates: 3,
-		ExpectedMatches: 4,
+		GroupName: "baz",
+		Result: model.UpdateResult{
+			UpdatedCount: 3,
+			MatchedCount: 4,
+		},
 	}, {
 		Name: "ok, no match",
 
@@ -2800,17 +2857,17 @@ func TestUpdateDevicesGroup(t *testing.T) {
 			model.DeviceID(oid.NewUUIDv5("12").String()),
 			model.DeviceID(oid.NewUUIDv5("13").String()),
 		},
-		GroupName:       "foo",
-		ExpectedMatches: 0,
-		ExpectedUpdates: 0,
+		GroupName: "foo",
+		Result: model.UpdateResult{
+			UpdatedCount: 0,
+			MatchedCount: 0,
+		},
 	}, {
-		Name: "error, nil array - internal mongo error",
+		Name: "error, nil array - noop",
 
-		DeviceIDs:       nil,
-		GroupName:       "foo",
-		ExpectedMatches: -1,
-		ExpectedUpdates: -1,
-		MongoError:      true,
+		DeviceIDs: nil,
+		GroupName: "foo",
+		Result:    model.UpdateResult{},
 	}}
 
 	for _, testCase := range testCases {
@@ -2832,16 +2889,17 @@ func TestUpdateDevicesGroup(t *testing.T) {
 			if _, err := collDevs.InsertMany(ctx, deviceSet); err != nil {
 				t.Fatalf("Failed to initialize test context, error: %v", err)
 			}
-			matched, updated, err := store.UpdateDevicesGroup(
+			result, err := store.UpdateDevicesGroup(
 				ctx, testCase.DeviceIDs, testCase.GroupName,
 			)
 
-			assert.Equal(t, testCase.ExpectedMatches, matched)
-			assert.Equal(t, testCase.ExpectedUpdates, updated)
 			if testCase.MongoError {
 				assert.Error(t, err)
 			} else {
 				assert.NoError(t, err)
+				if assert.NotNil(t, result) {
+					assert.Equal(t, testCase.Result, *result)
+				}
 			}
 		})
 	}
@@ -2878,9 +2936,8 @@ func TestClearDevicesGroup(t *testing.T) {
 		DeviceIDs []model.DeviceID
 		model.GroupName
 
-		ExpectedMatches int64
-		ExpectedUpdates int64
-		MongoError      bool
+		Result     model.UpdateResult
+		MongoError bool
 	}{{
 		Name: "ok, all matched updated",
 
@@ -2888,8 +2945,11 @@ func TestClearDevicesGroup(t *testing.T) {
 			model.DeviceID(oid.NewUUIDv5("1").String()),
 			model.DeviceID(oid.NewUUIDv5("2").String()),
 		},
-		GroupName:       "foo",
-		ExpectedUpdates: 2,
+		GroupName: "foo",
+		Result: model.UpdateResult{
+			MatchedCount: 2,
+			UpdatedCount: 2,
+		},
 	}, {
 		Name: "ok, partial update (tenant)",
 
@@ -2900,8 +2960,11 @@ func TestClearDevicesGroup(t *testing.T) {
 			model.DeviceID(oid.NewUUIDv5("3").String()),
 			model.DeviceID(oid.NewUUIDv5("4").String()),
 		},
-		GroupName:       "baz",
-		ExpectedUpdates: 1,
+		GroupName: "baz",
+		Result: model.UpdateResult{
+			MatchedCount: 1,
+			UpdatedCount: 1,
+		},
 	}, {
 		Name: "ok, no match",
 
@@ -2911,15 +2974,14 @@ func TestClearDevicesGroup(t *testing.T) {
 			model.DeviceID(oid.NewUUIDv5("12").String()),
 			model.DeviceID(oid.NewUUIDv5("13").String()),
 		},
-		GroupName:       "foo",
-		ExpectedUpdates: 0,
+		GroupName: "foo",
+		Result:    model.UpdateResult{},
 	}, {
-		Name: "error, nil array - internal mongo error",
+		Name: "empty input array - noop",
 
-		DeviceIDs:       nil,
-		GroupName:       "foo",
-		ExpectedUpdates: -1,
-		MongoError:      true,
+		DeviceIDs: nil,
+		GroupName: "foo",
+		Result:    model.UpdateResult{},
 	}}
 
 	for _, testCase := range testCases {
@@ -2945,11 +3007,13 @@ func TestClearDevicesGroup(t *testing.T) {
 				ctx, testCase.DeviceIDs, testCase.GroupName,
 			)
 
-			assert.Equal(t, testCase.ExpectedUpdates, updated)
 			if testCase.MongoError {
 				assert.Error(t, err)
 			} else {
 				assert.NoError(t, err)
+				if assert.NotNil(t, updated) {
+					assert.Equal(t, testCase.Result, *updated)
+				}
 			}
 		})
 	}
