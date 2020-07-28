@@ -14,7 +14,9 @@
 
 package model
 
-type GroupUpdateResponse struct {
+type UpdateResult struct {
 	MatchedCount int64 `json:"matched_count,omitempty"`
 	UpdatedCount int64 `json:"updated_count,omitempty"`
+	CreatedCount int64 `json:"created_count,omitempty"`
+	DeletedCount int64 `json:"deleted_count,omitempty"`
 }

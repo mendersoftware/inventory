@@ -47,32 +47,25 @@ type DataStore interface {
 	// })
 	AddDevice(ctx context.Context, dev *model.Device) error
 
-	// delete device and all attributes
-	DeleteDevice(ctx context.Context, id model.DeviceID) error
+	// DeleteDevices removes devices with the given IDs from the database.
+	DeleteDevices(ctx context.Context, ids []model.DeviceID) (*model.UpdateResult, error)
 
-	// Updates the device attributes in a differential manner.
-	// Nonexistent attributes are created, existing are overwritten; the device resource is also created if necessary.
-	UpsertAttributes(ctx context.Context, id model.DeviceID, attrs model.DeviceAttributes) error
-
-	// Unset group in device with `id`
-	UnsetDeviceGroup(ctx context.Context, id model.DeviceID, groupName model.GroupName) error
-
-	// Updates device group
-	UpdateDeviceGroup(ctx context.Context, devid model.DeviceID, group model.GroupName) error
-
-	// UpdateDevicesGroup updates multiple devices' group, returning number
-	// of matching devices, the number devices that changed group and error,
-	// if any.
-	UpdateDevicesGroup(
-		ctx context.Context, devIDs []model.DeviceID, group model.GroupName,
-	) (int64, int64, error)
+	// UpsertDevicesAttributes provides an interface to apply the same
+	// attribute update to multiple devices. Attribute updates are performed
+	// in a differential manner. Nonexistent attributes are created,
+	// existing are overwritten; the device resource is also created if
+	// necessary.
+	UpsertDevicesAttributes(ctx context.Context, ids []model.DeviceID, attrs model.DeviceAttributes) (*model.UpdateResult, error)
 
 	// UnsetDevicesGroup removes a list of deices from their respective
 	// groups returning the number of devices that were modified or an
 	// error if any, respectively.
-	UnsetDevicesGroup(
-		ctx context.Context, deviceIDs []model.DeviceID, group model.GroupName,
-	) (int64, error)
+	UnsetDevicesGroup(ctx context.Context, deviceIDs []model.DeviceID, group model.GroupName) (*model.UpdateResult, error)
+
+	// UpdateDevicesGroup updates multiple devices' group, returning number
+	// of matching devices, the number devices that changed group and error,
+	// if any.
+	UpdateDevicesGroup(ctx context.Context, devIDs []model.DeviceID, group model.GroupName) (*model.UpdateResult, error)
 
 	// List groups
 	ListGroups(ctx context.Context) ([]model.GroupName, error)

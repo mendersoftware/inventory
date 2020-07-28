@@ -772,50 +772,61 @@ func getTenantContext(ctx context.Context, tenantId string) context.Context {
 }
 
 func (i *inventoryHandlers) InternalDevicesStatusHandler(w rest.ResponseWriter, r *rest.Request) {
-	ctx := r.Context()
+	const (
+		StatusDecommissioned = "decommissioned"
+		StatusAccepted       = "accepted"
+		StatusRejected       = "rejected"
+		StatusPreauthorized  = "preauthorized"
+		StatusPending        = "pending"
+	)
+	var (
+		ids    []model.DeviceID
+		result *model.UpdateResult
+	)
 
+	ctx := r.Context()
 	l := log.FromContext(ctx)
 
+	tenantID := r.PathParam("tenant_id")
+	ctx = getTenantContext(ctx, tenantID)
+
 	status := r.PathParam("status")
-	if status == "" {
-		u.RestErrWithLog(w, r, l, errors.New("status not provided"), http.StatusBadRequest)
-		return
-	}
 
-	tenantId := r.PathParam("tenant_id")
-
-	ctx = getTenantContext(ctx, tenantId)
-
-	var ids []string
 	err := r.DecodeJsonPayload(&ids)
 	if err != nil {
 		u.RestErrWithLog(w, r, l, errors.Wrap(err, "cant parse device ids"), http.StatusBadRequest)
 		return
 	}
 
-	for _, id := range ids {
-		attrs := model.DeviceAttributes{
-			{
-				Name:        "status",
-				Description: nil,
-				Value:       status,
-				Scope:       model.AttrScopeIdentity,
-			},
-		}
+	switch status {
+	case StatusAccepted, StatusPreauthorized,
+		StatusPending, StatusRejected:
+		// Update statuses
+		attrs := model.DeviceAttributes{{
+			Name:  "status",
+			Scope: model.AttrScopeIdentity,
+			Value: status,
+		}}
+		result, err = i.inventory.UpsertDevicesAttributes(ctx, ids, attrs)
 
-		if status == "decommissioned" {
-			err = i.inventory.DeleteDevice(ctx, model.DeviceID(id))
-		} else {
-			//upsert the attributes
-			err = i.inventory.UpsertAttributes(ctx, model.DeviceID(id), attrs)
-		}
-		if err != nil {
-			u.RestErrWithLogInternal(w, r, l, err)
-			return
-		}
+	case StatusDecommissioned:
+		// Delete Inventory
+		result, err = i.inventory.DeleteDevices(ctx, ids)
+	default:
+		// Unrecognized status
+		u.RestErrWithLog(w, r, l,
+			errors.Errorf("unrecognized status: %s", status),
+			http.StatusNotFound,
+		)
+		return
+	}
+	if err != nil {
+		u.RestErrWithLogInternal(w, r, l, err)
+		return
 	}
 
 	w.WriteHeader(http.StatusOK)
+	w.WriteJson(result)
 }
 
 func parseSearchParams(r *rest.Request) (*model.SearchParams, error) {
