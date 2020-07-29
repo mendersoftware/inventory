@@ -252,11 +252,11 @@ func TestInventoryUpsertAttributes(t *testing.T) {
 			ctx := context.Background()
 
 			db := &mstore.DataStore{}
-			db.On("UpsertDeviceAttributes",
+			db.On("UpsertDevicesAttributes",
 				ctx,
-				mock.AnythingOfType("model.DeviceID"),
+				mock.AnythingOfType("[]model.DeviceID"),
 				mock.AnythingOfType("model.DeviceAttributes")).
-				Return(tc.datastoreError)
+				Return(nil, tc.datastoreError)
 			i := invForTest(db)
 
 			err := i.UpsertAttributes(ctx, "devid", model.DeviceAttributes{})
