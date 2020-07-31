@@ -260,27 +260,35 @@ func (db *DataStoreMongo) AddDevice(ctx context.Context, dev *model.Device) erro
 			Value: dev.Group,
 		})
 	}
-	err := db.UpsertAttributes(ctx, dev.ID, dev.Attributes)
+	_, err := db.UpsertDevicesAttributes(
+		ctx, []model.DeviceID{dev.ID}, dev.Attributes,
+	)
 	if err != nil {
 		return errors.Wrap(err, "failed to store device")
 	}
 	return nil
 }
 
-// UpsertAttributes makes an upsert on the device's attributes.
-func (db *DataStoreMongo) UpsertAttributes(ctx context.Context, id model.DeviceID, attrs model.DeviceAttributes) error {
+func (db *DataStoreMongo) UpsertDevicesAttributes(
+	ctx context.Context,
+	ids []model.DeviceID,
+	attrs model.DeviceAttributes,
+) (*model.UpdateResult, error) {
 	const systemScope = DbDevAttributes + "." + model.AttrScopeSystem
 	const updatedField = systemScope + "-" + model.AttrNameUpdated
 	const createdField = systemScope + "-" + model.AttrNameCreated
+	var (
+		result *model.UpdateResult
+		err    error
+	)
 
 	c := db.client.
 		Database(mstore.DbFromContext(ctx, DbName)).
 		Collection(DbDevicesColl)
 
-	filter := bson.M{"_id": id}
 	update, err := makeAttrUpsert(attrs)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	now := time.Now()
 	update[updatedField] = model.DeviceAttribute{
@@ -298,11 +306,40 @@ func (db *DataStoreMongo) UpsertAttributes(ctx context.Context, id model.DeviceI
 			},
 		},
 	}
-	_, err = c.UpdateOne(ctx, filter, update, mopts.Update().SetUpsert(true))
-	if err != nil {
-		return err
+
+	switch len(ids) {
+	case 0:
+		return &model.UpdateResult{}, nil
+	case 1:
+		var res *mongo.UpdateResult
+		filter := map[string]interface{}{"_id": ids[0]}
+		res, err = c.UpdateMany(ctx, filter, update, mopts.Update().SetUpsert(true))
+		result = &model.UpdateResult{
+			MatchedCount: res.MatchedCount,
+			CreatedCount: res.UpsertedCount,
+		}
+	default:
+		var bres *mongo.BulkWriteResult
+		// Perform single bulk-write operation
+		// NOTE: Can't use UpdateMany as $in query operator does not
+		//       upsert missing devices.
+		models := make([]mongo.WriteModel, len(ids))
+		for i, id := range ids {
+			umod := mongo.NewUpdateOneModel()
+			umod.Filter = bson.M{"_id": id}
+			umod.SetUpsert(true)
+			umod.Update = update
+			models[i] = umod
+		}
+		bres, err = c.BulkWrite(
+			ctx, models, mopts.BulkWrite().SetOrdered(false),
+		)
+		result = &model.UpdateResult{
+			MatchedCount: bres.MatchedCount,
+			CreatedCount: bres.UpsertedCount,
+		}
 	}
-	return nil
+	return result, err
 }
 
 // makeAttrField is a convenience function for composing attribute field names.
@@ -376,69 +413,22 @@ func mongoOperator(co store.ComparisonOperator) string {
 	return ""
 }
 
-func (db *DataStoreMongo) UnsetDeviceGroup(ctx context.Context, id model.DeviceID, groupName model.GroupName) error {
-	c := db.client.
-		Database(mstore.DbFromContext(ctx, DbName)).
-		Collection(DbDevicesColl)
-
-	filter := bson.M{
-		"_id":                     id,
-		DbDevAttributesGroupValue: groupName,
-	}
-	update := bson.M{
-		"$unset": bson.M{
-			DbDevAttributesGroup: 1,
-		},
-	}
-
-	res, err := c.UpdateMany(ctx, filter, update)
-	if err != nil {
-		return err
-	}
-	if res.ModifiedCount <= 0 {
-		return store.ErrDevNotFound
-	}
-	return nil
-}
-
-func (db *DataStoreMongo) UpdateDeviceGroup(ctx context.Context, devId model.DeviceID, newGroup model.GroupName) error {
-	c := db.client.Database(mstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
-
-	filter := bson.M{
-		"_id": devId,
-	}
-	update := bson.M{
-		"$set": bson.M{
-			DbDevAttributesGroup: model.DeviceAttribute{
-				Scope: model.AttrScopeSystem,
-				Name:  DbDevGroup,
-				Value: newGroup,
-			},
-		},
-	}
-
-	res, err := c.UpdateOne(ctx, filter, update)
-	if err != nil {
-		return err
-	}
-
-	if res.ModifiedCount > 0 {
-		return nil
-	} else {
-		return store.ErrDevNotFound
-	} // to check the update count
-}
-
 func (db *DataStoreMongo) UpdateDevicesGroup(
 	ctx context.Context,
 	devIDs []model.DeviceID,
 	group model.GroupName,
-) (int64, int64, error) {
+) (*model.UpdateResult, error) {
 	database := db.client.Database(mstore.DbFromContext(ctx, DbName))
 	collDevs := database.Collection(DbDevicesColl)
 
-	filter := bson.M{
-		DbDevId: bson.M{"$in": devIDs},
+	var filter = bson.M{}
+	switch len(devIDs) {
+	case 0:
+		return &model.UpdateResult{}, nil
+	case 1:
+		filter[DbDevId] = devIDs[0]
+	default:
+		filter[DbDevId] = bson.M{"$in": devIDs}
 	}
 	update := bson.M{
 		"$set": bson.M{
@@ -451,23 +441,38 @@ func (db *DataStoreMongo) UpdateDevicesGroup(
 	}
 	res, err := collDevs.UpdateMany(ctx, filter, update)
 	if err != nil {
-		return -1, -1, err
+		return nil, err
 	}
-	return res.MatchedCount, res.ModifiedCount, nil
+	return &model.UpdateResult{
+		MatchedCount: res.MatchedCount,
+		UpdatedCount: res.ModifiedCount,
+	}, nil
 }
 
 func (db *DataStoreMongo) UnsetDevicesGroup(
 	ctx context.Context,
 	deviceIDs []model.DeviceID,
 	group model.GroupName,
-) (int64, error) {
+) (*model.UpdateResult, error) {
 	database := db.client.Database(mstore.DbFromContext(ctx, DbName))
 	collDevs := database.Collection(DbDevicesColl)
 
-	filter := bson.D{
-		{Key: DbDevId, Value: bson.M{"$in": deviceIDs}},
-		{Key: DbDevAttributesGroupValue, Value: group},
+	var filter bson.D
+	// Add filter on device id (either $in or direct indexing)
+	switch len(deviceIDs) {
+	case 0:
+		return &model.UpdateResult{}, nil
+	case 1:
+		filter = bson.D{{Key: DbDevId, Value: deviceIDs[0]}}
+	default:
+		filter = bson.D{{Key: DbDevId, Value: bson.M{"$in": deviceIDs}}}
 	}
+	// Append filter on group
+	filter = append(
+		filter,
+		bson.E{Key: DbDevAttributesGroupValue, Value: group},
+	)
+	// Create unset operation on group attribute
 	update := bson.M{
 		"$unset": bson.M{
 			DbDevAttributesGroup: "",
@@ -475,10 +480,12 @@ func (db *DataStoreMongo) UnsetDevicesGroup(
 	}
 	res, err := collDevs.UpdateMany(ctx, filter, update)
 	if err != nil {
-		return -1, err
+		return nil, err
 	}
-	return res.ModifiedCount, nil
-
+	return &model.UpdateResult{
+		MatchedCount: res.MatchedCount,
+		UpdatedCount: res.ModifiedCount,
+	}, nil
 }
 
 func (db *DataStoreMongo) ListGroups(ctx context.Context) ([]model.GroupName, error) {
@@ -547,19 +554,29 @@ func (db *DataStoreMongo) GetDeviceGroup(ctx context.Context, id model.DeviceID)
 	return dev.Group, nil
 }
 
-func (db *DataStoreMongo) DeleteDevice(ctx context.Context, id model.DeviceID) error {
-	c := db.client.Database(mstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
+func (db *DataStoreMongo) DeleteDevices(
+	ctx context.Context, ids []model.DeviceID,
+) (*model.UpdateResult, error) {
+	var filter = bson.M{}
+	database := db.client.Database(mstore.DbFromContext(ctx, DbName))
+	collDevs := database.Collection(DbDevicesColl)
 
-	filter := bson.M{DbDevId: id}
-	result, err := c.DeleteOne(ctx, filter)
-	if err != nil {
-		return err
+	switch len(ids) {
+	case 0:
+		// This is a no-op, don't bother requesting mongo.
+		return &model.UpdateResult{DeletedCount: 0}, nil
+	case 1:
+		filter[DbDevId] = ids[0]
+	default:
+		filter[DbDevId] = bson.M{"$in": ids}
 	}
-	if result.DeletedCount < 1 {
-		return store.ErrDevNotFound
-	} // to check the delete count
-
-	return nil
+	res, err := collDevs.DeleteMany(ctx, filter)
+	if err != nil {
+		return nil, err
+	}
+	return &model.UpdateResult{
+		DeletedCount: res.DeletedCount,
+	}, nil
 }
 
 func (db *DataStoreMongo) GetAllAttributeNames(ctx context.Context) ([]string, error) {

@@ -25,6 +25,7 @@ import (
 
 	"github.com/ant0ine/go-json-rest/rest"
 	"github.com/ant0ine/go-json-rest/rest/test"
+	"github.com/mendersoftware/go-lib-micro/mongo/oid"
 	"github.com/mendersoftware/go-lib-micro/requestid"
 	"github.com/mendersoftware/go-lib-micro/requestlog"
 	mt "github.com/mendersoftware/go-lib-micro/testing"
@@ -1789,7 +1790,7 @@ func TestAPIClearDevicesGroup(t *testing.T) {
 		Devices:   []model.DeviceID{"1", "2", "3"},
 		JSONResponseParams: utils.JSONResponseParams{
 			OutputStatus: http.StatusOK,
-			OutputBodyObject: &model.GroupUpdateResponse{
+			OutputBodyObject: &model.UpdateResult{
 				UpdatedCount: 3,
 			},
 		},
@@ -1870,10 +1871,10 @@ func TestAPIClearDevicesGroup(t *testing.T) {
 			ctx := contextMatcher()
 			apih := makeMockApiHandler(t, &inv)
 
-			var ret *model.GroupUpdateResponse
+			var ret *model.UpdateResult
 			if rsp, ok := testCase.JSONResponseParams.
 				OutputBodyObject.(*model.
-				GroupUpdateResponse); ok {
+				UpdateResult); ok {
 				ret = rsp
 			}
 			inv.On("UnsetDevicesGroup",
@@ -1916,7 +1917,7 @@ func TestAPIPatchGroupDevices(t *testing.T) {
 		GroupName: "foo",
 		JSONResponseParams: utils.JSONResponseParams{
 			OutputStatus: http.StatusOK,
-			OutputBodyObject: &model.GroupUpdateResponse{
+			OutputBodyObject: &model.UpdateResult{
 				MatchedCount: 3,
 				UpdatedCount: 3,
 			},
@@ -1995,10 +1996,10 @@ func TestAPIPatchGroupDevices(t *testing.T) {
 			ctx := contextMatcher()
 			apih := makeMockApiHandler(t, &inv)
 
-			var ret *model.GroupUpdateResponse
+			var ret *model.UpdateResult
 			if rsp, ok := testCase.JSONResponseParams.
 				OutputBodyObject.(*model.
-				GroupUpdateResponse); ok {
+				UpdateResult); ok {
 				ret = rsp
 			}
 			inv.On("UpdateDevicesGroup",
@@ -2106,62 +2107,85 @@ func TestApiInventoryInternalDevicesStatus(t *testing.T) {
 
 	rest.ErrorFieldName = "error"
 
-	deviceAttributes := model.DeviceAttributes{
-		{Name: "status", Value: "accepted", Scope: model.AttrScopeIdentity},
-	}
-	deviceID := mockListDeviceIDs(1)[0]
 	tenantId := "5abcb6de7a673a0001287c71"
 	emptyTenant := ""
 	acceptedStatus := "accepted"
 
 	testCases := map[string]struct {
-		deviceAttributes model.DeviceAttributes
-		deviceId         model.DeviceID
-		tenantId         string
-		status           string
-		inReq            *http.Request
+		// Let intputDeviceIDs be interface{} type in order to allow
+		// passing illegal request body values.
+		inputDeviceIDs interface{}
+		tenantID       string
+		status         string
+		*model.UpdateResult
 
 		inventoryErr error
 
 		resp utils.JSONResponseParams
 	}{
 		"ok": {
-			deviceAttributes: deviceAttributes,
-			deviceId:         deviceID,
-			tenantId:         tenantId,
-			status:           acceptedStatus,
-			inReq: test.MakeSimpleRequest("POST",
-				"http://1.2.3.4/api/internal/v1/inventory/tenants/"+tenantId+"/devices/"+acceptedStatus,
-				[]string{deviceID.String()},
-			),
+			inputDeviceIDs: []model.DeviceID{
+				model.DeviceID(oid.NewUUIDv5("1").String()),
+				model.DeviceID(oid.NewUUIDv5("2").String()),
+				model.DeviceID(oid.NewUUIDv5("3").String()),
+			},
+			tenantID: tenantId,
+			status:   acceptedStatus,
+			UpdateResult: &model.UpdateResult{
+				MatchedCount: 3,
+				UpdatedCount: 2,
+			},
 			resp: utils.JSONResponseParams{
 				OutputStatus: http.StatusOK,
+				OutputBodyObject: &model.UpdateResult{
+					MatchedCount: 3,
+					UpdatedCount: 2,
+				},
 			},
 		},
 
 		"ok single tenant": {
-			deviceAttributes: deviceAttributes,
-			deviceId:         deviceID,
-			tenantId:         emptyTenant,
-			status:           acceptedStatus,
-			inReq: test.MakeSimpleRequest("POST",
-				"http://1.2.3.4/api/internal/v1/inventory/tenants/"+emptyTenant+"/devices/"+acceptedStatus,
-				[]string{deviceID.String()},
-			),
+			inputDeviceIDs: []model.DeviceID{
+				model.DeviceID(oid.NewUUIDv5("1").String()),
+				model.DeviceID(oid.NewUUIDv5("2").String()),
+			},
+			tenantID: emptyTenant,
+			status:   acceptedStatus,
+			UpdateResult: &model.UpdateResult{
+				MatchedCount: 2,
+				UpdatedCount: 2,
+			},
 			resp: utils.JSONResponseParams{
 				OutputStatus: http.StatusOK,
+				OutputBodyObject: &model.UpdateResult{
+					MatchedCount: 2,
+					UpdatedCount: 2,
+				},
+			},
+		},
+
+		"ok, decommissioned": {
+			inputDeviceIDs: []model.DeviceID{
+				model.DeviceID(oid.NewUUIDv5("1").String()),
+				model.DeviceID(oid.NewUUIDv5("2").String()),
+			},
+			tenantID: emptyTenant,
+			status:   "decommissioned",
+			UpdateResult: &model.UpdateResult{
+				DeletedCount: 2,
+			},
+			resp: utils.JSONResponseParams{
+				OutputStatus: http.StatusOK,
+				OutputBodyObject: &model.UpdateResult{
+					DeletedCount: 2,
+				},
 			},
 		},
 
 		"error, payload empty": {
-			deviceAttributes: deviceAttributes,
-			deviceId:         deviceID,
-			tenantId:         tenantId,
-			status:           acceptedStatus,
-			inReq: test.MakeSimpleRequest("POST",
-				"http://1.2.3.4/api/internal/v1/inventory/tenants/"+tenantId+"/devices/"+acceptedStatus,
-				nil,
-			),
+			tenantID:       tenantId,
+			status:         acceptedStatus,
+			inputDeviceIDs: nil,
 			resp: utils.JSONResponseParams{
 				OutputStatus:     http.StatusBadRequest,
 				OutputBodyObject: RestError("cant parse device ids: JSON payload is empty"),
@@ -2169,29 +2193,39 @@ func TestApiInventoryInternalDevicesStatus(t *testing.T) {
 		},
 
 		"error, payload not expected": {
-			deviceAttributes: deviceAttributes,
-			deviceId:         deviceID,
-			tenantId:         tenantId,
-			status:           acceptedStatus,
-			inReq: test.MakeSimpleRequest("POST",
-				"http://1.2.3.4/api/internal/v1/inventory/tenants/"+tenantId+"/devices/"+acceptedStatus,
-				"unexpected here",
-			),
+			inputDeviceIDs: "sneaky wool carpet",
+			tenantID:       tenantId,
+			status:         acceptedStatus,
 			resp: utils.JSONResponseParams{
 				OutputStatus:     http.StatusBadRequest,
-				OutputBodyObject: RestError("cant parse device ids: json: cannot unmarshal string into Go value of type []string"),
+				OutputBodyObject: RestError("cant parse device ids: json: cannot unmarshal string into Go value of type []model.DeviceID"),
+			},
+		},
+
+		"error, bad status": {
+			inputDeviceIDs: []model.DeviceID{
+				model.DeviceID(oid.NewUUIDv5("1").String()),
+				model.DeviceID(oid.NewUUIDv5("2").String()),
+			},
+			tenantID: emptyTenant,
+			status:   "quo",
+			UpdateResult: &model.UpdateResult{
+				MatchedCount: 1,
+				UpdatedCount: 1,
+			},
+			resp: utils.JSONResponseParams{
+				OutputStatus:     http.StatusNotFound,
+				OutputBodyObject: RestError("unrecognized status: quo"),
 			},
 		},
 
 		"error, db Upsert failed": {
-			deviceAttributes: deviceAttributes,
-			deviceId:         deviceID,
-			tenantId:         tenantId,
-			status:           acceptedStatus,
-			inReq: test.MakeSimpleRequest("POST",
-				"http://1.2.3.4/api/internal/v1/inventory/tenants/"+tenantId+"/devices/"+acceptedStatus,
-				[]string{deviceID.String()},
-			),
+			inputDeviceIDs: []model.DeviceID{
+				model.DeviceID(oid.NewUUIDv5("1").String()),
+				model.DeviceID(oid.NewUUIDv5("2").String()),
+			},
+			tenantID:     tenantId,
+			status:       acceptedStatus,
 			inventoryErr: errors.New("cant upsert"),
 			resp: utils.JSONResponseParams{
 				OutputStatus:     http.StatusInternalServerError,
@@ -2201,22 +2235,46 @@ func TestApiInventoryInternalDevicesStatus(t *testing.T) {
 	}
 
 	for name, tc := range testCases {
-		t.Logf("test case: %s", name)
-		inv := minventory.InventoryApp{}
+		t.Run(name, func(t *testing.T) {
+			var (
+				inReq = test.MakeSimpleRequest("POST",
+					"http://1.2.3.4/api/internal/v1/inventory/tenants/"+
+						tc.tenantID+"/devices/"+tc.status,
+					tc.inputDeviceIDs,
+				)
+				deviceAttributes = model.DeviceAttributes{{
+					Name:  "status",
+					Value: tc.status,
+					Scope: model.AttrScopeIdentity,
+				}}
+			)
 
-		ctx := contextMatcher()
+			inv := minventory.InventoryApp{}
+			ctx := contextMatcher()
 
-		inv.On("UpsertAttributes",
-			ctx,
-			deviceID,
-			tc.deviceAttributes,
-		).Return(tc.inventoryErr)
+			switch tc.status {
+			case "accepted", "preauthorized", "pending":
+				// Update statuses
+				inv.On("UpsertDevicesAttributes",
+					ctx,
+					tc.inputDeviceIDs,
+					deviceAttributes,
+				).Return(tc.UpdateResult, tc.inventoryErr)
 
-		apih := makeMockApiHandler(t, &inv)
+			case "decommissioned", "rejected":
+				// Delete Inventory
+				inv.On("DeleteDevices",
+					ctx,
+					tc.inputDeviceIDs,
+				).Return(tc.UpdateResult, tc.inventoryErr)
+			}
 
-		rest.ErrorFieldName = "error"
+			apih := makeMockApiHandler(t, &inv)
 
-		runTestRequest(t, apih, tc.inReq, tc.resp)
+			rest.ErrorFieldName = "error"
+
+			runTestRequest(t, apih, inReq, tc.resp)
+		})
 	}
 }
 

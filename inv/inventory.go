@@ -11,6 +11,7 @@
 //    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
+
 package inv
 
 import (
@@ -29,22 +30,31 @@ type InventoryApp interface {
 	GetDevice(ctx context.Context, id model.DeviceID) (*model.Device, error)
 	AddDevice(ctx context.Context, d *model.Device) error
 	UpsertAttributes(ctx context.Context, id model.DeviceID, attrs model.DeviceAttributes) error
+	UpsertDevicesAttributes(
+		ctx context.Context,
+		ids []model.DeviceID,
+		attrs model.DeviceAttributes,
+	) (*model.UpdateResult, error)
 	UnsetDeviceGroup(ctx context.Context, id model.DeviceID, groupName model.GroupName) error
 	UnsetDevicesGroup(
 		ctx context.Context,
 		deviceIDs []model.DeviceID,
 		groupName model.GroupName,
-	) (*model.GroupUpdateResponse, error)
+	) (*model.UpdateResult, error)
 	UpdateDeviceGroup(ctx context.Context, id model.DeviceID, group model.GroupName) error
 	UpdateDevicesGroup(
 		ctx context.Context,
 		ids []model.DeviceID,
 		group model.GroupName,
-	) (*model.GroupUpdateResponse, error)
+	) (*model.UpdateResult, error)
 	ListGroups(ctx context.Context) ([]model.GroupName, error)
 	ListDevicesByGroup(ctx context.Context, group model.GroupName, skip int, limit int) ([]model.DeviceID, int, error)
 	GetDeviceGroup(ctx context.Context, id model.DeviceID) (model.GroupName, error)
 	DeleteDevice(ctx context.Context, id model.DeviceID) error
+	DeleteDevices(
+		ctx context.Context,
+		ids []model.DeviceID,
+	) (*model.UpdateResult, error)
 	CreateTenant(ctx context.Context, tenant model.NewTenant) error
 	SearchDevices(ctx context.Context, searchParams model.SearchParams) ([]model.Device, int, error)
 }
@@ -86,41 +96,53 @@ func (i *inventory) AddDevice(ctx context.Context, dev *model.Device) error {
 	return nil
 }
 
+func (i *inventory) DeleteDevices(
+	ctx context.Context,
+	ids []model.DeviceID,
+) (*model.UpdateResult, error) {
+	return i.db.DeleteDevices(ctx, ids)
+}
+
 func (i *inventory) DeleteDevice(ctx context.Context, id model.DeviceID) error {
-	err := i.db.DeleteDevice(ctx, id)
-	switch err {
-	case nil:
-		return nil
-	case store.ErrDevNotFound:
-		return store.ErrDevNotFound
-	default:
+	res, err := i.db.DeleteDevices(ctx, []model.DeviceID{id})
+	if err != nil {
 		return errors.Wrap(err, "failed to delete device")
+	} else if res.DeletedCount < 1 {
+		return store.ErrDevNotFound
 	}
+	return nil
 }
 
 func (i *inventory) UpsertAttributes(ctx context.Context, id model.DeviceID, attrs model.DeviceAttributes) error {
-	if err := i.db.UpsertAttributes(ctx, id, attrs); err != nil {
+	if _, err := i.db.UpsertDevicesAttributes(
+		ctx, []model.DeviceID{id}, attrs,
+	); err != nil {
 		return errors.Wrap(err, "failed to upsert attributes in db")
 	}
-
 	return nil
 }
+func (i *inventory) UpsertDevicesAttributes(
+	ctx context.Context,
+	ids []model.DeviceID,
+	attrs model.DeviceAttributes,
+) (*model.UpdateResult, error) {
+	return i.db.UpsertDevicesAttributes(ctx, ids, attrs)
+}
 
-func (i *inventory) UnsetDeviceGroup(ctx context.Context, id model.DeviceID, groupName model.GroupName) error {
-	err := i.db.UnsetDeviceGroup(ctx, id, groupName)
+func (i *inventory) UnsetDevicesGroup(
+	ctx context.Context,
+	deviceIDs []model.DeviceID,
+	groupName model.GroupName,
+) (*model.UpdateResult, error) {
+	return i.db.UnsetDevicesGroup(ctx, deviceIDs, groupName)
+}
+
+func (i *inventory) UnsetDeviceGroup(ctx context.Context, id model.DeviceID, group model.GroupName) error {
+	result, err := i.db.UnsetDevicesGroup(ctx, []model.DeviceID{id}, group)
 	if err != nil {
-		if err.Error() == store.ErrDevNotFound.Error() {
-			return err
-		}
 		return errors.Wrap(err, "failed to unassign group from device")
-	}
-	return nil
-}
-
-func (i *inventory) UpdateDeviceGroup(ctx context.Context, devid model.DeviceID, group model.GroupName) error {
-	err := i.db.UpdateDeviceGroup(ctx, devid, group)
-	if err != nil {
-		return errors.Wrap(err, "failed to add device to group")
+	} else if result.MatchedCount <= 0 {
+		return store.ErrDevNotFound
 	}
 	return nil
 }
@@ -129,31 +151,24 @@ func (i *inventory) UpdateDevicesGroup(
 	ctx context.Context,
 	deviceIDs []model.DeviceID,
 	group model.GroupName,
-) (*model.GroupUpdateResponse, error) {
-	matched, updated, err := i.db.UpdateDevicesGroup(ctx, deviceIDs, group)
-	if err != nil {
-		return nil, err
-	}
-	ret := &model.GroupUpdateResponse{
-		MatchedCount: matched,
-		UpdatedCount: updated,
-	}
-	return ret, err
+) (*model.UpdateResult, error) {
+	return i.db.UpdateDevicesGroup(ctx, deviceIDs, group)
 }
 
-func (i *inventory) UnsetDevicesGroup(
+func (i *inventory) UpdateDeviceGroup(
 	ctx context.Context,
-	deviceIDs []model.DeviceID,
-	groupName model.GroupName,
-) (*model.GroupUpdateResponse, error) {
-	deleted, err := i.db.UnsetDevicesGroup(ctx, deviceIDs, groupName)
+	devid model.DeviceID,
+	group model.GroupName,
+) error {
+	result, err := i.db.UpdateDevicesGroup(
+		ctx, []model.DeviceID{devid}, group,
+	)
 	if err != nil {
-		return nil, err
+		return errors.Wrap(err, "failed to add device to group")
+	} else if result.MatchedCount <= 0 {
+		return store.ErrDevNotFound
 	}
-	ret := &model.GroupUpdateResponse{
-		UpdatedCount: deleted,
-	}
-	return ret, err
+	return nil
 }
 
 func (i *inventory) ListGroups(ctx context.Context) ([]model.GroupName, error) {
