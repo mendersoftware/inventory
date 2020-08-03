@@ -33,6 +33,8 @@ var (
 )
 
 type DataStore interface {
+	Ping(ctx context.Context) error
+
 	GetDevices(ctx context.Context, q ListQuery) ([]model.Device, int, error)
 
 	// find a device with given `id`, returns the device or nil,

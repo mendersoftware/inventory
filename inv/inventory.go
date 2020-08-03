@@ -26,6 +26,7 @@ import (
 
 // this inventory service interface
 type InventoryApp interface {
+	HealthCheck(ctx context.Context) error
 	ListDevices(ctx context.Context, q store.ListQuery) ([]model.Device, int, error)
 	GetDevice(ctx context.Context, id model.DeviceID) (*model.Device, error)
 	AddDevice(ctx context.Context, d *model.Device) error
@@ -65,6 +66,14 @@ type inventory struct {
 
 func NewInventory(d store.DataStore) InventoryApp {
 	return &inventory{db: d}
+}
+
+func (i *inventory) HealthCheck(ctx context.Context) error {
+	err := i.db.Ping(ctx)
+	if err != nil {
+		return errors.Wrap(err, "error reaching MongoDB")
+	}
+	return nil
 }
 
 func (i *inventory) ListDevices(ctx context.Context, q store.ListQuery) ([]model.Device, int, error) {

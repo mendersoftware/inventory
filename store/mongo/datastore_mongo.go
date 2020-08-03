@@ -147,6 +147,11 @@ func NewDataStoreMongo(config DataStoreMongoConfig) (store.DataStore, error) {
 	return db, nil
 }
 
+func (db *DataStoreMongo) Ping(ctx context.Context) error {
+	res := db.client.Database(DbName).RunCommand(ctx, bson.M{"ping": 1})
+	return res.Err()
+}
+
 func (db *DataStoreMongo) GetDevices(ctx context.Context, q store.ListQuery) ([]model.Device, int, error) {
 	c := db.client.Database(mstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
 
