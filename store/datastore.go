@@ -32,6 +32,7 @@ var (
 	ErrNoAttrName = errors.New("attribute name not present")
 )
 
+//go:generate ../utils/mockgen.sh
 type DataStore interface {
 	Ping(ctx context.Context) error
 
