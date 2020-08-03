@@ -38,6 +38,17 @@ import (
 	"github.com/pkg/errors"
 )
 
+func TestPing(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping TestPing in short mode")
+	}
+	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
+	defer cancel()
+	dataStore := NewDataStoreMongoWithSession(db.Client())
+	err := dataStore.Ping(ctx)
+	assert.NoError(t, err)
+}
+
 // test funcs
 func TestMongoGetDevices(t *testing.T) {
 	if testing.Short() {

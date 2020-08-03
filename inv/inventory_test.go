@@ -37,6 +37,37 @@ func boolPtr(value bool) *bool {
 	return &value
 }
 
+func TestHealthCheck(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		Name           string
+		DataStoreError error
+	}{{
+		Name: "ok",
+	}, {
+		Name:           "error, error reaching MongoDB",
+		DataStoreError: errors.New("connection refused"),
+	}}
+	for _, tc := range testCases {
+		t.Run(tc.Name, func(t *testing.T) {
+			ctx := context.TODO()
+			db := &mstore.DataStore{}
+			db.On("Ping", ctx).Return(tc.DataStoreError)
+			inv := NewInventory(db)
+			err := inv.HealthCheck(ctx)
+			if tc.DataStoreError != nil {
+				assert.EqualError(t, err,
+					"error reaching MongoDB: "+
+						tc.DataStoreError.Error(),
+				)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
 func TestInventoryListDevices(t *testing.T) {
 	t.Parallel()
 
