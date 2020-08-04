@@ -28,6 +28,7 @@ import (
 	"github.com/mendersoftware/go-lib-micro/mongo/oid"
 	"github.com/mendersoftware/go-lib-micro/requestid"
 	"github.com/mendersoftware/go-lib-micro/requestlog"
+	"github.com/mendersoftware/go-lib-micro/rest_utils"
 	mt "github.com/mendersoftware/go-lib-micro/testing"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
@@ -123,6 +124,67 @@ func floatPtr(f float64) *float64 {
 	ret := f
 	return &ret
 }
+
+func TestLiveliness(t *testing.T) {
+	api := makeMockApiHandler(t, nil)
+	req, _ := http.NewRequest("GET", "http://localhost"+uriInternalAlive, nil)
+	recorded := test.RunRequest(t, api, req)
+	recorded.CodeIs(http.StatusNoContent)
+}
+
+func TestHealthCheck(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		Name     string
+		AppError error
+		HTTPCode int
+	}{{
+		Name:     "ok",
+		HTTPCode: http.StatusNoContent,
+	}, {
+		Name:     "error, MongoDB not reachable",
+		HTTPCode: http.StatusServiceUnavailable,
+		AppError: errors.New("connection error"),
+	}}
+
+	for _, tc := range testCases {
+		t.Run(tc.Name, func(t *testing.T) {
+			app := &minventory.InventoryApp{}
+			app.On("HealthCheck", mock.MatchedBy(
+				func(ctx interface{}) bool {
+					if _, ok := ctx.(context.Context); ok {
+						return true
+					}
+					return false
+				},
+			)).Return(tc.AppError)
+			req, _ := http.NewRequest(
+				"GET",
+				"http://localhost"+uriInternalHealth,
+				nil,
+			)
+			req.Header.Add("X-MEN-RequestID", "test")
+			api := makeMockApiHandler(t, app)
+			recorded := test.RunRequest(t, api, req)
+			recorded.CodeIs(tc.HTTPCode)
+			if tc.HTTPCode == 204 {
+				recorded.BodyIs("")
+			} else {
+				apiErr := rest_utils.ApiError{
+					Err:   tc.AppError.Error(),
+					ReqId: "test",
+				}
+				b, _ := json.Marshal(apiErr)
+				assert.JSONEq(t,
+					string(b),
+					recorded.Recorder.Body.String(),
+				)
+			}
+		})
+	}
+}
+
 func TestApiParseFilterParams(t *testing.T) {
 	t.Parallel()
 

@@ -19,11 +19,13 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/ant0ine/go-json-rest/rest"
 	"github.com/go-ozzo/ozzo-validation/v4"
 	midentity "github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/log"
+	"github.com/mendersoftware/go-lib-micro/rest_utils"
 	u "github.com/mendersoftware/go-lib-micro/rest_utils"
 	"github.com/pkg/errors"
 
@@ -43,6 +45,8 @@ const (
 	uriGroups        = "/api/0.1.0/groups"
 	uriGroupsDevices = "/api/0.1.0/groups/:name/devices"
 
+	uriInternalAlive         = "/api/internal/v1/inventory/alive"
+	uriInternalHealth        = "/api/internal/v1/inventory/health"
 	uriInternalTenants       = "/api/internal/v1/inventory/tenants"
 	uriInternalDevices       = "/api/internal/v1/inventory/devices"
 	urlInternalDevicesStatus = "/api/internal/v1/inventory/tenants/:tenant_id/devices/:status"
@@ -68,6 +72,10 @@ const (
 	sortOrderIdx             = 1
 )
 
+const (
+	DefaultTimeout = time.Second * 10
+)
+
 // model of device's group name response at /devices/:id/group endpoint
 type InventoryApiGroup struct {
 	Group model.GroupName `json:"group"`
@@ -90,6 +98,9 @@ func NewInventoryApiHandlers(i inventory.InventoryApp) ApiHandler {
 
 func (i *inventoryHandlers) GetApp() (rest.App, error) {
 	routes := []*rest.Route{
+		rest.Get(uriInternalAlive, i.LivelinessHandler),
+		rest.Get(uriInternalHealth, i.HealthCheckHandler),
+
 		rest.Get(uriDevices, i.GetDevicesHandler),
 		rest.Get(uriDevice, i.GetDeviceHandler),
 		rest.Delete(uriDevice, i.DeleteDeviceHandler),
@@ -123,6 +134,26 @@ func (i *inventoryHandlers) GetApp() (rest.App, error) {
 
 	return app, nil
 
+}
+
+func (i *inventoryHandlers) LivelinessHandler(w rest.ResponseWriter, r *rest.Request) {
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (i *inventoryHandlers) HealthCheckHandler(w rest.ResponseWriter, r *rest.Request) {
+	ctx := r.Context()
+	l := log.FromContext(ctx)
+
+	ctx, cancel := context.WithTimeout(ctx, DefaultTimeout)
+	defer cancel()
+
+	err := i.inventory.HealthCheck(ctx)
+	if err != nil {
+		rest_utils.RestErrWithLog(w, r, l, err, http.StatusServiceUnavailable)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // `sort` paramater value is an attribute name with optional direction (desc or asc)

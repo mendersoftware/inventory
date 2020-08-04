@@ -32,7 +32,10 @@ var (
 	ErrNoAttrName = errors.New("attribute name not present")
 )
 
+//go:generate ../utils/mockgen.sh
 type DataStore interface {
+	Ping(ctx context.Context) error
+
 	GetDevices(ctx context.Context, q ListQuery) ([]model.Device, int, error)
 
 	// find a device with given `id`, returns the device or nil,
