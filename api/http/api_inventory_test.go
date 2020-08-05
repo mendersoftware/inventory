@@ -2181,7 +2181,8 @@ func TestApiInventoryInternalDevicesStatus(t *testing.T) {
 		status         string
 		*model.UpdateResult
 
-		inventoryErr error
+		callsInventory bool
+		inventoryErr   error
 
 		resp utils.JSONResponseParams
 	}{
@@ -2204,6 +2205,7 @@ func TestApiInventoryInternalDevicesStatus(t *testing.T) {
 					UpdatedCount: 2,
 				},
 			},
+			callsInventory: true,
 		},
 		"ok, noauth": {
 			inputDeviceIDs: []model.DeviceID{
@@ -2224,6 +2226,7 @@ func TestApiInventoryInternalDevicesStatus(t *testing.T) {
 					UpdatedCount: 2,
 				},
 			},
+			callsInventory: true,
 		},
 
 		"ok single tenant": {
@@ -2244,6 +2247,7 @@ func TestApiInventoryInternalDevicesStatus(t *testing.T) {
 					UpdatedCount: 2,
 				},
 			},
+			callsInventory: true,
 		},
 
 		"ok, decommissioned": {
@@ -2262,6 +2266,7 @@ func TestApiInventoryInternalDevicesStatus(t *testing.T) {
 					DeletedCount: 2,
 				},
 			},
+			callsInventory: true,
 		},
 
 		"error, payload empty": {
@@ -2272,6 +2277,7 @@ func TestApiInventoryInternalDevicesStatus(t *testing.T) {
 				OutputStatus:     http.StatusBadRequest,
 				OutputBodyObject: RestError("cant parse device ids: JSON payload is empty"),
 			},
+			callsInventory: false,
 		},
 
 		"error, payload not expected": {
@@ -2282,6 +2288,7 @@ func TestApiInventoryInternalDevicesStatus(t *testing.T) {
 				OutputStatus:     http.StatusBadRequest,
 				OutputBodyObject: RestError("cant parse device ids: json: cannot unmarshal string into Go value of type []model.DeviceID"),
 			},
+			callsInventory: false,
 		},
 
 		"error, bad status": {
@@ -2299,6 +2306,7 @@ func TestApiInventoryInternalDevicesStatus(t *testing.T) {
 				OutputStatus:     http.StatusNotFound,
 				OutputBodyObject: RestError("unrecognized status: quo"),
 			},
+			callsInventory: false,
 		},
 
 		"error, db Upsert failed": {
@@ -2313,6 +2321,7 @@ func TestApiInventoryInternalDevicesStatus(t *testing.T) {
 				OutputStatus:     http.StatusInternalServerError,
 				OutputBodyObject: RestError("internal error"),
 			},
+			callsInventory: true,
 		},
 	}
 
@@ -2334,21 +2343,23 @@ func TestApiInventoryInternalDevicesStatus(t *testing.T) {
 			inv := minventory.InventoryApp{}
 			ctx := contextMatcher()
 
-			switch tc.status {
-			case "accepted", "preauthorized", "pending", "noauth":
-				// Update statuses
-				inv.On("UpsertDevicesAttributes",
-					ctx,
-					tc.inputDeviceIDs,
-					deviceAttributes,
-				).Return(tc.UpdateResult, tc.inventoryErr)
+			if tc.callsInventory {
+				switch tc.status {
+				case "accepted", "preauthorized", "pending", "noauth":
+					// Update statuses
+					inv.On("UpsertDevicesAttributes",
+						ctx,
+						tc.inputDeviceIDs,
+						deviceAttributes,
+					).Return(tc.UpdateResult, tc.inventoryErr)
 
-			case "decommissioned":
-				// Delete Inventory
-				inv.On("DeleteDevices",
-					ctx,
-					tc.inputDeviceIDs,
-				).Return(tc.UpdateResult, tc.inventoryErr)
+				case "decommissioned":
+					// Delete Inventory
+					inv.On("DeleteDevices",
+						ctx,
+						tc.inputDeviceIDs,
+					).Return(tc.UpdateResult, tc.inventoryErr)
+				}
 			}
 
 			apih := makeMockApiHandler(t, &inv)
@@ -2356,6 +2367,8 @@ func TestApiInventoryInternalDevicesStatus(t *testing.T) {
 			rest.ErrorFieldName = "error"
 
 			runTestRequest(t, apih, inReq, tc.resp)
+
+			inv.AssertExpectations(t)
 		})
 	}
 }
