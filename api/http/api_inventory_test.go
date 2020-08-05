@@ -2205,6 +2205,26 @@ func TestApiInventoryInternalDevicesStatus(t *testing.T) {
 				},
 			},
 		},
+		"ok, noauth": {
+			inputDeviceIDs: []model.DeviceID{
+				model.DeviceID(oid.NewUUIDv5("1").String()),
+				model.DeviceID(oid.NewUUIDv5("2").String()),
+				model.DeviceID(oid.NewUUIDv5("3").String()),
+			},
+			tenantID: tenantId,
+			status:   "noauth",
+			UpdateResult: &model.UpdateResult{
+				MatchedCount: 3,
+				UpdatedCount: 2,
+			},
+			resp: utils.JSONResponseParams{
+				OutputStatus: http.StatusOK,
+				OutputBodyObject: &model.UpdateResult{
+					MatchedCount: 3,
+					UpdatedCount: 2,
+				},
+			},
+		},
 
 		"ok single tenant": {
 			inputDeviceIDs: []model.DeviceID{
@@ -2315,7 +2335,7 @@ func TestApiInventoryInternalDevicesStatus(t *testing.T) {
 			ctx := contextMatcher()
 
 			switch tc.status {
-			case "accepted", "preauthorized", "pending":
+			case "accepted", "preauthorized", "pending", "noauth":
 				// Update statuses
 				inv.On("UpsertDevicesAttributes",
 					ctx,
