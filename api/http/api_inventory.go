@@ -809,6 +809,7 @@ func (i *inventoryHandlers) InternalDevicesStatusHandler(w rest.ResponseWriter, 
 		StatusRejected       = "rejected"
 		StatusPreauthorized  = "preauthorized"
 		StatusPending        = "pending"
+		StatusNoAuth         = "noauth"
 	)
 	var (
 		ids    []model.DeviceID
@@ -831,7 +832,8 @@ func (i *inventoryHandlers) InternalDevicesStatusHandler(w rest.ResponseWriter, 
 
 	switch status {
 	case StatusAccepted, StatusPreauthorized,
-		StatusPending, StatusRejected:
+		StatusPending, StatusRejected,
+		StatusNoAuth:
 		// Update statuses
 		attrs := model.DeviceAttributes{{
 			Name:  "status",
