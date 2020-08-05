@@ -2343,7 +2343,7 @@ func TestApiInventoryInternalDevicesStatus(t *testing.T) {
 					deviceAttributes,
 				).Return(tc.UpdateResult, tc.inventoryErr)
 
-			case "decommissioned", "rejected":
+			case "decommissioned":
 				// Delete Inventory
 				inv.On("DeleteDevices",
 					ctx,
