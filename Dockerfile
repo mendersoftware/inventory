@@ -1,10 +1,10 @@
-FROM golang:1.11-alpine3.9 as builder
+FROM golang:1.14-alpine3.12 as builder
 RUN mkdir -p /go/src/github.com/mendersoftware/inventory
 WORKDIR /go/src/github.com/mendersoftware/inventory
 ADD ./ .
 RUN CGO_ENABLED=0 GOARCH=amd64 go build -o inventory .
 
-FROM alpine:3.9
+FROM alpine:3.12
 EXPOSE 8080
 RUN mkdir /etc/inventory
 ENTRYPOINT ["/usr/bin/inventory", "--config", "/etc/inventory/config.yaml"]

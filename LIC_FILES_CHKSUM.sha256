@@ -6,6 +6,8 @@ c773be5f6ca136ca7791e117829ff9a60b4a1436cc2bfa9214895f4ed9b3f2a9  COPYING
 d5a55eaa82e2c109b8bcadfa66139497511b80d665668264f155b5a45086b086  vendor/github.com/mendersoftware/go-lib-micro/LICENSE
 5e3400b93bbb099e83e52bab885e7441750673c21f97988ca3f1240639b63283  vendor/github.com/spf13/afero/LICENSE.txt
 f6918bd93ffe07f4b2c61b8287c32cb3122e08aed0be50f1c7d0eddc87877a8f  vendor/gopkg.in/ini.v1/LICENSE
+03cfaf331a260694d06227a589cdd2b5fcfab474697b72e250736696c313655a  vendor/github.com/jmespath/go-jmespath/LICENSE
+cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30  vendor/github.com/aws/aws-sdk-go/LICENSE.txt
 #
 # BSD-2-Clause
 e45788cee53174eee4d7938484bedca0e66dcac6e92bec354b410273bdb5f6e7  vendor/github.com/magiconair/properties/LICENSE
@@ -61,3 +63,4 @@ fe60e0cc90e88f12c814adb7dc88df6791c6ec6798d8c856b7d5ad1b805b4f10  vendor/github.
 f69f157b0be75da373605dbc8bbf142e8924ee82d8f44f11bcaf351335bf98cf  vendor/github.com/golang/snappy/LICENSE
 09e8a9bcec8067104652c168685ab0931e7868f9c8284b66f5ae6edae5f1130b  vendor/github.com/xdg/scram/LICENSE
 09e8a9bcec8067104652c168685ab0931e7868f9c8284b66f5ae6edae5f1130b  vendor/github.com/xdg/stringprep/LICENSE
+2d36597f7117c38b006835ae7f537487207d8ec407aa9d9980794b2030cbc067  vendor/github.com/aws/aws-sdk-go/internal/sync/singleflight/LICENSE
