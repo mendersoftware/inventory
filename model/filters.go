@@ -19,7 +19,9 @@ import (
 )
 
 var validSelectors = []interface{}{
-	"$eq"}
+	"$eq",
+	"$nin",
+}
 
 var validSortOrders = []interface{}{"asc", "desc"}
 
