@@ -1797,8 +1797,10 @@ func TestMongoListGroups(t *testing.T) {
 
 	testCases := map[string]struct {
 		InputDevices []model.Device
+		Filters      []model.FilterPredicate
 		tenant       string
 		OutputGroups []model.GroupName
+		Error        error
 	}{
 		"groups foo, bar": {
 			InputDevices: []model.Device{
@@ -1886,45 +1888,137 @@ func TestMongoListGroups(t *testing.T) {
 			tenant:       "foo",
 			OutputGroups: []model.GroupName{},
 		},
+		"ok, filtered result": {
+			InputDevices: []model.Device{
+				{
+					ID:    model.DeviceID("1"),
+					Group: model.GroupName("foo"),
+					Attributes: model.DeviceAttributes{{
+						Scope: model.AttrScopeIdentity,
+						Name:  "status",
+						Value: "accepted",
+					}},
+				},
+				{
+					ID:    model.DeviceID("2"),
+					Group: model.GroupName("foo"),
+					Attributes: model.DeviceAttributes{{
+						Scope: model.AttrScopeIdentity,
+						Name:  "status",
+						Value: "accepted",
+					}},
+				},
+				{
+					ID:    model.DeviceID("3"),
+					Group: model.GroupName("foo"),
+					Attributes: model.DeviceAttributes{{
+						Scope: model.AttrScopeIdentity,
+						Name:  "status",
+						Value: "rejected",
+					}},
+				},
+				{
+					ID:    model.DeviceID("4"),
+					Group: model.GroupName("bar"),
+					Attributes: model.DeviceAttributes{{
+						Scope: model.AttrScopeIdentity,
+						Name:  "status",
+						Value: "noauth",
+					}},
+				},
+				{
+					ID:    model.DeviceID("5"),
+					Group: model.GroupName(""),
+					Attributes: model.DeviceAttributes{{
+						Scope: model.AttrScopeIdentity,
+						Name:  "status",
+						Value: "accepted",
+					}},
+				},
+			},
+			Filters: []model.FilterPredicate{{
+				Attribute: "status",
+				Scope:     model.AttrScopeIdentity,
+				Type:      "$eq",
+				Value:     "accepted",
+			}},
+			tenant:       "foo",
+			OutputGroups: []model.GroupName{"foo"},
+		},
+		"error, bad filter": {
+			InputDevices: []model.Device{{
+				ID:    model.DeviceID("1"),
+				Group: model.GroupName("foo"),
+			}, {
+				ID:    model.DeviceID("2"),
+				Group: model.GroupName("foo"),
+			}, {
+				ID:    model.DeviceID("3"),
+				Group: model.GroupName("foo"),
+			}, {
+				ID:    model.DeviceID("4"),
+				Group: model.GroupName("bar"),
+			}, {
+				ID:    model.DeviceID("5"),
+				Group: model.GroupName(""),
+			}},
+			Filters: []model.FilterPredicate{{
+				Attribute: "status",
+				Scope:     model.AttrScopeIdentity,
+				Type:      "$expr",
+				Value:     "accepted",
+			}},
+			tenant:       "foo",
+			OutputGroups: []model.GroupName{"foo"},
+			Error: errors.New(
+				"store: bad filter predicate: " +
+					"type: must be a valid value.",
+			),
+		},
 	}
 
 	for name, testCase := range testCases {
-		t.Logf("test case: %s", name)
+		t.Run(name, func(t *testing.T) {
+			db.Wipe()
 
-		db.Wipe()
+			client := db.Client()
 
-		client := db.Client()
-
-		var ctx context.Context
-		if testCase.tenant != "" {
-			ctx = identity.WithContext(db.CTX(), &identity.Identity{
-				Tenant: testCase.tenant,
-			})
-		} else {
-			ctx = identity.WithContext(db.CTX(), &identity.Identity{
-				Tenant: "",
-			})
-		}
-
-		for _, d := range testCase.InputDevices {
-			client.Database(mstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl).InsertOne(ctx, d)
-		}
-
-		// Make sure we start test with empty database
-		store := NewDataStoreMongoWithSession(client)
-
-		groups, err := store.ListGroups(ctx)
-		assert.NoError(t, err, "expected no error")
-
-		t.Logf("groups: %v", groups)
-		if testCase.OutputGroups != nil {
-			assert.Len(t, groups, len(testCase.OutputGroups))
-			for _, eg := range testCase.OutputGroups {
-				assert.Contains(t, groups, eg)
+			var ctx context.Context
+			if testCase.tenant != "" {
+				ctx = identity.WithContext(db.CTX(), &identity.Identity{
+					Tenant: testCase.tenant,
+				})
+			} else {
+				ctx = identity.WithContext(db.CTX(), &identity.Identity{
+					Tenant: "",
+				})
 			}
-		} else {
-			assert.Len(t, groups, 0)
-		}
+
+			for _, d := range testCase.InputDevices {
+				client.Database(mstore.DbFromContext(ctx, DbName)).
+					Collection(DbDevicesColl).
+					InsertOne(ctx, d)
+			}
+
+			// Make sure we start test with empty database
+			store := NewDataStoreMongoWithSession(client)
+
+			groups, err := store.ListGroups(ctx, testCase.Filters)
+			if testCase.Error != nil {
+				assert.EqualError(t, err, testCase.Error.Error())
+				return
+			}
+			assert.NoError(t, err, "expected no error")
+
+			if testCase.OutputGroups != nil {
+				assert.Len(t, groups, len(testCase.OutputGroups))
+				for _, eg := range testCase.OutputGroups {
+					assert.Contains(t, groups, eg)
+				}
+			} else {
+				assert.Len(t, groups, 0)
+			}
+		})
 	}
 }
 

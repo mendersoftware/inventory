@@ -642,11 +642,23 @@ func parseAttributes(r *rest.Request) (model.DeviceAttributes, error) {
 }
 
 func (i *inventoryHandlers) GetGroupsHandler(w rest.ResponseWriter, r *rest.Request) {
+	var fltr []model.FilterPredicate
 	ctx := r.Context()
 
 	l := log.FromContext(ctx)
 
-	groups, err := i.inventory.ListGroups(ctx)
+	query := r.URL.Query()
+	status := query.Get("status")
+	if status != "" {
+		fltr = []model.FilterPredicate{{
+			Attribute: "status",
+			Scope:     "identity",
+			Type:      "$eq",
+			Value:     status,
+		}}
+	}
+
+	groups, err := i.inventory.ListGroups(ctx, fltr)
 	if err != nil {
 		u.RestErrWithLogInternal(w, r, l, err)
 		return

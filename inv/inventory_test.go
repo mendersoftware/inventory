@@ -435,8 +435,9 @@ func TestInventoryListGroups(t *testing.T) {
 
 	testCases := map[string]struct {
 		inputGroups    []model.GroupName
-		datastoreError error
 		outputGroups   []model.GroupName
+		filters        []model.FilterPredicate
+		datastoreError error
 		outError       error
 	}{
 		"some groups": {
@@ -446,6 +447,12 @@ func TestInventoryListGroups(t *testing.T) {
 		"no groups - nil": {
 			inputGroups:  nil,
 			outputGroups: []model.GroupName{},
+			filters: []model.FilterPredicate{{
+				Attribute: "status",
+				Scope:     model.AttrScopeIdentity,
+				Type:      "$eq",
+				Value:     "rejected",
+			}},
 		},
 		"no groups - empty slice": {
 			inputGroups:  []model.GroupName{},
@@ -458,26 +465,24 @@ func TestInventoryListGroups(t *testing.T) {
 	}
 
 	for name, tc := range testCases {
-		t.Logf("test case: %s", name)
+		t.Run(name, func(t *testing.T) {
+			ctx := context.Background()
+			db := &mstore.DataStore{}
 
-		ctx := context.Background()
+			db.On("ListGroups", ctx, tc.filters).
+				Return(tc.inputGroups, tc.datastoreError)
+			i := invForTest(db)
 
-		db := &mstore.DataStore{}
-
-		db.On("ListGroups", ctx).
-			Return(tc.inputGroups, tc.datastoreError)
-		i := invForTest(db)
-
-		groups, err := i.ListGroups(ctx)
-
-		if tc.outError != nil {
-			if assert.Error(t, err) {
-				assert.EqualError(t, err, tc.outError.Error())
+			groups, err := i.ListGroups(ctx, tc.filters)
+			if tc.outError != nil {
+				if assert.Error(t, err) {
+					assert.EqualError(t, err, tc.outError.Error())
+				}
+			} else {
+				assert.NoError(t, err)
+				assert.EqualValues(t, tc.outputGroups, groups)
 			}
-		} else {
-			assert.NoError(t, err)
-			assert.EqualValues(t, tc.outputGroups, groups)
-		}
+		})
 	}
 }
 
