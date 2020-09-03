@@ -304,7 +304,14 @@ paths:
         - Management API
       security:
         - ManagementJWT: []
+
       summary: List all groups existing device groups
+      parameters:
+        - name: status
+          in: query
+          description: Show groups for devices with the given auth set status.
+          required: false
+          type: string
       responses:
         200:
           description: Successful response.

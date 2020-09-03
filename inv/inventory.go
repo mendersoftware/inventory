@@ -49,7 +49,7 @@ type InventoryApp interface {
 		ids []model.DeviceID,
 		group model.GroupName,
 	) (*model.UpdateResult, error)
-	ListGroups(ctx context.Context) ([]model.GroupName, error)
+	ListGroups(ctx context.Context, filters []model.FilterPredicate) ([]model.GroupName, error)
 	ListDevicesByGroup(ctx context.Context, group model.GroupName, skip int, limit int) ([]model.DeviceID, int, error)
 	GetDeviceGroup(ctx context.Context, id model.DeviceID) (model.GroupName, error)
 	DeleteDevice(ctx context.Context, id model.DeviceID) error
@@ -181,8 +181,11 @@ func (i *inventory) UpdateDeviceGroup(
 	return nil
 }
 
-func (i *inventory) ListGroups(ctx context.Context) ([]model.GroupName, error) {
-	groups, err := i.db.ListGroups(ctx)
+func (i *inventory) ListGroups(
+	ctx context.Context,
+	filters []model.FilterPredicate,
+) ([]model.GroupName, error) {
+	groups, err := i.db.ListGroups(ctx, filters)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to list groups")
 	}

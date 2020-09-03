@@ -1488,7 +1488,7 @@ func TestApiListGroups(t *testing.T) {
 			},
 		},
 		"no groups": {
-			inReq: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/groups", nil),
+			inReq: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/groups?status=rejected", nil),
 			JSONResponseParams: utils.JSONResponseParams{
 				OutputStatus:     http.StatusOK,
 				OutputBodyObject: []string{},
@@ -1505,16 +1505,27 @@ func TestApiListGroups(t *testing.T) {
 	}
 
 	for name, tc := range tcases {
-		t.Logf("test case: %s", name)
-		inv := minventory.InventoryApp{}
+		t.Run(name, func(t *testing.T) {
+			var filters []model.FilterPredicate
+			if status := tc.inReq.URL.Query().
+				Get("status"); status != "" {
+				filters = []model.FilterPredicate{{
+					Scope:     model.AttrScopeIdentity,
+					Attribute: "status",
+					Type:      "$eq",
+					Value:     status,
+				}}
+			}
+			inv := minventory.InventoryApp{}
+			ctx := contextMatcher()
 
-		ctx := contextMatcher()
+			inv.On("ListGroups", ctx, filters).
+				Return(tc.outputGroups, tc.inventoryErr)
 
-		inv.On("ListGroups", ctx).Return(tc.outputGroups, tc.inventoryErr)
+			apih := makeMockApiHandler(t, &inv)
 
-		apih := makeMockApiHandler(t, &inv)
-
-		runTestRequest(t, apih, tc.inReq, tc.JSONResponseParams)
+			runTestRequest(t, apih, tc.inReq, tc.JSONResponseParams)
+		})
 	}
 }
 

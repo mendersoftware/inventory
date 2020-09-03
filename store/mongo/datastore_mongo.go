@@ -493,14 +493,42 @@ func (db *DataStoreMongo) UnsetDevicesGroup(
 	}, nil
 }
 
-func (db *DataStoreMongo) ListGroups(ctx context.Context) ([]model.GroupName, error) {
+func predicateToQuery(pred model.FilterPredicate) (bson.D, error) {
+	if err := pred.Validate(); err != nil {
+		return nil, err
+	}
+	name := fmt.Sprintf(
+		"%s.%s-%s.value", DbDevAttributes, pred.Scope, pred.Attribute,
+	)
+	return bson.D{{
+		Key: name, Value: bson.D{{Key: pred.Type, Value: pred.Value}},
+	}}, nil
+}
+
+func (db *DataStoreMongo) ListGroups(
+	ctx context.Context,
+	filters []model.FilterPredicate,
+) ([]model.GroupName, error) {
 	c := db.client.
 		Database(mstore.DbFromContext(ctx, DbName)).
 		Collection(DbDevicesColl)
 
-	filter := bson.M{DbDevAttributesGroupValue: bson.M{"$exists": true}}
+	fltr := bson.D{{
+		Key: DbDevAttributesGroupValue, Value: bson.M{"$exists": true},
+	}}
+	if len(fltr) > 0 {
+		for _, p := range filters {
+			q, err := predicateToQuery(p)
+			if err != nil {
+				return nil, errors.Wrap(
+					err, "store: bad filter predicate",
+				)
+			}
+			fltr = append(fltr, q...)
+		}
+	}
 	results, err := c.Distinct(
-		ctx, DbDevAttributesGroupValue, filter,
+		ctx, DbDevAttributesGroupValue, fltr,
 	)
 	if err != nil {
 		return nil, err

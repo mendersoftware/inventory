@@ -70,8 +70,9 @@ type DataStore interface {
 	// if any.
 	UpdateDevicesGroup(ctx context.Context, devIDs []model.DeviceID, group model.GroupName) (*model.UpdateResult, error)
 
-	// List groups
-	ListGroups(ctx context.Context) ([]model.GroupName, error)
+	// ListGroups returns a list of all existing groups. Devices included
+	// in the evaluation can be filtered by the filters argument.
+	ListGroups(ctx context.Context, filters []model.FilterPredicate) ([]model.GroupName, error)
 
 	// Lists devices belonging to a group
 	GetDevicesByGroup(ctx context.Context, group model.GroupName, skip, limit int) ([]model.DeviceID, int, error)
