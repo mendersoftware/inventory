@@ -318,7 +318,7 @@ func (db *DataStoreMongo) UpsertDevicesAttributes(
 	case 1:
 		var res *mongo.UpdateResult
 		filter := map[string]interface{}{"_id": ids[0]}
-		res, err = c.UpdateMany(ctx, filter, update, mopts.Update().SetUpsert(true))
+		res, err = c.UpdateOne(ctx, filter, update, mopts.Update().SetUpsert(true))
 		result = &model.UpdateResult{
 			MatchedCount: res.MatchedCount,
 			CreatedCount: res.UpsertedCount,
