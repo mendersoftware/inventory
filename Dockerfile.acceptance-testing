@@ -1,4 +1,4 @@
-FROM golang:1.13 as builder
+FROM golang:1.15.1-alpine3.12 as builder
 RUN mkdir -p /go/src/github.com/mendersoftware/inventory
 COPY . /go/src/github.com/mendersoftware/inventory
 RUN cd /go/src/github.com/mendersoftware/inventory && \
