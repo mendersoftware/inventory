@@ -20,6 +20,3 @@ include:
     file: '.gitlab-ci-check-docker-build.yml'
   - project: 'Northern.tech/Mender/mendertesting'
     file: '.gitlab-ci-github-status-updates.yml'
-
-test:unit:
-  image: golang:1.13
