@@ -110,6 +110,103 @@ paths:
           description: Internal server error.
           schema:
             $ref: '#/definitions/Error'
+
+  /tenants/{tenant_id}/devices/{status}:
+    post:
+      operationId: Update Status of Devices
+      tags:
+        - Internal API
+      summary: Update the status of a list of devices
+      description: |
+        An API end-point that allows to bulk update the status of a list
+        of devices.
+      parameters:
+        - name: tenant_id
+          in: path
+          description: ID of given tenant.
+          required: true
+          type: string
+        - name: status
+          in: path
+          description: New status to set for the specified devices.
+          required: true
+          type: string
+        - name: device_ids
+          in: body
+          description: List of device ID.
+          required: true
+          schema:
+            type: array
+            items:
+              type: string
+            description: A list of device ID.
+            example:
+              - "ff8f7099-d842-42f2-9d5b-46a9ad13f90a"
+              - "80f3ad8f-40f2-429a-8931-b47cebbbe9b3"
+      produces:
+        - application/json
+      responses:
+        200:
+          description: The operation completed successfully.
+        400:
+          description: Malformed request body. See error for details.
+          schema:
+            $ref: '#/definitions/Error'
+        500:
+          description: Internal server error.
+          schema:
+            $ref: '#/definitions/Error'
+
+  /tenants/{tenant_id}/device/{device_id}/attribute/scope/{scope}:
+    patch:
+      operationId: Update Inventory for a Device
+      tags:
+        - Internal API
+      summary: Update multiple inventory attributes in a single scope for a device
+      description: |
+        An API end-point that allows to  update the inventory attributes in
+        a single scope for a device.
+      parameters:
+        - name: tenant_id
+          in: path
+          description: ID of given tenant.
+          required: true
+          type: string
+        - name: device_id
+          in: path
+          description: ID of given device.
+          required: true
+          type: string
+        - name: scope
+          in: path
+          description: Scope of the inventory attributes.
+          required: true
+          type: string
+        - name: attributes
+          in: body
+          description: List of inventory attributes to set.
+          required: true
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/Attribute'
+            description: A list of attribute descriptors.
+      produces:
+        - application/json
+      responses:
+        201:
+          description: New deployment created.
+          headers:
+            Location:
+              description: URL of the newly created deployment.
+              type: string
+        400:
+          $ref: '#/definitions/Error'
+        422:
+          $ref: '#/definitions/Error'
+        500:
+          $ref: '#/definitions/Error'
+
 definitions:
   Error:
     description: Error descriptor.
