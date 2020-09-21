@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"github.com/ant0ine/go-json-rest/rest"
-	"github.com/go-ozzo/ozzo-validation/v4"
+	validation "github.com/go-ozzo/ozzo-validation/v4"
 	midentity "github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/log"
 	"github.com/mendersoftware/go-lib-micro/rest_utils"

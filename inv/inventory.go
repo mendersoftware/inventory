@@ -124,10 +124,31 @@ func (i *inventory) DeleteDevice(ctx context.Context, id model.DeviceID) error {
 }
 
 func (i *inventory) UpsertAttributes(ctx context.Context, id model.DeviceID, attrs model.DeviceAttributes) error {
-	if _, err := i.db.UpsertDevicesAttributes(
-		ctx, []model.DeviceID{id}, attrs,
-	); err != nil {
-		return errors.Wrap(err, "failed to upsert attributes in db")
+	needsUpsert := true
+	if device, err := i.GetDevice(ctx, id); err == nil && device != nil {
+		needsUpsert = false
+		for _, attribute := range attrs {
+			attributeChanged := true
+			for _, deviceAttribute := range device.Attributes {
+				if !(attribute.Scope == deviceAttribute.Scope && attribute.Name == deviceAttribute.Name) {
+					continue
+				}
+				attributeChanged = attribute.Value != deviceAttribute.Value
+				break
+			}
+			if attributeChanged {
+				needsUpsert = true
+				break
+			}
+		}
+	}
+
+	if needsUpsert {
+		if _, err := i.db.UpsertDevicesAttributes(
+			ctx, []model.DeviceID{id}, attrs,
+		); err != nil {
+			return errors.Wrap(err, "failed to upsert attributes in db")
+		}
 	}
 	return nil
 }

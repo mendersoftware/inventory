@@ -263,14 +263,84 @@ func TestInventoryUpsertAttributes(t *testing.T) {
 	t.Parallel()
 
 	testCases := map[string]struct {
+		device         *model.Device
+		attributes     model.DeviceAttributes
+		runsUpsert     bool
 		datastoreError error
 		outError       error
 	}{
-		"datastore success": {
+		"device, new attributes": {
+			device: &model.Device{
+				Attributes: model.DeviceAttributes{
+					model.DeviceAttribute{
+						Name:  "another-attribute",
+						Scope: model.AttrScopeIdentity,
+						Value: "another-value",
+					},
+				},
+			},
+			attributes: model.DeviceAttributes{
+				model.DeviceAttribute{
+					Name:  "name",
+					Scope: model.AttrScopeIdentity,
+					Value: "value",
+				},
+			},
+			runsUpsert:     true,
 			datastoreError: nil,
 			outError:       nil,
 		},
-		"datastore error": {
+		"device, attribute with different value": {
+			device: &model.Device{
+				Attributes: model.DeviceAttributes{
+					model.DeviceAttribute{
+						Name:  "name",
+						Scope: model.AttrScopeIdentity,
+						Value: "another-value",
+					},
+				},
+			},
+			attributes: model.DeviceAttributes{
+				model.DeviceAttribute{
+					Name:  "name",
+					Scope: model.AttrScopeIdentity,
+					Value: "value",
+				},
+			},
+			runsUpsert:     true,
+			datastoreError: nil,
+			outError:       nil,
+		},
+		"device, attribute with same value": {
+			device: &model.Device{
+				Attributes: model.DeviceAttributes{
+					model.DeviceAttribute{
+						Name:  "name",
+						Scope: model.AttrScopeIdentity,
+						Value: "value",
+					},
+				},
+			},
+			attributes: model.DeviceAttributes{
+				model.DeviceAttribute{
+					Name:  "name",
+					Scope: model.AttrScopeIdentity,
+					Value: "value",
+				},
+			},
+			runsUpsert:     false,
+			datastoreError: nil,
+			outError:       nil,
+		},
+		"no device, datastore success": {
+			attributes:     model.DeviceAttributes{},
+			runsUpsert:     true,
+			datastoreError: nil,
+			outError:       nil,
+		},
+		"no device, datastore error": {
+			attributes:     model.DeviceAttributes{},
+			runsUpsert:     true,
 			datastoreError: errors.New("db connection failed"),
 			outError:       errors.New("failed to upsert attributes in db: db connection failed"),
 		},
@@ -281,17 +351,26 @@ func TestInventoryUpsertAttributes(t *testing.T) {
 			t.Logf("test case: %s", name)
 
 			ctx := context.Background()
+			const devID = "devid"
 
 			db := &mstore.DataStore{}
-			db.On("UpsertDevicesAttributes",
+			defer db.AssertExpectations(t)
+
+			db.On("GetDevice",
 				ctx,
-				mock.AnythingOfType("[]model.DeviceID"),
-				mock.AnythingOfType("model.DeviceAttributes")).
-				Return(nil, tc.datastoreError)
+				model.DeviceID(devID),
+			).Return(tc.device, nil)
+
+			if tc.runsUpsert {
+				db.On("UpsertDevicesAttributes",
+					ctx,
+					mock.AnythingOfType("[]model.DeviceID"),
+					mock.AnythingOfType("model.DeviceAttributes")).
+					Return(nil, tc.datastoreError)
+			}
+
 			i := invForTest(db)
-
-			err := i.UpsertAttributes(ctx, "devid", model.DeviceAttributes{})
-
+			err := i.UpsertAttributes(ctx, devID, tc.attributes)
 			if tc.outError != nil {
 				if assert.Error(t, err) {
 					assert.EqualError(t, err, tc.outError.Error())
