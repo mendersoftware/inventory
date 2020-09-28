@@ -1,5 +1,5 @@
 [![Build Status](https://gitlab.com/Northern.tech/Mender/inventory/badges/master/pipeline.svg)](https://gitlab.com/Northern.tech/Mender/inventory/pipelines)
-[![codecov](https://codecov.io/gh/mendersoftware/inventory/branch/master/graph/badge.svg)](https://codecov.io/gh/mendersoftware/inventory)
+[![Coverage Status](https://coveralls.io/repos/github/mendersoftware/inventory/badge.svg?branch=master)](https://coveralls.io/github/mendersoftware/inventory?branch=master)
 [![Go Report Card](https://goreportcard.com/badge/github.com/mendersoftware/inventory)](https://goreportcard.com/report/github.com/mendersoftware/inventory)
 [![Docker pulls](https://img.shields.io/docker/pulls/mendersoftware/inventory.svg?maxAge=3600)](https://hub.docker.com/r/mendersoftware/inventory/)
 
