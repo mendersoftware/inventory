@@ -77,6 +77,29 @@ func TestDeviceAttributesMarshal(t *testing.T) {
 	assert.Equal(t, "[]", string(data))
 }
 
+func TestMarshalMarshalBSON(t *testing.T) {
+	dev := Device{
+		ID: "foo",
+		Attributes: DeviceAttributes{{
+			Name:  "a.b",
+			Value: "foo",
+			Scope: "bar",
+		}, {
+			Name:  "c$d",
+			Value: "foo",
+			Scope: "bar",
+		}},
+	}
+	b, err := bson.Marshal(dev)
+	if assert.NoError(t, err) {
+		var tmp Device
+
+		err := bson.Unmarshal(b, &tmp)
+		assert.NoError(t, err)
+		assert.EqualValues(t, dev, tmp)
+	}
+}
+
 func TestMarshalUnmarshalBSON(t *testing.T) {
 	str2Ptr := func(s string) *string {
 		return &s

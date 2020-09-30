@@ -158,7 +158,7 @@ func (db *DataStoreMongo) GetDevices(ctx context.Context, q store.ListQuery) ([]
 	queryFilters := make([]bson.M, 0)
 	for _, filter := range q.Filters {
 		op := mongoOperator(filter.Operator)
-		name := fmt.Sprintf("%s-%s", filter.AttrScope, filter.AttrName)
+		name := fmt.Sprintf("%s-%s", filter.AttrScope, model.GetDeviceAttributeNameReplacer().Replace(filter.AttrName))
 		field := fmt.Sprintf("%s.%s.%s", DbDevAttributes, name, DbDevAttributesValue)
 		switch filter.Operator {
 		default:
@@ -202,7 +202,7 @@ func (db *DataStoreMongo) GetDevices(ctx context.Context, q store.ListQuery) ([]
 		findOptions.SetLimit(int64(q.Limit))
 	}
 	if q.Sort != nil {
-		name := fmt.Sprintf("%s-%s", q.Sort.AttrScope, q.Sort.AttrName)
+		name := fmt.Sprintf("%s-%s", q.Sort.AttrScope, model.GetDeviceAttributeNameReplacer().Replace(q.Sort.AttrName))
 		sortField := fmt.Sprintf("%s.%s.%s", DbDevAttributes, name, DbDevAttributesValue)
 		sortFieldQuery := bson.M{}
 		sortFieldQuery[sortField] = 1
@@ -349,7 +349,7 @@ func (db *DataStoreMongo) UpsertDevicesAttributes(
 
 // makeAttrField is a convenience function for composing attribute field names.
 func makeAttrField(attrName, attrScope string, subFields ...string) string {
-	field := fmt.Sprintf("%s.%s-%s", DbDevAttributes, attrScope, attrName)
+	field := fmt.Sprintf("%s.%s-%s", DbDevAttributes, attrScope, model.GetDeviceAttributeNameReplacer().Replace(attrName))
 	if len(subFields) > 0 {
 		field = strings.Join(
 			append([]string{field}, subFields...), ".",
@@ -362,7 +362,6 @@ func makeAttrField(attrName, attrScope string, subFields ...string) string {
 func makeAttrUpsert(attrs model.DeviceAttributes) (bson.M, error) {
 	var fieldName string
 	upsert := make(bson.M)
-	replacer := strings.NewReplacer(".", "_", "$", "_S_")
 
 	for i := range attrs {
 		if attrs[i].Name == "" {
@@ -372,7 +371,6 @@ func makeAttrUpsert(attrs model.DeviceAttributes) (bson.M, error) {
 			// Default to inventory scope
 			attrs[i].Scope = model.AttrScopeInventory
 		}
-		attrs[i].Name = replacer.Replace(attrs[i].Name)
 
 		fieldName = makeAttrField(
 			attrs[i].Name,
@@ -498,7 +496,7 @@ func predicateToQuery(pred model.FilterPredicate) (bson.D, error) {
 		return nil, err
 	}
 	name := fmt.Sprintf(
-		"%s.%s-%s.value", DbDevAttributes, pred.Scope, pred.Attribute,
+		"%s.%s-%s.value", DbDevAttributes, pred.Scope, model.GetDeviceAttributeNameReplacer().Replace(pred.Attribute),
 	)
 	return bson.D{{
 		Key: name, Value: bson.D{{Key: pred.Type, Value: pred.Value}},
@@ -678,7 +676,7 @@ func (db *DataStoreMongo) SearchDevices(ctx context.Context, searchParams model.
 		if filter.Scope == model.AttrScopeIdentity && filter.Attribute == model.AttrNameID {
 			field = DbDevId
 		} else {
-			name := fmt.Sprintf("%s-%s", filter.Scope, filter.Attribute)
+			name := fmt.Sprintf("%s-%s", filter.Scope, model.GetDeviceAttributeNameReplacer().Replace(filter.Attribute))
 			field = fmt.Sprintf("%s.%s.%s", DbDevAttributes, name, DbDevAttributesValue)
 		}
 		queryFilters = append(queryFilters, bson.M{field: bson.M{op: filter.Value}})
@@ -701,7 +699,7 @@ func (db *DataStoreMongo) SearchDevices(ctx context.Context, searchParams model.
 	if len(searchParams.Sort) > 0 {
 		sortField := bson.M{}
 		for _, sortQ := range searchParams.Sort {
-			name := fmt.Sprintf("%s-%s", sortQ.Scope, sortQ.Attribute)
+			name := fmt.Sprintf("%s-%s", sortQ.Scope, model.GetDeviceAttributeNameReplacer().Replace(sortQ.Attribute))
 			field := fmt.Sprintf("%s.%s.%s", DbDevAttributes, name, DbDevAttributesValue)
 			sortField[field] = 1
 			if sortQ.Order == "desc" {
