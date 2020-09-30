@@ -21,7 +21,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-ozzo/ozzo-validation/v4"
+	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/pkg/errors"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/bsontype"
@@ -37,6 +37,11 @@ const (
 	AttrNameGroup   = "group"
 	AttrNameUpdated = "updated_ts"
 	AttrNameCreated = "created_ts"
+)
+
+const (
+	runeDollar = '\uFF04'
+	runeDot    = '\uFF0E'
 )
 
 var validGroupNameRegex = regexp.MustCompile("^[A-Za-z0-9_-]*$")
@@ -242,6 +247,10 @@ func (d DeviceAttributes) Validate() error {
 	return nil
 }
 
+func GetDeviceAttributeNameReplacer() *strings.Replacer {
+	return strings.NewReplacer(".", string(runeDot), "$", string(runeDollar))
+}
+
 // UnmarshalBSONValue correctly unmarshals DeviceAttributes from Device
 // documents stored in the DB.
 func (d *DeviceAttributes) UnmarshalBSONValue(t bsontype.Type, b []byte) error {
@@ -266,11 +275,16 @@ func (d *DeviceAttributes) UnmarshalBSONValue(t bsontype.Type, b []byte) error {
 // "<scope>-<name>".
 func (d DeviceAttributes) MarshalBSONValue() (bsontype.Type, []byte, error) {
 	attrs := make(bson.D, len(d))
-	replacer := strings.NewReplacer(".", "_", "$", "_S_")
+	replacer := GetDeviceAttributeNameReplacer()
 	for i := range d {
-		d[i].Name = replacer.Replace(d[i].Name)
-		attrs[i].Key = d[i].Scope + "-" + d[i].Name
-		attrs[i].Value = &d[i]
+		attr := DeviceAttribute{
+			Name:        d[i].Name,
+			Description: d[i].Description,
+			Value:       d[i].Value,
+			Scope:       d[i].Scope,
+		}
+		attrs[i].Key = attr.Scope + "-" + replacer.Replace(d[i].Name)
+		attrs[i].Value = &attr
 	}
 	return bson.MarshalValue(attrs)
 }

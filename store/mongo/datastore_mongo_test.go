@@ -1263,6 +1263,48 @@ func TestMongoUpsertDevicesAttributes(t *testing.T) {
 				CreatedTs: createdTs,
 			}},
 		},
+		"dev exists, no attributes exist, upsert new attrs with dots and dolllars (val + descr)": {
+			devs: []model.Device{
+				{
+					ID:        model.DeviceID("0003"),
+					CreatedTs: createdTs,
+				},
+			},
+			inDevIDs: []model.DeviceID{"0003"},
+			inAttrs: model.DeviceAttributes{
+				{
+					Scope:       model.AttrScopeInventory,
+					Name:        "ip.address",
+					Value:       primitive.A{"1.2.3.4", "1.2.3.5"},
+					Description: strPtr("ip addr array"),
+				},
+				{
+					Scope:       model.AttrScopeInventory,
+					Name:        "mac$addreses",
+					Value:       primitive.A{"0006-mac"},
+					Description: strPtr("mac addr"),
+				},
+			},
+
+			outDevs: []model.Device{{
+				ID: model.DeviceID("0003"),
+				Attributes: model.DeviceAttributes{
+					{
+						Scope:       model.AttrScopeInventory,
+						Name:        "ip.address",
+						Value:       primitive.A{"1.2.3.4", "1.2.3.5"},
+						Description: strPtr("ip addr array"),
+					},
+					{
+						Scope:       model.AttrScopeInventory,
+						Name:        "mac$address",
+						Value:       primitive.A{"0006-mac"},
+						Description: strPtr("mac addr"),
+					},
+				},
+				CreatedTs: createdTs,
+			}},
+		},
 		"dev doesn't exist, upsert new attr (descr + val)": {
 			devs:     []model.Device{},
 			inDevIDs: []model.DeviceID{"0099"},
@@ -2744,6 +2786,7 @@ func TestMongoSearchDevices(t *testing.T) {
 				{Name: "MAC", Value: "000", Description: strPtr("MAC"), Scope: model.AttrScopeInventory},
 				{Name: "SN", Value: float64(100), Description: strPtr("SN"), Scope: model.AttrScopeInventory},
 				{Name: "group", Value: "foo", Description: strPtr("group"), Scope: model.AttrScopeInventory},
+				{Name: "ip.address", Value: "1.2.3.4", Scope: model.AttrScopeInventory},
 			},
 			Group: "foo",
 		},
@@ -2804,6 +2847,23 @@ func TestMongoSearchDevices(t *testing.T) {
 						Attribute: "MAC",
 						Type:      "$eq",
 						Value:     "000",
+					},
+				},
+				Sort: []model.SortCriteria{},
+			},
+		},
+		"single filter, single device, with dots": {
+			expected: []model.Device{inputDevs[0]},
+			devTotal: 1,
+			searchParams: model.SearchParams{
+				Page:    1,
+				PerPage: 5,
+				Filters: []model.FilterPredicate{
+					{
+						Scope:     "inventory",
+						Attribute: "ip.address",
+						Type:      "$eq",
+						Value:     "1.2.3.4",
 					},
 				},
 				Sort: []model.SortCriteria{},
