@@ -408,12 +408,95 @@ func makeAttrUpsert(attrs model.DeviceAttributes) (bson.M, error) {
 	return upsert, nil
 }
 
+// makeAttrUpsert creates a new upsert document for the given attributes.
+func makeAttrRemove(attrs model.DeviceAttributes) (bson.M, error) {
+	var fieldName string
+	remove := make(bson.M)
+
+	if attrs != nil {
+		for i := range attrs {
+			if attrs[i].Name == "" {
+				return nil, store.ErrNoAttrName
+			}
+			if attrs[i].Scope == "" {
+				// Default to inventory scope
+				attrs[i].Scope = model.AttrScopeInventory
+			}
+			fieldName = makeAttrField(
+				attrs[i].Name,
+				attrs[i].Scope,
+			)
+			remove[fieldName] = true
+		}
+	}
+	return remove, nil
+}
+
 func mongoOperator(co store.ComparisonOperator) string {
 	switch co {
 	case store.Eq:
 		return "$eq"
 	}
 	return ""
+}
+
+func (db *DataStoreMongo) UpsertRemoveDeviceAttributes(
+	ctx context.Context,
+	id model.DeviceID,
+	updateAttrs model.DeviceAttributes,
+	removeAttrs model.DeviceAttributes,
+) (*model.UpdateResult, error) {
+	const systemScope = DbDevAttributes + "." + model.AttrScopeSystem
+	const updatedField = systemScope + "-" + model.AttrNameUpdated
+	const createdField = systemScope + "-" + model.AttrNameCreated
+	var (
+		result *model.UpdateResult
+		err    error
+	)
+
+	c := db.client.
+		Database(mstore.DbFromContext(ctx, DbName)).
+		Collection(DbDevicesColl)
+
+	update, err := makeAttrUpsert(updateAttrs)
+	if err != nil {
+		return nil, err
+	}
+	remove, err := makeAttrRemove(removeAttrs)
+	if err != nil {
+		return nil, err
+	}
+
+	now := time.Now()
+	update[updatedField] = model.DeviceAttribute{
+		Scope: model.AttrScopeSystem,
+		Name:  model.AttrNameUpdated,
+		Value: now,
+	}
+	update = bson.M{
+		"$set": update,
+		"$setOnInsert": bson.M{
+			createdField: model.DeviceAttribute{
+				Scope: model.AttrScopeSystem,
+				Name:  model.AttrNameCreated,
+				Value: now,
+			},
+		},
+	}
+	if len(remove) > 0 {
+		update["$unset"] = remove
+	}
+
+	var res *mongo.UpdateResult
+	filter := map[string]interface{}{"_id": id}
+	res, err = c.UpdateOne(ctx, filter, update, mopts.Update().SetUpsert(true))
+	if err == nil {
+		result = &model.UpdateResult{
+			MatchedCount: res.MatchedCount,
+			CreatedCount: res.UpsertedCount,
+		}
+	}
+	return result, err
 }
 
 func (db *DataStoreMongo) UpdateDevicesGroup(

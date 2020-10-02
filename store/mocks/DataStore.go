@@ -379,6 +379,29 @@ func (_m *DataStore) UpsertDevicesAttributes(ctx context.Context, ids []model.De
 	return r0, r1
 }
 
+// UpsertRemoveDeviceAttributes provides a mock function with given fields: ctx, id, updateAttrs, removeAttrs
+func (_m *DataStore) UpsertRemoveDeviceAttributes(ctx context.Context, id model.DeviceID, updateAttrs model.DeviceAttributes, removeAttrs model.DeviceAttributes) (*model.UpdateResult, error) {
+	ret := _m.Called(ctx, id, updateAttrs, removeAttrs)
+
+	var r0 *model.UpdateResult
+	if rf, ok := ret.Get(0).(func(context.Context, model.DeviceID, model.DeviceAttributes, model.DeviceAttributes) *model.UpdateResult); ok {
+		r0 = rf(ctx, id, updateAttrs, removeAttrs)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*model.UpdateResult)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, model.DeviceID, model.DeviceAttributes, model.DeviceAttributes) error); ok {
+		r1 = rf(ctx, id, updateAttrs, removeAttrs)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // WithAutomigrate provides a mock function with given fields:
 func (_m *DataStore) WithAutomigrate() store.DataStore {
 	ret := _m.Called()

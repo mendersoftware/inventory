@@ -303,6 +303,173 @@ func TestInventoryUpsertAttributes(t *testing.T) {
 	}
 }
 
+func TestReplaceAttributes(t *testing.T) {
+	t.Parallel()
+
+	testCases := map[string]struct {
+		deviceID       model.DeviceID
+		getDevice      *model.Device
+		getDeviceErr   error
+		datastoreError error
+
+		upsertAttrs model.DeviceAttributes
+		removeAttrs model.DeviceAttributes
+		outError    error
+	}{
+		"ok, device not found": {
+			deviceID:     "1",
+			getDevice:    nil,
+			getDeviceErr: store.ErrDevNotFound,
+
+			upsertAttrs: model.DeviceAttributes{
+				model.DeviceAttribute{
+					Name:  "name",
+					Value: "foo",
+					Scope: model.AttrScopeInventory,
+				},
+				model.DeviceAttribute{
+					Name:  "ip_address",
+					Value: "127.0.0.1",
+					Scope: model.AttrScopeInventory,
+				},
+			},
+			removeAttrs: model.DeviceAttributes{},
+
+			datastoreError: nil,
+			outError:       nil,
+		},
+		"ok, device found": {
+			deviceID: "1",
+			getDevice: &model.Device{
+				Attributes: model.DeviceAttributes{},
+			},
+			getDeviceErr: nil,
+
+			upsertAttrs: model.DeviceAttributes{
+				model.DeviceAttribute{
+					Name:  "name",
+					Value: "foo",
+					Scope: model.AttrScopeInventory,
+				},
+				model.DeviceAttribute{
+					Name:  "ip_address",
+					Value: "127.0.0.1",
+					Scope: model.AttrScopeInventory,
+				},
+			},
+			removeAttrs: model.DeviceAttributes{},
+
+			datastoreError: nil,
+			outError:       nil,
+		},
+		"ok, device found, replace attributes": {
+			deviceID: "1",
+			getDevice: &model.Device{
+				Attributes: model.DeviceAttributes{
+					model.DeviceAttribute{
+						Name:  "name",
+						Value: "foo",
+						Scope: model.AttrScopeInventory,
+					},
+					model.DeviceAttribute{
+						Name:  "custom",
+						Value: "bar",
+						Scope: model.AttrScopeInventory,
+					},
+				},
+			},
+			getDeviceErr: nil,
+
+			upsertAttrs: model.DeviceAttributes{
+				model.DeviceAttribute{
+					Name:  "name",
+					Value: "foo",
+					Scope: model.AttrScopeInventory,
+				},
+				model.DeviceAttribute{
+					Name:  "ip_address",
+					Value: "127.0.0.1",
+					Scope: model.AttrScopeInventory,
+				},
+			},
+			removeAttrs: model.DeviceAttributes{
+				model.DeviceAttribute{
+					Name:  "custom",
+					Value: "bar",
+					Scope: model.AttrScopeInventory,
+				},
+			},
+
+			datastoreError: nil,
+			outError:       nil,
+		},
+		"ko, get device error": {
+			deviceID:     "1",
+			getDevice:    nil,
+			getDeviceErr: errors.New("get device error"),
+
+			datastoreError: nil,
+			outError:       errors.New("failed to get the device: get device error"),
+		},
+		"ko, datastore error": {
+			deviceID:     "1",
+			getDevice:    nil,
+			getDeviceErr: store.ErrDevNotFound,
+
+			upsertAttrs: model.DeviceAttributes{
+				model.DeviceAttribute{
+					Name:  "name",
+					Value: "foo",
+					Scope: model.AttrScopeInventory,
+				},
+				model.DeviceAttribute{
+					Name:  "ip_address",
+					Value: "127.0.0.1",
+					Scope: model.AttrScopeInventory,
+				},
+			},
+			removeAttrs: model.DeviceAttributes{},
+
+			datastoreError: errors.New("get device error"),
+			outError:       errors.New("failed to replace attributes in db: get device error"),
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			ctx := context.Background()
+
+			db := &mstore.DataStore{}
+			defer db.AssertExpectations(t)
+
+			db.On("GetDevice",
+				ctx,
+				tc.deviceID,
+			).Return(tc.getDevice, tc.getDeviceErr)
+
+			if tc.getDeviceErr == nil || tc.getDeviceErr == store.ErrDevNotFound {
+				db.On("UpsertRemoveDeviceAttributes",
+					ctx,
+					tc.deviceID,
+					tc.upsertAttrs,
+					tc.removeAttrs,
+				).Return(nil, tc.datastoreError)
+			}
+
+			i := invForTest(db)
+			err := i.ReplaceAttributes(ctx, tc.deviceID, tc.upsertAttrs, model.AttrScopeInventory)
+
+			if tc.outError != nil {
+				if assert.Error(t, err) {
+					assert.EqualError(t, err, tc.outError.Error())
+				}
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
 func TestInventoryUnsetDeviceGroup(t *testing.T) {
 	t.Parallel()
 

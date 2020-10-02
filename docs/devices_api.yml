@@ -74,6 +74,54 @@ paths:
           description: Internal server error.
           schema:
             $ref: '#/definitions/Error'
+    put:
+      operationId: Replace Attributes
+      tags:
+        - Device API
+      security:
+        - DeviceJWT: []
+      summary: Replace the set of attributes for a device
+      description: |
+        Replaces the attribute set for the authenticated device with the provided one.
+        The device ID is retrieved from the authorization header.
+
+        This method replaces all the attributes with the new set:
+
+        * attributes not provided in the set are removed from the db
+
+        * the values of existing attributes are overwritten
+
+        * attributes assigned for the first time are automatically created
+      parameters:
+        - name: attributes
+          in: body
+          description: A list of attribute descriptors.
+          required: true
+          schema:
+            title: ListOfAttributes
+            type: array
+            items:
+              $ref: '#/definitions/Attribute'
+            example:
+              - name: "ip_addr"
+                value: "1.2.3.4"
+                description: "IP address"
+              - name: "mac_addr"
+                value: "00.01:02:03:04:05"
+                description: "MAC address"
+      responses:
+        200:
+          description: Attributes were uploaded successfully.
+        401:
+          description: The device is not authenticated.
+        400:
+          description: Missing/malformed request parameters or body.
+          schema:
+            $ref: '#/definitions/Error'
+        500:
+          description: Internal server error.
+          schema:
+            $ref: '#/definitions/Error'
 
 definitions:
   Attribute:

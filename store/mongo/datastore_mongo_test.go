@@ -1534,6 +1534,774 @@ func TestMongoUpsertDevicesAttributes(t *testing.T) {
 	}
 }
 
+func TestMongoUpsertRemoveDeviceAttributes(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping TestMongoUpsertRemoveDeviceAttributes in short mode.")
+	}
+
+	//single create timestamp for all inserted devs
+	createdTs := time.Now()
+
+	testCases := map[string]struct {
+		devs []model.Device
+
+		inDevID       model.DeviceID
+		inUpsertAttrs model.DeviceAttributes
+		inRemoveAttrs model.DeviceAttributes
+
+		tenant string
+
+		outDevs []model.Device
+		err     error
+	}{
+		"dev exists, attributes exist, update both attrs (descr + val)": {
+			devs: []model.Device{
+				{
+					ID: model.DeviceID("0003"),
+					Attributes: model.DeviceAttributes{
+						{
+							Name:        "mac",
+							Value:       "0003-mac",
+							Description: strPtr("descr"),
+							Scope:       model.AttrScopeInventory,
+						},
+						{
+							Name:        "sn",
+							Value:       "0003-sn",
+							Description: strPtr("descr"),
+							Scope:       model.AttrScopeInventory,
+						},
+					},
+					CreatedTs: createdTs,
+				},
+			},
+			inDevID: model.DeviceID("0003"),
+			inUpsertAttrs: model.DeviceAttributes{
+				{
+					Description: strPtr("mac description"),
+					Scope:       model.AttrScopeInventory,
+					Name:        "mac",
+					Value:       "0003-newmac",
+				},
+				{
+					Description: strPtr("sn description"),
+					Scope:       model.AttrScopeInventory,
+					Name:        "sn",
+					Value:       "0003-newsn",
+				},
+			},
+
+			outDevs: []model.Device{
+				{
+					ID: model.DeviceID("0003"),
+					Attributes: model.DeviceAttributes{
+						{
+							Description: strPtr("mac description"),
+							Scope:       model.AttrScopeInventory,
+							Name:        "mac",
+							Value:       "0003-newmac",
+						},
+						{
+							Description: strPtr("sn description"),
+							Scope:       model.AttrScopeInventory,
+							Name:        "sn",
+							Value:       "0003-newsn",
+						},
+					},
+					CreatedTs: createdTs,
+				},
+			},
+		},
+		"dev exists, attributes exist, update both attrs (descr + val); with tenant": {
+			devs: []model.Device{
+				{
+					ID: model.DeviceID("0003"),
+					Attributes: model.DeviceAttributes{
+						{
+							Name:        "mac",
+							Value:       "0003-mac",
+							Description: strPtr("descr"),
+							Scope:       model.AttrScopeInventory,
+						},
+						{
+							Name:        "sn",
+							Value:       "0003-sn",
+							Description: strPtr("descr"),
+							Scope:       model.AttrScopeInventory,
+						},
+					},
+					CreatedTs: createdTs,
+				},
+			},
+			inDevID: model.DeviceID("0003"),
+			inUpsertAttrs: model.DeviceAttributes{
+				{
+					Description: strPtr("mac description"),
+					Scope:       model.AttrScopeInventory,
+					Name:        "mac",
+					Value:       "0003-newmac",
+				},
+				{
+					Description: strPtr("sn description"),
+					Scope:       model.AttrScopeInventory,
+					Name:        "sn",
+					Value:       "0003-newsn",
+				},
+			},
+
+			outDevs: []model.Device{{
+				ID: model.DeviceID("0003"),
+				Attributes: model.DeviceAttributes{
+					{
+						Description: strPtr("mac description"),
+						Scope:       model.AttrScopeInventory,
+						Name:        "mac",
+						Value:       "0003-newmac",
+					},
+					{
+						Description: strPtr("sn description"),
+						Scope:       model.AttrScopeInventory,
+						Name:        "sn",
+						Value:       "0003-newsn",
+					},
+				},
+				CreatedTs: createdTs,
+			}},
+		},
+		"dev exists, attributes exist, update one attr (descr + val)": {
+			devs: []model.Device{
+				{
+					ID: model.DeviceID("0003"),
+					Attributes: model.DeviceAttributes{
+						{
+							Name:        "mac",
+							Value:       "0003-mac",
+							Description: strPtr("descr"),
+							Scope:       model.AttrScopeInventory,
+						},
+						{
+							Name:        "sn",
+							Value:       "0003-sn",
+							Description: strPtr("descr"),
+							Scope:       model.AttrScopeInventory,
+						},
+					},
+					CreatedTs: createdTs,
+				},
+			},
+			inDevID: model.DeviceID("0003"),
+			inUpsertAttrs: model.DeviceAttributes{
+				{
+					Description: strPtr("sn description"),
+					Scope:       model.AttrScopeInventory,
+					Name:        "sn",
+					Value:       "0003-newsn",
+				},
+			},
+
+			outDevs: []model.Device{{
+				ID: model.DeviceID("0003"),
+				Attributes: model.DeviceAttributes{
+					{
+						Description: strPtr("descr"),
+						Scope:       model.AttrScopeInventory,
+						Name:        "mac",
+						Value:       "0003-mac",
+					},
+					{
+						Description: strPtr("sn description"),
+						Scope:       model.AttrScopeInventory,
+						Name:        "sn",
+						Value:       "0003-newsn",
+					},
+				},
+				CreatedTs: createdTs,
+			}},
+		},
+		"dev exists, attributes exist, update one attr (descr + val), remove another": {
+			devs: []model.Device{
+				{
+					ID: model.DeviceID("0003"),
+					Attributes: model.DeviceAttributes{
+						{
+							Name:        "mac",
+							Value:       "0003-mac",
+							Description: strPtr("descr"),
+							Scope:       model.AttrScopeInventory,
+						},
+						{
+							Name:        "sn",
+							Value:       "0003-sn",
+							Description: strPtr("descr"),
+							Scope:       model.AttrScopeInventory,
+						},
+					},
+					CreatedTs: createdTs,
+				},
+			},
+			inDevID: model.DeviceID("0003"),
+			inUpsertAttrs: model.DeviceAttributes{
+				{
+					Description: strPtr("sn description"),
+					Scope:       model.AttrScopeInventory,
+					Name:        "sn",
+					Value:       "0003-newsn",
+				},
+			},
+			inRemoveAttrs: model.DeviceAttributes{
+				{
+					Name:        "mac",
+					Value:       "0003-mac",
+					Description: strPtr("descr"),
+					Scope:       model.AttrScopeInventory,
+				},
+			},
+			outDevs: []model.Device{{
+				ID: model.DeviceID("0003"),
+				Attributes: model.DeviceAttributes{
+					{
+						Description: strPtr("sn description"),
+						Scope:       model.AttrScopeInventory,
+						Name:        "sn",
+						Value:       "0003-newsn",
+					},
+				},
+				CreatedTs: createdTs,
+			}},
+		},
+		"dev exists, attributes exist, update one attr (descr only)": {
+			devs: []model.Device{
+				{
+					ID: model.DeviceID("0003"),
+					Attributes: model.DeviceAttributes{
+						{
+							Name:        "mac",
+							Value:       "0003-mac",
+							Description: strPtr("descr"),
+							Scope:       model.AttrScopeInventory,
+						},
+						{
+							Name:        "sn",
+							Value:       "0003-sn",
+							Description: strPtr("descr"),
+							Scope:       model.AttrScopeInventory,
+						},
+					},
+					CreatedTs: createdTs,
+				},
+			},
+			inDevID: model.DeviceID("0003"),
+			inUpsertAttrs: model.DeviceAttributes{
+				{
+					Description: strPtr("sn description"),
+					Scope:       model.AttrScopeInventory,
+					Name:        "sn",
+				},
+			},
+
+			outDevs: []model.Device{{
+				ID: model.DeviceID("0003"),
+				Attributes: model.DeviceAttributes{
+					{
+						Description: strPtr("descr"),
+						Scope:       model.AttrScopeInventory,
+						Name:        "mac",
+						Value:       "0003-mac",
+					},
+					{
+						Description: strPtr("sn description"),
+						Scope:       model.AttrScopeInventory,
+						Name:        "sn",
+						Value:       "0003-sn",
+					},
+				},
+				CreatedTs: createdTs,
+			}},
+		},
+		"dev exists, attributes exist, update one attr (value only)": {
+			devs: []model.Device{
+				{
+					ID: model.DeviceID("0003"),
+					Attributes: model.DeviceAttributes{
+						{
+							Name:        "mac",
+							Value:       "0003-mac",
+							Description: strPtr("descr"),
+							Scope:       model.AttrScopeInventory,
+						},
+						{
+							Name:        "sn",
+							Value:       "0003-sn",
+							Description: strPtr("descr"),
+							Scope:       model.AttrScopeInventory,
+						},
+					},
+					CreatedTs: createdTs,
+				},
+			},
+			inDevID: model.DeviceID("0003"),
+			inUpsertAttrs: model.DeviceAttributes{
+				{
+					Scope: model.AttrScopeInventory,
+					Name:  "sn",
+					Value: "0003-newsn",
+				},
+			},
+
+			outDevs: []model.Device{{
+				ID: model.DeviceID("0003"),
+				Attributes: model.DeviceAttributes{
+					{
+						Description: strPtr("descr"),
+						Scope:       model.AttrScopeInventory,
+						Name:        "mac",
+						Value:       "0003-mac",
+					},
+					{
+						Description: strPtr("descr"),
+						Scope:       model.AttrScopeInventory,
+						Name:        "sn",
+						Value:       "0003-newsn",
+					},
+				},
+				CreatedTs: createdTs,
+			}},
+		},
+		"dev exists, attributes exist, update one attr (value only, change type)": {
+			devs: []model.Device{
+				{
+					ID: model.DeviceID("0003"),
+					Attributes: model.DeviceAttributes{
+						{
+							Name:        "mac",
+							Value:       "0003-mac",
+							Description: strPtr("descr"),
+							Scope:       model.AttrScopeInventory,
+						},
+						{
+							Name:        "sn",
+							Value:       "0003-sn",
+							Description: strPtr("descr"),
+							Scope:       model.AttrScopeInventory,
+						},
+					},
+					CreatedTs: createdTs,
+				},
+			},
+			inDevID: model.DeviceID("0003"),
+			inUpsertAttrs: model.DeviceAttributes{
+				{
+					Value: primitive.A{"0003-sn-1", "0003-sn-2"},
+					Scope: model.AttrScopeInventory,
+					Name:  "sn",
+				},
+			},
+
+			outDevs: []model.Device{{
+				ID: model.DeviceID("0003"),
+				Attributes: model.DeviceAttributes{
+					{
+						Description: strPtr("descr"),
+						Scope:       model.AttrScopeInventory,
+						Name:        "mac",
+						Value:       "0003-mac",
+					},
+					{
+						Description: strPtr("descr"),
+						Scope:       model.AttrScopeInventory,
+						Name:        "sn",
+						Value:       primitive.A{"0003-sn-1", "0003-sn-2"},
+					},
+				},
+				CreatedTs: createdTs,
+			}},
+		},
+		"dev exists, attributes exist, add(merge) new attrs": {
+			devs: []model.Device{
+				{
+					ID: model.DeviceID("0003"),
+					Attributes: model.DeviceAttributes{
+						{
+							Name:        "mac",
+							Value:       "0003-mac",
+							Description: strPtr("descr"),
+							Scope:       model.AttrScopeInventory,
+						},
+						{
+							Name:        "sn",
+							Value:       "0003-sn",
+							Description: strPtr("descr"),
+							Scope:       model.AttrScopeInventory,
+						},
+					},
+					CreatedTs: createdTs,
+				},
+			},
+			inDevID: model.DeviceID("0003"),
+			inUpsertAttrs: model.DeviceAttributes{
+				{
+					Scope: model.AttrScopeInventory,
+					Name:  "new-1",
+					Value: primitive.A{"new-1-0", "new-1-0"},
+				},
+				{
+					Scope:       model.AttrScopeInventory,
+					Name:        "new-2",
+					Value:       "new-2-val",
+					Description: strPtr("foo"),
+				},
+			},
+
+			outDevs: []model.Device{{
+				ID: model.DeviceID("0003"),
+				Attributes: model.DeviceAttributes{
+					{
+						Scope:       model.AttrScopeInventory,
+						Name:        "mac",
+						Description: strPtr("descr"),
+						Value:       "0003-mac",
+					},
+					{
+						Scope:       model.AttrScopeInventory,
+						Name:        "sn",
+						Value:       "0003-sn",
+						Description: strPtr("descr"),
+					},
+					{
+						Scope: model.AttrScopeInventory,
+						Name:  "new-1",
+						Value: primitive.A{"new-1-0", "new-1-0"},
+					},
+					{
+						Scope:       model.AttrScopeInventory,
+						Name:        "new-2",
+						Value:       "new-2-val",
+						Description: strPtr("foo"),
+					},
+				},
+				CreatedTs: createdTs,
+			}},
+		},
+		"dev exists, attributes exist, add(merge) new attrs + modify existing": {
+			devs: []model.Device{
+				{
+					ID: model.DeviceID("0003"),
+					Attributes: model.DeviceAttributes{
+						{
+							Name:        "mac",
+							Value:       "0003-mac",
+							Description: strPtr("descr"),
+							Scope:       model.AttrScopeInventory,
+						},
+						{
+							Name:        "sn",
+							Value:       "0003-sn",
+							Description: strPtr("descr"),
+							Scope:       model.AttrScopeInventory,
+						},
+					},
+					CreatedTs: createdTs,
+				},
+			},
+			inDevID: model.DeviceID("0003"),
+			inUpsertAttrs: model.DeviceAttributes{
+				{
+					Name:        "mac",
+					Value:       "0003-mac-new",
+					Description: strPtr("descr-new"),
+				},
+				{
+					Name:  "new-1",
+					Value: primitive.A{"new-1-0", "new-1-0"},
+				},
+				{
+					Name:        "new-2",
+					Value:       "new-2-val",
+					Description: strPtr("foo"),
+				},
+			},
+
+			outDevs: []model.Device{{
+				ID: model.DeviceID("0003"),
+				Attributes: model.DeviceAttributes{
+					{
+						Scope:       model.AttrScopeInventory,
+						Name:        "mac",
+						Value:       "0003-mac-new",
+						Description: strPtr("descr-new"),
+					},
+					{
+						Scope:       model.AttrScopeInventory,
+						Name:        "sn",
+						Value:       "0003-sn",
+						Description: strPtr("descr"),
+					},
+					{
+						Scope: model.AttrScopeInventory,
+						Name:  "new-1",
+						Value: primitive.A{"new-1-0", "new-1-0"},
+					},
+					{
+						Scope:       model.AttrScopeInventory,
+						Name:        "new-2",
+						Value:       "new-2-val",
+						Description: strPtr("foo"),
+					},
+				},
+				CreatedTs: createdTs,
+			}},
+		},
+		"dev exists, no attributes exist, upsert new attrs (val + descr)": {
+			devs: []model.Device{
+				{
+					ID:        model.DeviceID("0003"),
+					CreatedTs: createdTs,
+				},
+			},
+			inDevID: model.DeviceID("0003"),
+			inUpsertAttrs: model.DeviceAttributes{
+				{
+					Scope:       model.AttrScopeInventory,
+					Name:        "ip",
+					Value:       primitive.A{"1.2.3.4", "1.2.3.5"},
+					Description: strPtr("ip addr array"),
+				},
+				{
+					Scope:       model.AttrScopeInventory,
+					Name:        "mac",
+					Value:       primitive.A{"0006-mac"},
+					Description: strPtr("mac addr"),
+				},
+			},
+
+			outDevs: []model.Device{{
+				ID: model.DeviceID("0003"),
+				Attributes: model.DeviceAttributes{
+					{
+						Scope:       model.AttrScopeInventory,
+						Name:        "ip",
+						Value:       primitive.A{"1.2.3.4", "1.2.3.5"},
+						Description: strPtr("ip addr array"),
+					},
+					{
+						Scope:       model.AttrScopeInventory,
+						Name:        "mac",
+						Value:       primitive.A{"0006-mac"},
+						Description: strPtr("mac addr"),
+					},
+				},
+				CreatedTs: createdTs,
+			}},
+		},
+		"dev exists, no attributes exist, upsert new attrs with dots and dolllars (val + descr)": {
+			devs: []model.Device{
+				{
+					ID:        model.DeviceID("0003"),
+					CreatedTs: createdTs,
+				},
+			},
+			inDevID: model.DeviceID("0003"),
+			inUpsertAttrs: model.DeviceAttributes{
+				{
+					Scope:       model.AttrScopeInventory,
+					Name:        "ip.address",
+					Value:       primitive.A{"1.2.3.4", "1.2.3.5"},
+					Description: strPtr("ip addr array"),
+				},
+				{
+					Scope:       model.AttrScopeInventory,
+					Name:        "mac$addreses",
+					Value:       primitive.A{"0006-mac"},
+					Description: strPtr("mac addr"),
+				},
+			},
+
+			outDevs: []model.Device{{
+				ID: model.DeviceID("0003"),
+				Attributes: model.DeviceAttributes{
+					{
+						Scope:       model.AttrScopeInventory,
+						Name:        "ip.address",
+						Value:       primitive.A{"1.2.3.4", "1.2.3.5"},
+						Description: strPtr("ip addr array"),
+					},
+					{
+						Scope:       model.AttrScopeInventory,
+						Name:        "mac$address",
+						Value:       primitive.A{"0006-mac"},
+						Description: strPtr("mac addr"),
+					},
+				},
+				CreatedTs: createdTs,
+			}},
+		},
+		"dev doesn't exist, upsert new attr (descr + val)": {
+			devs:    []model.Device{},
+			inDevID: model.DeviceID("0099"),
+			inUpsertAttrs: model.DeviceAttributes{
+				{
+					Scope:       model.AttrScopeInventory,
+					Name:        "ip",
+					Description: strPtr("ip addr array"),
+					Value:       primitive.A{"1.2.3.4", "1.2.3.5"},
+				},
+			},
+
+			outDevs: []model.Device{{
+				ID: model.DeviceID("0099"),
+				Attributes: model.DeviceAttributes{
+					{
+						Scope:       model.AttrScopeInventory,
+						Name:        "ip",
+						Description: strPtr("ip addr array"),
+						Value:       primitive.A{"1.2.3.4", "1.2.3.5"},
+					},
+				},
+				CreatedTs: createdTs,
+			}},
+		},
+		"dev doesn't exist, upsert new attr (val only)": {
+			devs:    []model.Device{},
+			inDevID: model.DeviceID("0099"),
+			inUpsertAttrs: model.DeviceAttributes{
+				{
+					Scope: model.AttrScopeInventory,
+					Name:  "ip",
+					Value: primitive.A{"1.2.3.4", "1.2.3.5"},
+				},
+			},
+
+			outDevs: []model.Device{{
+				ID: model.DeviceID("0099"),
+				Attributes: model.DeviceAttributes{
+					{
+						Scope: model.AttrScopeInventory,
+						Name:  "ip",
+						Value: primitive.A{"1.2.3.4", "1.2.3.5"},
+					},
+				},
+				CreatedTs: createdTs,
+			}},
+		},
+		"dev doesn't exist, upsert with new attrs (val + descr)": {
+			inDevID: model.DeviceID("0099"),
+			inUpsertAttrs: model.DeviceAttributes{
+				{
+					Scope:       model.AttrScopeInventory,
+					Name:        "ip",
+					Value:       primitive.A{"1.2.3.4", "1.2.3.5"},
+					Description: strPtr("ip addr array"),
+				},
+				{
+					Scope:       model.AttrScopeInventory,
+					Name:        "mac",
+					Value:       primitive.A{"0099-mac"},
+					Description: strPtr("mac addr"),
+				},
+			},
+
+			outDevs: []model.Device{{
+				ID: model.DeviceID("0099"),
+				Attributes: model.DeviceAttributes{
+					{
+						Scope:       model.AttrScopeInventory,
+						Name:        "ip",
+						Value:       primitive.A{"1.2.3.4", "1.2.3.5"},
+						Description: strPtr("ip addr array"),
+					},
+					{
+						Scope:       model.AttrScopeInventory,
+						Name:        "mac",
+						Value:       primitive.A{"0099-mac"},
+						Description: strPtr("mac addr"),
+					},
+				},
+				CreatedTs: createdTs,
+			}},
+		},
+		"error, missing attribute name": {
+			inUpsertAttrs: model.DeviceAttributes{{
+				Scope: model.AttrScopeInventory,
+				Value: "foo",
+			}},
+			err: errors.New("attribute name not present"),
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			//setup
+			db.Wipe()
+
+			s := db.Client()
+
+			var ctx context.Context
+			if tc.tenant != "" {
+				ctx = identity.WithContext(db.CTX(), &identity.Identity{
+					Tenant: tc.tenant,
+				})
+			} else {
+				ctx = identity.WithContext(db.CTX(), &identity.Identity{
+					Tenant: "",
+				})
+			}
+
+			//test
+			d := NewDataStoreMongoWithSession(s)
+			for _, dev := range tc.devs {
+				err := d.AddDevice(ctx, &dev)
+				assert.NoError(t, err, "failed to setup input data")
+			}
+
+			_, err := d.UpsertRemoveDeviceAttributes(ctx, tc.inDevID, tc.inUpsertAttrs, tc.inRemoveAttrs)
+			if tc.err != nil {
+				assert.EqualError(t, err, tc.err.Error())
+			} else {
+				assert.NoError(t, err, "UpsertRemoveAttributes failed")
+			}
+
+			//get the device back
+			var devs []model.Device
+			cur, err := s.Database(DbName).
+				Collection(DbDevicesColl).
+				Find(
+					nil,
+					bson.M{},
+					mopts.Find().SetSort(bson.M{"_id": 1}),
+				)
+			if err == nil {
+				err = cur.All(nil, &devs)
+			}
+			if !assert.NoError(t, err) {
+				t.FailNow()
+			}
+
+			if assert.Len(t, devs, len(tc.outDevs)) {
+				for i, dev := range tc.outDevs {
+					assert.Equal(t, dev.ID, devs[i].ID)
+					if !compareAttrsWithoutTimestamp(
+						dev.Attributes,
+						devs[i].Attributes,
+					) {
+						t.Errorf("attributes mismatch, have: %v\nwant: %v",
+							devs[i].Attributes,
+							dev.Attributes,
+						)
+					}
+					// check timestamp validity
+					// note that mongo stores time with lower
+					// precision- custom comparison
+					assert.Condition(t,
+						func() bool {
+							return devs[i].UpdatedTs.After(dev.CreatedTs) ||
+								devs[i].UpdatedTs == dev.CreatedTs
+						})
+				}
+			}
+		})
+	}
+}
+
 func TestMongoUpdateDeviceGroup(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping TestMongoUpdateDeviceGroup in short mode.")

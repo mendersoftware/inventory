@@ -237,6 +237,20 @@ func (_m *InventoryApp) ListGroups(ctx context.Context, filters []model.FilterPr
 	return r0, r1
 }
 
+// ReplaceAttributes provides a mock function with given fields: ctx, id, upsertAttrs, scope
+func (_m *InventoryApp) ReplaceAttributes(ctx context.Context, id model.DeviceID, upsertAttrs model.DeviceAttributes, scope string) error {
+	ret := _m.Called(ctx, id, upsertAttrs, scope)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, model.DeviceID, model.DeviceAttributes, string) error); ok {
+		r0 = rf(ctx, id, upsertAttrs, scope)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // SearchDevices provides a mock function with given fields: ctx, searchParams
 func (_m *InventoryApp) SearchDevices(ctx context.Context, searchParams model.SearchParams) ([]model.Device, int, error) {
 	ret := _m.Called(ctx, searchParams)

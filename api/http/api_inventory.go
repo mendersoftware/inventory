@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"github.com/ant0ine/go-json-rest/rest"
-	"github.com/go-ozzo/ozzo-validation/v4"
+	validation "github.com/go-ozzo/ozzo-validation/v4"
 	midentity "github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/log"
 	"github.com/mendersoftware/go-lib-micro/rest_utils"
@@ -106,7 +106,8 @@ func (i *inventoryHandlers) GetApp() (rest.App, error) {
 		rest.Delete(uriDevice, i.DeleteDeviceHandler),
 		rest.Delete(uriDeviceGroup, i.DeleteDeviceGroupHandler),
 		rest.Delete(uriGroupsDevices, i.ClearDevicesGroup),
-		rest.Patch(uriAttributes, i.PatchDeviceAttributesHandler),
+		rest.Patch(uriAttributes, i.UpdateDeviceAttributesHandler),
+		rest.Put(uriAttributes, i.UpdateDeviceAttributesHandler),
 		rest.Patch(urlInternalAttributes, i.PatchDeviceAttributesInternalHandler),
 		rest.Put(uriDeviceGroups, i.AddDeviceToGroupHandler),
 		rest.Patch(uriGroupsDevices, i.AppendDevicesToGroup),
@@ -377,7 +378,7 @@ func (i *inventoryHandlers) AddDeviceHandler(w rest.ResponseWriter, r *rest.Requ
 	w.WriteHeader(http.StatusCreated)
 }
 
-func (i *inventoryHandlers) PatchDeviceAttributesHandler(w rest.ResponseWriter, r *rest.Request) {
+func (i *inventoryHandlers) UpdateDeviceAttributesHandler(w rest.ResponseWriter, r *rest.Request) {
 	ctx := r.Context()
 
 	l := log.FromContext(ctx)
@@ -396,8 +397,15 @@ func (i *inventoryHandlers) PatchDeviceAttributesHandler(w rest.ResponseWriter, 
 		return
 	}
 
-	//upsert the attributes
-	err = i.inventory.UpsertAttributes(ctx, model.DeviceID(idata.Subject), attrs)
+	// upsert or replace the attributes
+	if r.Method == http.MethodPatch {
+		err = i.inventory.UpsertAttributes(ctx, model.DeviceID(idata.Subject), attrs)
+	} else if r.Method == http.MethodPut {
+		err = i.inventory.ReplaceAttributes(ctx, model.DeviceID(idata.Subject), attrs, model.AttrScopeInventory)
+	} else {
+		u.RestErrWithLog(w, r, l, errors.New("method not alllowed"), http.StatusMethodNotAllowed)
+		return
+	}
 	cause := errors.Cause(err)
 	switch cause {
 	case store.ErrNoAttrName:
