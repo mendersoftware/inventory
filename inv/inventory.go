@@ -32,6 +32,7 @@ type InventoryApp interface {
 	GetDevice(ctx context.Context, id model.DeviceID) (*model.Device, error)
 	AddDevice(ctx context.Context, d *model.Device) error
 	UpsertAttributes(ctx context.Context, id model.DeviceID, attrs model.DeviceAttributes) error
+	ReplaceAttributes(ctx context.Context, id model.DeviceID, upsertAttrs model.DeviceAttributes, scope string) error
 	UpsertDevicesAttributes(
 		ctx context.Context,
 		ids []model.DeviceID,
@@ -131,6 +132,34 @@ func (i *inventory) UpsertAttributes(ctx context.Context, id model.DeviceID, att
 	}
 	return nil
 }
+
+func (i *inventory) ReplaceAttributes(ctx context.Context, id model.DeviceID, upsertAttrs model.DeviceAttributes, scope string) error {
+	device, err := i.db.GetDevice(ctx, id)
+	if err != nil && err != store.ErrDevNotFound {
+		return errors.Wrap(err, "failed to get the device")
+	}
+	removeAttrs := model.DeviceAttributes{}
+	if device != nil {
+		for _, attr := range device.Attributes {
+			if attr.Scope == scope {
+				update := false
+				for _, upsertAttr := range upsertAttrs {
+					if upsertAttr.Name == attr.Name {
+						update = true
+					}
+				}
+				if !update {
+					removeAttrs = append(removeAttrs, attr)
+				}
+			}
+		}
+	}
+	if _, err := i.db.UpsertRemoveDeviceAttributes(ctx, id, upsertAttrs, removeAttrs); err != nil {
+		return errors.Wrap(err, "failed to replace attributes in db")
+	}
+	return nil
+}
+
 func (i *inventory) UpsertDevicesAttributes(
 	ctx context.Context,
 	ids []model.DeviceID,

@@ -945,6 +945,30 @@ func TestApiInventoryUpsertAttributes(t *testing.T) {
 				OutputBodyObject: RestError("internal error"),
 			},
 		},
+
+		"body formatted ok, attributes ok (values only), PUT": {
+			inReq: test.MakeSimpleRequest("PUT",
+				"http://1.2.3.4/api/0.1.0/attributes",
+				[]model.DeviceAttribute{
+					{
+						Name:  "name1",
+						Value: "value1",
+					},
+					{
+						Name:  "name2",
+						Value: 2,
+					},
+				},
+			),
+			inHdrs: map[string]string{
+				"Authorization": makeDeviceAuthHeader(`{"sub": "fakeid"}`),
+			},
+			inventoryErr: nil,
+			resp: utils.JSONResponseParams{
+				OutputStatus:     http.StatusOK,
+				OutputBodyObject: nil,
+			},
+		},
 	}
 
 	for name, tc := range testCases {
@@ -953,20 +977,38 @@ func TestApiInventoryUpsertAttributes(t *testing.T) {
 
 		ctx := contextMatcher()
 
-		inv.On("UpsertAttributes",
-			ctx,
-			mock.AnythingOfType("model.DeviceID"),
-			mock.MatchedBy(
-				func(attrs model.DeviceAttributes) bool {
-					if tc.deviceAttributes != nil {
-						if !reflect.DeepEqual(tc.deviceAttributes, attrs) {
-							assert.FailNow(t, "", "attributes not equal: %v \n%v\n", tc.deviceAttributes, attrs)
+		if tc.inReq.Method == http.MethodPatch {
+			inv.On("UpsertAttributes",
+				ctx,
+				mock.AnythingOfType("model.DeviceID"),
+				mock.MatchedBy(
+					func(attrs model.DeviceAttributes) bool {
+						if tc.deviceAttributes != nil {
+							if !reflect.DeepEqual(tc.deviceAttributes, attrs) {
+								assert.FailNow(t, "", "attributes not equal: %v \n%v\n", tc.deviceAttributes, attrs)
+							}
 						}
-					}
-					return true
-				},
-			),
-		).Return(tc.inventoryErr)
+						return true
+					},
+				),
+			).Return(tc.inventoryErr)
+		} else {
+			inv.On("ReplaceAttributes",
+				ctx,
+				mock.AnythingOfType("model.DeviceID"),
+				mock.MatchedBy(
+					func(attrs model.DeviceAttributes) bool {
+						if tc.deviceAttributes != nil {
+							if !reflect.DeepEqual(tc.deviceAttributes, attrs) {
+								assert.FailNow(t, "", "attributes not equal: %v \n%v\n", tc.deviceAttributes, attrs)
+							}
+						}
+						return true
+					},
+				),
+				model.AttrScopeInventory,
+			).Return(tc.inventoryErr)
+		}
 
 		apih := makeMockApiHandler(t, &inv)
 

@@ -60,6 +60,13 @@ type DataStore interface {
 	// necessary.
 	UpsertDevicesAttributes(ctx context.Context, ids []model.DeviceID, attrs model.DeviceAttributes) (*model.UpdateResult, error)
 
+	// UpsertRemoveDeviceAttributes provides an interface to replace the
+	// attributes for a device. It accepts two lists: a list of attributes
+	// to upsert, and a list of attributes to remove. Nonexistent attributes
+	// are created, existing are overwritten; the device resource is also
+	// created if necessary
+	UpsertRemoveDeviceAttributes(ctx context.Context, id model.DeviceID, updateAttrs model.DeviceAttributes, removeAttrs model.DeviceAttributes) (*model.UpdateResult, error)
+
 	// UnsetDevicesGroup removes a list of deices from their respective
 	// groups returning the number of devices that were modified or an
 	// error if any, respectively.
