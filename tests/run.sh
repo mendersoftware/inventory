@@ -12,8 +12,10 @@ HOST=${HOST="mender-inventory:8080"}
 [ $$ -eq 1 ] && {
     echo "-- running in container, wait for other services"
     # wait 10s for containters to start and
-    sleep 10
+    sleep 64
 }
+
+echo "running with: \"$@\"" 1>&2
 
 py.test -s --tb=short --host $HOST \
           --internal-spec $DIR/internal_api.yml \
