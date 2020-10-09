@@ -24,7 +24,7 @@ import (
 	"github.com/mendersoftware/inventory/store/mongo"
 )
 
-// this inventory service interface
+// this inventory service interface.
 //go:generate ../utils/mockgen.sh
 type InventoryApp interface {
 	HealthCheck(ctx context.Context) error
