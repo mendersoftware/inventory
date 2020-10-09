@@ -3014,45 +3014,7 @@ func TestApiInventoryInternalSearchDevices(t *testing.T) {
 				},
 			},
 		},
-		"invalid filter": {
-			listDevicesNum:  5,
-			listDevicesErr:  nil,
-			listDeviceTotal: 21,
-			inReq: test.MakeSimpleRequest("POST",
-				"http://1.2.3.4/api/internal/v2/inventory/tenants/foo/filters/search",
-				model.SearchParams{
-					Page:    4,
-					PerPage: 5,
-					Filters: []model.FilterPredicate{
-						{},
-						{
-							Scope:     "inventory",
-							Attribute: "foo1",
-							Type:      "$eq",
-							Value:     "baz",
-						},
-					},
-					Sort: []model.SortCriteria{
-						{
-							Scope:     "inventory",
-							Attribute: "foo",
-							Order:     "asc",
-						},
-						{
-							Scope:     "inventory",
-							Attribute: "foo1",
-							Order:     "desc",
-						},
-					},
-				},
-			),
-			resp: utils.JSONResponseParams{
-				OutputStatus:     400,
-				OutputBodyObject: RestError("attribute: cannot be blank; scope: cannot be blank; type: cannot be blank; value: is required."),
-				OutputHeaders:    nil,
-			},
-		},
-		"no tenant id": {
+		"valid filter and sort no tenant": {
 			listDevicesNum:  5,
 			listDevicesErr:  nil,
 			listDeviceTotal: 21,
@@ -3090,8 +3052,48 @@ func TestApiInventoryInternalSearchDevices(t *testing.T) {
 				},
 			),
 			resp: utils.JSONResponseParams{
+				OutputStatus:     200,
+				OutputBodyObject: mockListDevices(5),
+				OutputHeaders: map[string][]string{
+					hdrTotalCount: {"21"},
+				},
+			},
+		},
+		"invalid filter": {
+			listDevicesNum:  5,
+			listDevicesErr:  nil,
+			listDeviceTotal: 21,
+			inReq: test.MakeSimpleRequest("POST",
+				"http://1.2.3.4/api/internal/v2/inventory/tenants/foo/filters/search",
+				model.SearchParams{
+					Page:    4,
+					PerPage: 5,
+					Filters: []model.FilterPredicate{
+						{},
+						{
+							Scope:     "inventory",
+							Attribute: "foo1",
+							Type:      "$eq",
+							Value:     "baz",
+						},
+					},
+					Sort: []model.SortCriteria{
+						{
+							Scope:     "inventory",
+							Attribute: "foo",
+							Order:     "asc",
+						},
+						{
+							Scope:     "inventory",
+							Attribute: "foo1",
+							Order:     "desc",
+						},
+					},
+				},
+			),
+			resp: utils.JSONResponseParams{
 				OutputStatus:     400,
-				OutputBodyObject: RestError("tenant_id not provided"),
+				OutputBodyObject: RestError("attribute: cannot be blank; scope: cannot be blank; type: cannot be blank; value: is required."),
 				OutputHeaders:    nil,
 			},
 		},
