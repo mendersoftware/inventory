@@ -769,11 +769,9 @@ func (i *inventoryHandlers) InternalFiltersSearchHandler(w rest.ResponseWriter, 
 	l := log.FromContext(ctx)
 
 	tenantId := r.PathParam("tenant_id")
-	if tenantId == "" {
-		u.RestErrWithLog(w, r, l, errors.New("tenant_id not provided"), http.StatusBadRequest)
-		return
+	if tenantId != "" {
+		ctx = getTenantContext(ctx, tenantId)
 	}
-	ctx = getTenantContext(ctx, tenantId)
 
 	//extract attributes from body
 	searchParams, err := parseSearchParams(r)
