@@ -67,6 +67,10 @@ type DataStore interface {
 	// created if necessary
 	UpsertRemoveDeviceAttributes(ctx context.Context, id model.DeviceID, updateAttrs model.DeviceAttributes, removeAttrs model.DeviceAttributes) (*model.UpdateResult, error)
 
+	// GetFiltersAttributes returns the attributes which can be used
+	// in filters
+	GetFiltersAttributes(ctx context.Context) ([]model.FilterAttribute, error)
+
 	// UnsetDevicesGroup removes a list of deices from their respective
 	// groups returning the number of devices that were modified or an
 	// error if any, respectively.

@@ -52,6 +52,7 @@ const (
 	urlInternalDevicesStatus = "/api/internal/v1/inventory/tenants/:tenant_id/devices/:status"
 	urlInternalAttributes    = "/api/internal/v1/inventory/tenants/:tenant_id/device/:did/attribute/scope/:scope"
 	apiUrlManagementV2       = "/api/management/v2/inventory"
+	urlFiltersAttributes     = apiUrlManagementV2 + "/filters/attributes"
 	urlFiltersSearch         = apiUrlManagementV2 + "/filters/search"
 
 	apiUrlInternalV2         = "/api/internal/v2/inventory"
@@ -118,6 +119,7 @@ func (i *inventoryHandlers) GetApp() (rest.App, error) {
 		rest.Post(uriInternalTenants, i.CreateTenantHandler),
 		rest.Post(uriInternalDevices, i.AddDeviceHandler),
 		rest.Post(urlInternalDevicesStatus, i.InternalDevicesStatusHandler),
+		rest.Get(urlFiltersAttributes, i.FiltersAttributesHandler),
 		rest.Post(urlFiltersSearch, i.FiltersSearchHandler),
 
 		rest.Post(urlInternalFiltersSearch, i.InternalFiltersSearchHandler),
@@ -743,6 +745,21 @@ func (i *inventoryHandlers) CreateTenantHandler(w rest.ResponseWriter, r *rest.R
 	w.WriteHeader(http.StatusCreated)
 }
 
+func (i *inventoryHandlers) FiltersAttributesHandler(w rest.ResponseWriter, r *rest.Request) {
+	ctx := r.Context()
+
+	l := log.FromContext(ctx)
+
+	// query the database
+	attributes, err := i.inventory.GetFiltersAttributes(ctx)
+	if err != nil {
+		u.RestErrWithLogInternal(w, r, l, err)
+		return
+	}
+
+	w.WriteJson(attributes)
+}
+
 func (i *inventoryHandlers) FiltersSearchHandler(w rest.ResponseWriter, r *rest.Request) {
 	ctx := r.Context()
 
@@ -755,7 +772,7 @@ func (i *inventoryHandlers) FiltersSearchHandler(w rest.ResponseWriter, r *rest.
 		return
 	}
 
-	// query database
+	// query the database
 	devs, totalCount, err := i.inventory.SearchDevices(ctx, *searchParams)
 	if err != nil {
 		if strings.Contains(err.Error(), "BadValue") {
@@ -788,7 +805,7 @@ func (i *inventoryHandlers) InternalFiltersSearchHandler(w rest.ResponseWriter, 
 		return
 	}
 
-	// query database
+	// query the database
 	devs, totalCount, err := i.inventory.SearchDevices(ctx, *searchParams)
 	if err != nil {
 		if strings.Contains(err.Error(), "BadValue") {

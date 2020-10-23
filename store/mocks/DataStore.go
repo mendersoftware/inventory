@@ -194,6 +194,29 @@ func (_m *DataStore) GetDevicesByGroup(ctx context.Context, group model.GroupNam
 	return r0, r1, r2
 }
 
+// GetFiltersAttributes provides a mock function with given fields: ctx
+func (_m *DataStore) GetFiltersAttributes(ctx context.Context) ([]model.FilterAttribute, error) {
+	ret := _m.Called(ctx)
+
+	var r0 []model.FilterAttribute
+	if rf, ok := ret.Get(0).(func(context.Context) []model.FilterAttribute); ok {
+		r0 = rf(ctx)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]model.FilterAttribute)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // ListGroups provides a mock function with given fields: ctx, filters
 func (_m *DataStore) ListGroups(ctx context.Context, filters []model.FilterPredicate) ([]model.GroupName, error) {
 	ret := _m.Called(ctx, filters)

@@ -2302,6 +2302,158 @@ func TestMongoUpsertRemoveDeviceAttributes(t *testing.T) {
 	}
 }
 
+func TestGetFiltersAttributes(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping TestGetFiltersAttributes in short mode.")
+	}
+
+	// single create timestamp for all inserted devs
+	createdTs := time.Now()
+
+	testCases := map[string]struct {
+		tenant              string
+		devs                []model.Device
+		outFilterAttributes []model.FilterAttribute
+	}{
+		"single tenant": {
+			devs: []model.Device{
+				{
+					ID: model.DeviceID("0003"),
+					Attributes: model.DeviceAttributes{
+						{
+							Name:  "mac",
+							Value: "0003-mac",
+							Scope: model.AttrScopeInventory,
+						},
+						{
+							Name:  "sn",
+							Value: "0003-sn",
+							Scope: model.AttrScopeInventory,
+						},
+					},
+					CreatedTs: createdTs,
+				},
+				{
+					ID: model.DeviceID("0004"),
+					Attributes: model.DeviceAttributes{
+						{
+							Name:  "mac",
+							Value: "0004-mac",
+							Scope: model.AttrScopeInventory,
+						},
+					},
+					CreatedTs: createdTs,
+				},
+			},
+			outFilterAttributes: []model.FilterAttribute{
+				{
+					Name:  "mac",
+					Scope: model.AttrScopeInventory,
+					Count: 2,
+				},
+				{
+					Name:  "created_ts",
+					Scope: model.AttrScopeSystem,
+					Count: 2,
+				},
+				{
+					Name:  "updated_ts",
+					Scope: model.AttrScopeSystem,
+					Count: 2,
+				},
+				{
+					Name:  "sn",
+					Scope: model.AttrScopeInventory,
+					Count: 1,
+				},
+			},
+		},
+		"multitenant": {
+			tenant: "foo",
+			devs: []model.Device{
+				{
+					ID: model.DeviceID("0003"),
+					Attributes: model.DeviceAttributes{
+						{
+							Name:  "mac",
+							Value: "0003-mac",
+							Scope: model.AttrScopeInventory,
+						},
+						{
+							Name:  "sn",
+							Value: "0003-sn",
+							Scope: model.AttrScopeInventory,
+						},
+					},
+					CreatedTs: createdTs,
+				},
+				{
+					ID: model.DeviceID("0004"),
+					Attributes: model.DeviceAttributes{
+						{
+							Name:  "mac",
+							Value: "0004-mac",
+							Scope: model.AttrScopeInventory,
+						},
+					},
+					CreatedTs: createdTs,
+				},
+			},
+			outFilterAttributes: []model.FilterAttribute{
+				{
+					Name:  "mac",
+					Scope: model.AttrScopeInventory,
+					Count: 2,
+				},
+				{
+					Name:  "created_ts",
+					Scope: model.AttrScopeSystem,
+					Count: 2,
+				},
+				{
+					Name:  "updated_ts",
+					Scope: model.AttrScopeSystem,
+					Count: 2,
+				}, {
+					Name:  "sn",
+					Scope: model.AttrScopeInventory,
+					Count: 1,
+				},
+			},
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			// setup
+			db.Wipe()
+			s := db.Client()
+
+			var ctx context.Context
+			if tc.tenant != "" {
+				ctx = identity.WithContext(db.CTX(), &identity.Identity{
+					Tenant: tc.tenant,
+				})
+			} else {
+				ctx = identity.WithContext(db.CTX(), &identity.Identity{
+					Tenant: "",
+				})
+			}
+
+			// test
+			d := NewDataStoreMongoWithSession(s)
+			for _, dev := range tc.devs {
+				err := d.AddDevice(ctx, &dev)
+				assert.NoError(t, err, "failed to setup input data")
+			}
+
+			attributes, err := d.GetFiltersAttributes(ctx)
+			assert.NoError(t, err)
+			assert.Equal(t, tc.outFilterAttributes, attributes)
+		})
+	}
+}
+
 func TestMongoUpdateDeviceGroup(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping TestMongoUpdateDeviceGroup in short mode.")
