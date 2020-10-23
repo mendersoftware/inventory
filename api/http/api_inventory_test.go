@@ -2426,6 +2426,53 @@ func TestApiInventoryInternalDevicesStatus(t *testing.T) {
 	}
 }
 
+func TestApiInventoryFiltersAttributes(t *testing.T) {
+	testCases := map[string]struct {
+		attributes []model.FilterAttribute
+		err        error
+		httpCode   int
+	}{
+		"ok": {
+			attributes: []model.FilterAttribute{
+				{
+					Name:  "name",
+					Scope: "scope",
+					Count: 100,
+				},
+				{
+					Name:  "other_name",
+					Scope: "scope",
+					Count: 90,
+				},
+			},
+			httpCode: http.StatusOK,
+		},
+		"ko": {
+			err:      errors.New("error"),
+			httpCode: http.StatusInternalServerError,
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			inv := minventory.InventoryApp{}
+			inv.On("GetFiltersAttributes",
+				contextMatcher(),
+			).Return(tc.attributes, tc.err)
+
+			api := makeMockApiHandler(t, &inv)
+			req, _ := http.NewRequest("GET", "http://localhost"+urlFiltersAttributes, nil)
+			recorded := test.RunRequest(t, api, req)
+
+			recorded.CodeIs(tc.httpCode)
+			if tc.httpCode == http.StatusOK {
+				body, _ := json.Marshal(tc.attributes)
+				recorded.BodyIs(string(body))
+			}
+		})
+	}
+}
+
 func TestApiInventorySearchDevices(t *testing.T) {
 	t.Parallel()
 	rest.ErrorFieldName = "error"

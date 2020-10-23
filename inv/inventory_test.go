@@ -470,6 +470,54 @@ func TestReplaceAttributes(t *testing.T) {
 	}
 }
 
+func TestGetFiltersAttributes(t *testing.T) {
+	t.Parallel()
+
+	testCases := map[string]struct {
+		attributes []model.FilterAttribute
+		err        error
+		outErr     error
+	}{
+		"ok": {
+			attributes: []model.FilterAttribute{
+				{
+					Name:  "name",
+					Scope: "scope",
+					Count: 100,
+				},
+				{
+					Name:  "other_name",
+					Scope: "scope",
+					Count: 90,
+				},
+			},
+		},
+		"ko": {
+			err:    errors.New("error"),
+			outErr: errors.New("failed to get filter attributes from the db: error"),
+		},
+	}
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			ctx := context.Background()
+
+			db := &mstore.DataStore{}
+			db.On("GetFiltersAttributes",
+				ctx,
+			).Return(tc.attributes, tc.err)
+
+			i := invForTest(db)
+			attributes, err := i.GetFiltersAttributes(ctx)
+			assert.Equal(t, tc.attributes, attributes)
+			if tc.err != nil {
+				assert.EqualError(t, tc.outErr, err.Error())
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
 func TestInventoryUnsetDeviceGroup(t *testing.T) {
 	t.Parallel()
 

@@ -32,6 +32,33 @@ securityDefinitions:
       Format: 'Bearer [JWT]'
 
 paths:
+  /filters/attributes:
+    get:
+      operationId: Get filterable attributes
+      tags:
+        - Management API
+      security:
+        - ManagementJWT: []
+      summary: Get the list of filterable inventory attributes
+      description:  |
+        Returns a list of filterable inventory attributes.
+
+        The list is sorted in descending order by the count of occurrences of the
+        attribute in the inventory database, then in ascending order by scope and name.
+      responses:
+        200:
+          description: Successful response.
+          schema:
+            title: List of filter attributes
+            type: array
+            items:
+              $ref: '#/definitions/FilterAttribute'
+
+        500:
+          description: Internal error.
+          schema:
+            $ref: '#/definitions/Error'
+    
   /filters/search:
     post:
       operationId: Search Device Inventories
@@ -197,6 +224,28 @@ definitions:
     example:
       error: "failed to decode device group data: JSON payload is empty"
       request_id: "f7881e82-0492-49fb-b459-795654e7188a"
+
+  FilterAttribute:
+    description: Filterable attribute
+    type: object
+    required:
+      - scope
+      - name
+      - count
+    properties:
+      scope:
+        type: string
+        description: Scope of the attribute.
+      name:
+        type: string
+        description: Name of the attribute.
+      count:
+        type: integer
+        description: Number of occurrences of the attribute in the database.
+    example:
+      attribute: "serial_no"
+      name: "inventory"
+      count: 10
 
   FilterPredicate:
     description: Attribute filter predicate

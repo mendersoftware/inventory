@@ -33,6 +33,7 @@ type InventoryApp interface {
 	AddDevice(ctx context.Context, d *model.Device) error
 	UpsertAttributes(ctx context.Context, id model.DeviceID, attrs model.DeviceAttributes) error
 	ReplaceAttributes(ctx context.Context, id model.DeviceID, upsertAttrs model.DeviceAttributes, scope string) error
+	GetFiltersAttributes(ctx context.Context) ([]model.FilterAttribute, error)
 	UpsertDevicesAttributes(
 		ctx context.Context,
 		ids []model.DeviceID,
@@ -158,6 +159,14 @@ func (i *inventory) ReplaceAttributes(ctx context.Context, id model.DeviceID, up
 		return errors.Wrap(err, "failed to replace attributes in db")
 	}
 	return nil
+}
+
+func (i *inventory) GetFiltersAttributes(ctx context.Context) ([]model.FilterAttribute, error) {
+	attributes, err := i.db.GetFiltersAttributes(ctx)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get filter attributes from the db")
+	}
+	return attributes, nil
 }
 
 func (i *inventory) UpsertDevicesAttributes(

@@ -55,6 +55,8 @@ const (
 		DbDevAttributesValue
 
 	DbScopeInventory = "inventory"
+
+	FiltersAttributesLimit = 500
 )
 
 var (
@@ -533,6 +535,73 @@ func (db *DataStoreMongo) UpdateDevicesGroup(
 		MatchedCount: res.MatchedCount,
 		UpdatedCount: res.ModifiedCount,
 	}, nil
+}
+
+func (db *DataStoreMongo) GetFiltersAttributes(ctx context.Context) ([]model.FilterAttribute, error) {
+	database := db.client.Database(mstore.DbFromContext(ctx, DbName))
+	collDevs := database.Collection(DbDevicesColl)
+
+	const DbCount = "count"
+
+	cur, err := collDevs.Aggregate(ctx, []bson.M{
+		{
+			"$project": bson.M{
+				"attributes": bson.M{
+					"$objectToArray": "$" + DbDevAttributes,
+				},
+			},
+		},
+		{
+			"$unwind": "$" + DbDevAttributes,
+		},
+		{
+			"$project": bson.M{
+				DbDevAttributesName:  "$" + DbDevAttributes + ".v." + DbDevAttributesName,
+				DbDevAttributesScope: "$" + DbDevAttributes + ".v." + DbDevAttributesScope,
+			},
+		},
+		{
+			"$group": bson.M{
+				DbDevId: bson.M{
+					DbDevAttributesName:  "$" + DbDevAttributesName,
+					DbDevAttributesScope: "$" + DbDevAttributesScope,
+				},
+				DbCount: bson.M{
+					"$sum": 1,
+				},
+			},
+		},
+		{
+			"$project": bson.M{
+				DbDevId:              0,
+				DbDevAttributesName:  "$" + DbDevId + "." + DbDevAttributesName,
+				DbDevAttributesScope: "$" + DbDevId + "." + DbDevAttributesScope,
+				DbCount:              "$" + DbCount,
+			},
+		},
+		{
+			"$sort": bson.D{
+				{Key: DbCount, Value: -1},
+				{Key: DbDevAttributesScope, Value: 1},
+				{Key: DbDevAttributesName, Value: 1},
+			},
+		},
+		{
+			"$limit": FiltersAttributesLimit,
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+	defer cur.Close(ctx)
+
+	var attributes []model.FilterAttribute
+	err = cur.All(ctx, &attributes)
+	if err != nil {
+		return nil, err
+	}
+
+	return attributes, nil
 }
 
 func (db *DataStoreMongo) UnsetDevicesGroup(
