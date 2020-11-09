@@ -131,18 +131,20 @@ paths:
           description: New status to set for the specified devices.
           required: true
           type: string
-        - name: device_ids
+        - name: devices
           in: body
-          description: List of device ID.
+          description: List of devices.
           required: true
           schema:
             type: array
             items:
-              type: string
-            description: A list of device ID.
+              $ref: '#/definitions/DeviceUpdate'
+            description: A list of devices to update.
             example:
-              - "ff8f7099-d842-42f2-9d5b-46a9ad13f90a"
-              - "80f3ad8f-40f2-429a-8931-b47cebbbe9b3"
+              - id: "ff8f7099-d842-42f2-9d5b-46a9ad13f90a"
+                revision: 3
+              - id: "80f3ad8f-40f2-429a-8931-b47cebbbe9b3"
+                revision: 5
       produces:
         - application/json
       responses:
@@ -272,3 +274,17 @@ definitions:
       name: "ip_addr_eth"
       description: "Device IP address on ethernet interface"
       value: "127.0.0.1"
+  DeviceUpdate:
+    description: Object containing device id and device revision of the device to update.
+    type: object
+    required:
+      - id
+      - revision
+    properties:
+      id:
+        type: string
+        description: Device identifier.
+      revision:
+        type: number
+        format: integer
+        description: Device object revision.
