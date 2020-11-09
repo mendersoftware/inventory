@@ -938,7 +938,6 @@ func TestMongoUpsertDevicesAttributes(t *testing.T) {
 				CreatedTs: createdTs,
 			}},
 		},
-
 		"dev exists, attributes exist, update one attr (descr only)": {
 			devs: []model.Device{
 				{
@@ -4260,4 +4259,258 @@ func TestWithAutomigrate(t *testing.T) {
 	newStore := store.WithAutomigrate()
 
 	assert.NotEqual(t, store, newStore)
+}
+
+func TestMongoUpsertDevicesAttributesWithRevision(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping TestMongoUpsertDevicesAttributesWithRevision in short mode.")
+	}
+
+	//single create timestamp for all inserted devs
+	createdTs := time.Now()
+
+	testCases := map[string]struct {
+		devs []model.Device
+
+		inDevs  []model.DeviceUpdate
+		inAttrs model.DeviceAttributes
+
+		tenant string
+
+		outDevs []model.Device
+		err     error
+	}{
+		"dev exists, attributes exist, update both attrs (descr + val)": {
+			devs: []model.Device{
+				{
+					ID: model.DeviceID("0003"),
+					Attributes: model.DeviceAttributes{
+						{
+							Name:        "mac",
+							Value:       "0003-mac",
+							Description: strPtr("descr"),
+							Scope:       model.AttrScopeInventory,
+						},
+						{
+							Name:        "sn",
+							Value:       "0003-sn",
+							Description: strPtr("descr"),
+							Scope:       model.AttrScopeInventory,
+						},
+					},
+					CreatedTs: createdTs,
+				},
+			},
+			inDevs: []model.DeviceUpdate{{Id: model.DeviceID("0003"), Revision: 1}},
+			inAttrs: model.DeviceAttributes{
+				{
+					Description: strPtr("mac description"),
+					Scope:       model.AttrScopeInventory,
+					Name:        "mac",
+					Value:       "0003-newmac",
+				},
+				{
+					Description: strPtr("sn description"),
+					Scope:       model.AttrScopeInventory,
+					Name:        "sn",
+					Value:       "0003-newsn",
+				},
+			},
+
+			outDevs: []model.Device{
+				{
+					ID: model.DeviceID("0003"),
+					Attributes: model.DeviceAttributes{
+						{
+							Description: strPtr("mac description"),
+							Scope:       model.AttrScopeInventory,
+							Name:        "mac",
+							Value:       "0003-newmac",
+						},
+						{
+							Description: strPtr("sn description"),
+							Scope:       model.AttrScopeInventory,
+							Name:        "sn",
+							Value:       "0003-newsn",
+						},
+					},
+					CreatedTs: createdTs,
+				},
+			},
+		},
+		"dev exists, attributes exist, same revision": {
+			devs: []model.Device{
+				{
+					ID: model.DeviceID("0003"),
+					Attributes: model.DeviceAttributes{
+						{
+							Name:        "mac",
+							Value:       "0003-mac",
+							Description: strPtr("descr"),
+							Scope:       model.AttrScopeInventory,
+						},
+						{
+							Name:        "sn",
+							Value:       "0003-sn",
+							Description: strPtr("descr"),
+							Scope:       model.AttrScopeInventory,
+						},
+					},
+					CreatedTs: createdTs,
+				},
+			},
+			inDevs: []model.DeviceUpdate{{Id: model.DeviceID("0003"), Revision: 0}},
+			inAttrs: model.DeviceAttributes{
+				{
+					Description: strPtr("mac description"),
+					Scope:       model.AttrScopeInventory,
+					Name:        "mac",
+					Value:       "0003-newmac",
+				},
+				{
+					Description: strPtr("sn description"),
+					Scope:       model.AttrScopeInventory,
+					Name:        "sn",
+					Value:       "0003-newsn",
+				},
+			},
+
+			outDevs: []model.Device{
+				{
+					ID: model.DeviceID("0003"),
+					Attributes: model.DeviceAttributes{
+						{
+							Name:        "mac",
+							Value:       "0003-mac",
+							Description: strPtr("descr"),
+							Scope:       model.AttrScopeInventory,
+						},
+						{
+							Name:        "sn",
+							Value:       "0003-sn",
+							Description: strPtr("descr"),
+							Scope:       model.AttrScopeInventory,
+						},
+					},
+					CreatedTs: createdTs,
+				},
+			},
+		},
+		"Update multiple device attributes": {
+			devs: []model.Device{{
+				ID:        model.DeviceID("0003"),
+				CreatedTs: createdTs,
+			}, {
+				ID: model.DeviceID("0004"),
+				Attributes: model.DeviceAttributes{{
+					Scope: model.AttrScopeInventory,
+					Name:  "Artifact name",
+					Value: "acmeware2.0",
+				}},
+				CreatedTs: createdTs,
+			}},
+			inDevs: []model.DeviceUpdate{
+				{Id: model.DeviceID("0003"), Revision: 1},
+				{Id: model.DeviceID("0004"), Revision: 0},
+				{Id: model.DeviceID("0005"), Revision: 1},
+			},
+			inAttrs: model.DeviceAttributes{{
+				Scope:       model.AttrScopeIdentity,
+				Name:        "status",
+				Value:       "accepted",
+				Description: strPtr("deviceauth status"),
+			}},
+			outDevs: []model.Device{{
+				ID: model.DeviceID("0003"),
+				Attributes: model.DeviceAttributes{{
+					Scope:       model.AttrScopeIdentity,
+					Name:        "status",
+					Value:       "accepted",
+					Description: strPtr("deviceauth status"),
+				}},
+				CreatedTs: createdTs,
+			}, {
+				ID: model.DeviceID("0004"),
+				Attributes: model.DeviceAttributes{{
+					Scope: model.AttrScopeInventory,
+					Name:  "Artifact name",
+					Value: "acmeware2.0",
+				}},
+				CreatedTs: createdTs,
+			}, {
+				ID: model.DeviceID("0005"),
+				Attributes: model.DeviceAttributes{{
+					Scope:       model.AttrScopeIdentity,
+					Name:        "status",
+					Value:       "accepted",
+					Description: strPtr("deviceauth status"),
+				}},
+			}},
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			//setup
+			db.Wipe()
+
+			s := db.Client()
+
+			var ctx context.Context
+			if tc.tenant != "" {
+				ctx = identity.WithContext(db.CTX(), &identity.Identity{
+					Tenant: tc.tenant,
+				})
+			} else {
+				ctx = identity.WithContext(db.CTX(), &identity.Identity{
+					Tenant: "",
+				})
+			}
+
+			//test
+			d := NewDataStoreMongoWithSession(s)
+			for _, dev := range tc.devs {
+				err := d.AddDevice(ctx, &dev)
+				assert.NoError(t, err, "failed to setup input data")
+			}
+
+			_, err := d.UpsertDevicesAttributesWithRevision(ctx, tc.inDevs, tc.inAttrs)
+			if tc.err != nil {
+				assert.EqualError(t, err, tc.err.Error())
+			} else {
+				assert.NoError(t, err, "UpsertDevicesAttributesWithRevision failed")
+			}
+
+			//get the device back
+			var devs []model.Device
+			cur, err := s.Database(DbName).
+				Collection(DbDevicesColl).
+				Find(
+					nil,
+					bson.M{},
+					mopts.Find().SetSort(bson.M{"_id": 1}),
+				)
+			if err == nil {
+				err = cur.All(nil, &devs)
+			}
+			if !assert.NoError(t, err) {
+				t.FailNow()
+			}
+
+			if assert.Len(t, devs, len(tc.outDevs)) {
+				for i, dev := range tc.outDevs {
+					assert.Equal(t, dev.ID, devs[i].ID)
+					compareDevsWithoutTimestamps(t, &dev, &devs[i])
+					// check timestamp validity
+					// note that mongo stores time with lower
+					// precision- custom comparison
+					assert.Condition(t,
+						func() bool {
+							return devs[i].UpdatedTs.After(dev.CreatedTs) ||
+								devs[i].UpdatedTs == dev.CreatedTs
+						})
+				}
+			}
+		})
+	}
 }

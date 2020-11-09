@@ -379,6 +379,29 @@ func (_m *DataStore) UpdateDevicesGroup(ctx context.Context, devIDs []model.Devi
 	return r0, r1
 }
 
+// UpsertDevicesAttributesWithRevision provides a mock function with given fields: ctx, ids, attrs
+func (_m *DataStore) UpsertDevicesAttributesWithRevision(ctx context.Context, ids []model.DeviceUpdate, attrs model.DeviceAttributes) (*model.UpdateResult, error) {
+	ret := _m.Called(ctx, ids, attrs)
+
+	var r0 *model.UpdateResult
+	if rf, ok := ret.Get(0).(func(context.Context, []model.DeviceUpdate, model.DeviceAttributes) *model.UpdateResult); ok {
+		r0 = rf(ctx, ids, attrs)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*model.UpdateResult)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, []model.DeviceUpdate, model.DeviceAttributes) error); ok {
+		r1 = rf(ctx, ids, attrs)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // UpsertDevicesAttributes provides a mock function with given fields: ctx, ids, attrs
 func (_m *DataStore) UpsertDevicesAttributes(ctx context.Context, ids []model.DeviceID, attrs model.DeviceAttributes) (*model.UpdateResult, error) {
 	ret := _m.Called(ctx, ids, attrs)

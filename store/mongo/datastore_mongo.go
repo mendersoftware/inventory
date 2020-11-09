@@ -45,6 +45,7 @@ const (
 	DbDevId              = "_id"
 	DbDevAttributes      = "attributes"
 	DbDevGroup           = "group"
+	DbDevRevision        = "revision"
 	DbDevAttributesDesc  = "description"
 	DbDevAttributesValue = "value"
 	DbDevAttributesScope = "scope"
@@ -276,16 +277,42 @@ func (db *DataStoreMongo) AddDevice(ctx context.Context, dev *model.Device) erro
 	return nil
 }
 
+func (db *DataStoreMongo) UpsertDevicesAttributesWithRevision(
+	ctx context.Context,
+	devices []model.DeviceUpdate,
+	attrs model.DeviceAttributes,
+) (*model.UpdateResult, error) {
+	return db.upsertAttributes(ctx, devices, attrs, true)
+}
+
 func (db *DataStoreMongo) UpsertDevicesAttributes(
 	ctx context.Context,
 	ids []model.DeviceID,
 	attrs model.DeviceAttributes,
+) (*model.UpdateResult, error) {
+	return db.upsertAttributes(ctx, makeDevsWithIds(ids), attrs, false)
+}
+
+func makeDevsWithIds(ids []model.DeviceID) []model.DeviceUpdate {
+	devices := make([]model.DeviceUpdate, len(ids))
+	for i, id := range ids {
+		devices[i].Id = id
+	}
+	return devices
+}
+
+func (db *DataStoreMongo) upsertAttributes(
+	ctx context.Context,
+	devices []model.DeviceUpdate,
+	attrs model.DeviceAttributes,
+	withRevision bool,
 ) (*model.UpdateResult, error) {
 	const systemScope = DbDevAttributes + "." + model.AttrScopeSystem
 	const updatedField = systemScope + "-" + model.AttrNameUpdated
 	const createdField = systemScope + "-" + model.AttrNameCreated
 	var (
 		result *model.UpdateResult
+		filter interface{}
 		err    error
 	)
 
@@ -303,24 +330,57 @@ func (db *DataStoreMongo) UpsertDevicesAttributes(
 		Name:  model.AttrNameUpdated,
 		Value: now,
 	}
-	update = bson.M{
-		"$set": update,
-		"$setOnInsert": bson.M{
-			createdField: model.DeviceAttribute{
-				Scope: model.AttrScopeSystem,
-				Name:  model.AttrNameCreated,
-				Value: now,
-			},
-		},
-	}
 
-	switch len(ids) {
+	switch len(devices) {
 	case 0:
 		return &model.UpdateResult{}, nil
 	case 1:
 		var res *mongo.UpdateResult
-		filter := map[string]interface{}{"_id": ids[0]}
+		if withRevision {
+			filter = bson.D{
+				{Key: "$and", Value: []bson.M{
+					{
+						"_id": devices[0].Id,
+					},
+					{
+						DbDevRevision: bson.M{
+							"$lt": devices[0].Revision},
+					},
+				}},
+			}
+			update[DbDevRevision] = devices[0].Revision
+			update = bson.M{
+				"$set": update,
+				"$setOnInsert": bson.M{
+					createdField: model.DeviceAttribute{
+						Scope: model.AttrScopeSystem,
+						Name:  model.AttrNameCreated,
+						Value: now,
+					},
+				},
+			}
+		} else {
+			filter = map[string]interface{}{"_id": devices[0].Id}
+			update = bson.M{
+				"$set": update,
+				"$setOnInsert": bson.M{
+					createdField: model.DeviceAttribute{
+						Scope: model.AttrScopeSystem,
+						Name:  model.AttrNameCreated,
+						Value: now,
+					},
+					DbDevRevision: 0,
+				},
+			}
+		}
 		res, err = c.UpdateOne(ctx, filter, update, mopts.Update().SetUpsert(true))
+		if err != nil {
+			if strings.Contains(err.Error(), "duplicate key error") {
+				return &model.UpdateResult{}, nil
+			} else {
+				return nil, err
+			}
+		}
 		result = &model.UpdateResult{
 			MatchedCount: res.MatchedCount,
 			CreatedCount: res.UpsertedCount,
@@ -330,17 +390,61 @@ func (db *DataStoreMongo) UpsertDevicesAttributes(
 		// Perform single bulk-write operation
 		// NOTE: Can't use UpdateMany as $in query operator does not
 		//       upsert missing devices.
-		models := make([]mongo.WriteModel, len(ids))
-		for i, id := range ids {
+
+		models := make([]mongo.WriteModel, len(devices))
+		for i, dev := range devices {
 			umod := mongo.NewUpdateOneModel()
-			umod.Filter = bson.M{"_id": id}
+			if withRevision {
+				filter = bson.D{
+					{Key: "$and", Value: []bson.M{
+						{
+							"_id": dev.Id,
+						},
+						{
+							DbDevRevision: bson.M{
+								"$lt": dev.Revision},
+						},
+					}},
+				}
+				update[DbDevRevision] = dev.Revision
+				umod.Update = bson.M{
+					"$set": update,
+					"$setOnInsert": bson.M{
+						createdField: model.DeviceAttribute{
+							Scope: model.AttrScopeSystem,
+							Name:  model.AttrNameCreated,
+							Value: now,
+						},
+					},
+				}
+			} else {
+				filter = map[string]interface{}{"_id": dev.Id}
+				umod.Update = bson.M{
+					"$set": update,
+					"$setOnInsert": bson.M{
+						createdField: model.DeviceAttribute{
+							Scope: model.AttrScopeSystem,
+							Name:  model.AttrNameCreated,
+							Value: now,
+						},
+						DbDevRevision: 0,
+					},
+				}
+			}
+			umod.Filter = filter
 			umod.SetUpsert(true)
-			umod.Update = update
 			models[i] = umod
 		}
 		bres, err = c.BulkWrite(
 			ctx, models, mopts.BulkWrite().SetOrdered(false),
 		)
+		if err != nil {
+			if strings.Contains(err.Error(), "duplicate key error") {
+				return &model.UpdateResult{}, nil
+			} else {
+				return nil, err
+			}
+		}
 		result = &model.UpdateResult{
 			MatchedCount: bres.MatchedCount,
 			CreatedCount: bres.UpsertedCount,
