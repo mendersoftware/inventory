@@ -137,6 +137,9 @@ type Device struct {
 	CreatedTs time.Time `json:"-" bson:"created_ts,omitempty"`
 	//Timestamp of the last attribute update.
 	UpdatedTs time.Time `json:"updated_ts" bson:"updated_ts,omitempty"`
+
+	//device object revision
+	Revision uint `json:"-" bson:"revision,omitempty"`
 }
 
 // internalDevice is only used internally to avoid recursive type-loops for
@@ -287,4 +290,9 @@ func (d DeviceAttributes) MarshalBSONValue() (bsontype.Type, []byte, error) {
 		attrs[i].Value = &attr
 	}
 	return bson.MarshalValue(attrs)
+}
+
+type DeviceUpdate struct {
+	Id       DeviceID `json:"id"`
+	Revision uint     `json:"revision"`
 }
