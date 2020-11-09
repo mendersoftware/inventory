@@ -847,8 +847,8 @@ func (i *inventoryHandlers) InternalDevicesStatusHandler(w rest.ResponseWriter, 
 		StatusNoAuth         = "noauth"
 	)
 	var (
-		ids    []model.DeviceID
-		result *model.UpdateResult
+		devices []model.DeviceUpdate
+		result  *model.UpdateResult
 	)
 
 	ctx := r.Context()
@@ -859,9 +859,9 @@ func (i *inventoryHandlers) InternalDevicesStatusHandler(w rest.ResponseWriter, 
 
 	status := r.PathParam("status")
 
-	err := r.DecodeJsonPayload(&ids)
+	err := r.DecodeJsonPayload(&devices)
 	if err != nil {
-		u.RestErrWithLog(w, r, l, errors.Wrap(err, "cant parse device ids"), http.StatusBadRequest)
+		u.RestErrWithLog(w, r, l, errors.Wrap(err, "cant parse devices"), http.StatusBadRequest)
 		return
 	}
 
@@ -875,11 +875,10 @@ func (i *inventoryHandlers) InternalDevicesStatusHandler(w rest.ResponseWriter, 
 			Scope: model.AttrScopeIdentity,
 			Value: status,
 		}}
-		result, err = i.inventory.UpsertDevicesAttributes(ctx, ids, attrs)
-
+		result, err = i.inventory.UpsertDevicesStatuses(ctx, devices, attrs)
 	case StatusDecommissioned:
 		// Delete Inventory
-		result, err = i.inventory.DeleteDevices(ctx, ids)
+		result, err = i.inventory.DeleteDevices(ctx, getIdsFromDevices(devices))
 	default:
 		// Unrecognized status
 		u.RestErrWithLog(w, r, l,
@@ -895,6 +894,14 @@ func (i *inventoryHandlers) InternalDevicesStatusHandler(w rest.ResponseWriter, 
 
 	w.WriteHeader(http.StatusOK)
 	w.WriteJson(result)
+}
+
+func getIdsFromDevices(devices []model.DeviceUpdate) []model.DeviceID {
+	ids := make([]model.DeviceID, len(devices))
+	for i, dev := range devices {
+		ids[i] = dev.Id
+	}
+	return ids
 }
 
 func parseSearchParams(r *rest.Request) (*model.SearchParams, error) {

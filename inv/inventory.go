@@ -39,6 +39,11 @@ type InventoryApp interface {
 		ids []model.DeviceID,
 		attrs model.DeviceAttributes,
 	) (*model.UpdateResult, error)
+	UpsertDevicesStatuses(
+		ctx context.Context,
+		devices []model.DeviceUpdate,
+		attrs model.DeviceAttributes,
+	) (*model.UpdateResult, error)
 	UnsetDeviceGroup(ctx context.Context, id model.DeviceID, groupName model.GroupName) error
 	UnsetDevicesGroup(
 		ctx context.Context,
@@ -175,6 +180,14 @@ func (i *inventory) UpsertDevicesAttributes(
 	attrs model.DeviceAttributes,
 ) (*model.UpdateResult, error) {
 	return i.db.UpsertDevicesAttributes(ctx, ids, attrs)
+}
+
+func (i *inventory) UpsertDevicesStatuses(
+	ctx context.Context,
+	devices []model.DeviceUpdate,
+	attrs model.DeviceAttributes,
+) (*model.UpdateResult, error) {
+	return i.db.UpsertDevicesAttributesWithRevision(ctx, devices, attrs)
 }
 
 func (i *inventory) UnsetDevicesGroup(

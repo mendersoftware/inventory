@@ -2227,11 +2227,12 @@ func TestApiInventoryInternalDevicesStatus(t *testing.T) {
 	acceptedStatus := "accepted"
 
 	testCases := map[string]struct {
-		// Let intputDeviceIDs be interface{} type in order to allow
+		// Let intputDevices be interface{} type in order to allow
 		// passing illegal request body values.
-		inputDeviceIDs interface{}
-		tenantID       string
-		status         string
+		//inputDevices []model.DeviceUpdate
+		inputDevices interface{}
+		tenantID     string
+		status       string
 		*model.UpdateResult
 
 		callsInventory bool
@@ -2240,10 +2241,10 @@ func TestApiInventoryInternalDevicesStatus(t *testing.T) {
 		resp utils.JSONResponseParams
 	}{
 		"ok": {
-			inputDeviceIDs: []model.DeviceID{
-				model.DeviceID(oid.NewUUIDv5("1").String()),
-				model.DeviceID(oid.NewUUIDv5("2").String()),
-				model.DeviceID(oid.NewUUIDv5("3").String()),
+			inputDevices: []model.DeviceUpdate{
+				{Id: model.DeviceID(oid.NewUUIDv5("1").String()), Revision: 1},
+				{Id: model.DeviceID(oid.NewUUIDv5("2").String()), Revision: 1},
+				{Id: model.DeviceID(oid.NewUUIDv5("3").String()), Revision: 1},
 			},
 			tenantID: tenantId,
 			status:   acceptedStatus,
@@ -2261,10 +2262,10 @@ func TestApiInventoryInternalDevicesStatus(t *testing.T) {
 			callsInventory: true,
 		},
 		"ok, noauth": {
-			inputDeviceIDs: []model.DeviceID{
-				model.DeviceID(oid.NewUUIDv5("1").String()),
-				model.DeviceID(oid.NewUUIDv5("2").String()),
-				model.DeviceID(oid.NewUUIDv5("3").String()),
+			inputDevices: []model.DeviceUpdate{
+				{Id: model.DeviceID(oid.NewUUIDv5("1").String()), Revision: 1},
+				{Id: model.DeviceID(oid.NewUUIDv5("2").String()), Revision: 1},
+				{Id: model.DeviceID(oid.NewUUIDv5("3").String()), Revision: 1},
 			},
 			tenantID: tenantId,
 			status:   "noauth",
@@ -2283,9 +2284,9 @@ func TestApiInventoryInternalDevicesStatus(t *testing.T) {
 		},
 
 		"ok single tenant": {
-			inputDeviceIDs: []model.DeviceID{
-				model.DeviceID(oid.NewUUIDv5("1").String()),
-				model.DeviceID(oid.NewUUIDv5("2").String()),
+			inputDevices: []model.DeviceUpdate{
+				{Id: model.DeviceID(oid.NewUUIDv5("1").String()), Revision: 1},
+				{Id: model.DeviceID(oid.NewUUIDv5("2").String()), Revision: 1},
 			},
 			tenantID: emptyTenant,
 			status:   acceptedStatus,
@@ -2302,52 +2303,32 @@ func TestApiInventoryInternalDevicesStatus(t *testing.T) {
 			},
 			callsInventory: true,
 		},
-
-		"ok, decommissioned": {
-			inputDeviceIDs: []model.DeviceID{
-				model.DeviceID(oid.NewUUIDv5("1").String()),
-				model.DeviceID(oid.NewUUIDv5("2").String()),
-			},
-			tenantID: emptyTenant,
-			status:   "decommissioned",
-			UpdateResult: &model.UpdateResult{
-				DeletedCount: 2,
-			},
-			resp: utils.JSONResponseParams{
-				OutputStatus: http.StatusOK,
-				OutputBodyObject: &model.UpdateResult{
-					DeletedCount: 2,
-				},
-			},
-			callsInventory: true,
-		},
-
 		"error, payload empty": {
-			tenantID:       tenantId,
-			status:         acceptedStatus,
-			inputDeviceIDs: nil,
+			tenantID:     tenantId,
+			status:       acceptedStatus,
+			inputDevices: nil,
 			resp: utils.JSONResponseParams{
 				OutputStatus:     http.StatusBadRequest,
-				OutputBodyObject: RestError("cant parse device ids: JSON payload is empty"),
+				OutputBodyObject: RestError("cant parse devices: JSON payload is empty"),
 			},
 			callsInventory: false,
 		},
 
 		"error, payload not expected": {
-			inputDeviceIDs: "sneaky wool carpet",
-			tenantID:       tenantId,
-			status:         acceptedStatus,
+			inputDevices: "sneaky wool carpet",
+			tenantID:     tenantId,
+			status:       acceptedStatus,
 			resp: utils.JSONResponseParams{
 				OutputStatus:     http.StatusBadRequest,
-				OutputBodyObject: RestError("cant parse device ids: json: cannot unmarshal string into Go value of type []model.DeviceID"),
+				OutputBodyObject: RestError("cant parse devices: json: cannot unmarshal string into Go value of type []model.DeviceUpdate"),
 			},
 			callsInventory: false,
 		},
 
 		"error, bad status": {
-			inputDeviceIDs: []model.DeviceID{
-				model.DeviceID(oid.NewUUIDv5("1").String()),
-				model.DeviceID(oid.NewUUIDv5("2").String()),
+			inputDevices: []model.DeviceUpdate{
+				{Id: model.DeviceID(oid.NewUUIDv5("1").String()), Revision: 1},
+				{Id: model.DeviceID(oid.NewUUIDv5("2").String()), Revision: 1},
 			},
 			tenantID: emptyTenant,
 			status:   "quo",
@@ -2363,9 +2344,9 @@ func TestApiInventoryInternalDevicesStatus(t *testing.T) {
 		},
 
 		"error, db Upsert failed": {
-			inputDeviceIDs: []model.DeviceID{
-				model.DeviceID(oid.NewUUIDv5("1").String()),
-				model.DeviceID(oid.NewUUIDv5("2").String()),
+			inputDevices: []model.DeviceUpdate{
+				{Id: model.DeviceID(oid.NewUUIDv5("1").String()), Revision: 1},
+				{Id: model.DeviceID(oid.NewUUIDv5("2").String()), Revision: 1},
 			},
 			tenantID:     tenantId,
 			status:       acceptedStatus,
@@ -2384,7 +2365,7 @@ func TestApiInventoryInternalDevicesStatus(t *testing.T) {
 				inReq = test.MakeSimpleRequest("POST",
 					"http://1.2.3.4/api/internal/v1/inventory/tenants/"+
 						tc.tenantID+"/devices/"+tc.status,
-					tc.inputDeviceIDs,
+					tc.inputDevices,
 				)
 				deviceAttributes = model.DeviceAttributes{{
 					Name:  "status",
@@ -2400,9 +2381,9 @@ func TestApiInventoryInternalDevicesStatus(t *testing.T) {
 				switch tc.status {
 				case "accepted", "preauthorized", "pending", "noauth":
 					// Update statuses
-					inv.On("UpsertDevicesAttributes",
+					inv.On("UpsertDevicesStatuses",
 						ctx,
-						tc.inputDeviceIDs,
+						tc.inputDevices,
 						deviceAttributes,
 					).Return(tc.UpdateResult, tc.inventoryErr)
 
@@ -2410,7 +2391,7 @@ func TestApiInventoryInternalDevicesStatus(t *testing.T) {
 					// Delete Inventory
 					inv.On("DeleteDevices",
 						ctx,
-						tc.inputDeviceIDs,
+						getIdsFromDevices(tc.inputDevices.([]model.DeviceUpdate)),
 					).Return(tc.UpdateResult, tc.inventoryErr)
 				}
 			}
