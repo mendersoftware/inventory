@@ -66,6 +66,13 @@ type DataStore interface {
 	// are created, existing are overwritten; the device resource is also
 	// created if necessary
 	UpsertRemoveDeviceAttributes(ctx context.Context, id model.DeviceID, updateAttrs model.DeviceAttributes, removeAttrs model.DeviceAttributes) (*model.UpdateResult, error)
+	// UpsertDevicesAttributesWithRevision upserts attributes for devices in the same way
+	// UpsertDevicesAttributes does.
+	// The only difference between this method and UpsertDevicesAttributes
+	// method is that this method takes into accout device object revision
+	// and upserts attributes only if the recorded object has revision lower than
+	// the revision provided with the update.
+	UpsertDevicesAttributesWithRevision(ctx context.Context, ids []model.DeviceUpdate, attrs model.DeviceAttributes) (*model.UpdateResult, error)
 
 	// GetFiltersAttributes returns the attributes which can be used
 	// in filters
