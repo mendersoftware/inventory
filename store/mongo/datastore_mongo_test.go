@@ -4514,3 +4514,157 @@ func TestMongoUpsertDevicesAttributesWithRevision(t *testing.T) {
 		})
 	}
 }
+
+// check if the devices without revision field will also be updated
+func TestMongoUpsertOldDevicesAttributesWithRevision(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping TestMongoUpsertOldDevicesAttributesWithRevision in short mode.")
+	}
+
+	//single create timestamp for all inserted devs
+	createdTs := time.Now()
+
+	type DevWithoutRevision struct {
+		ID         model.DeviceID         `json:"id" bson:"_id,omitempty"`
+		Attributes model.DeviceAttributes `json:"attributes,omitempty" bson:"attributes,omitempty"`
+		Group      model.GroupName        `json:"-" bson:"group,omitempty"`
+		CreatedTs  time.Time              `json:"-" bson:"created_ts,omitempty"`
+		UpdatedTs  time.Time              `json:"updated_ts" bson:"updated_ts,omitempty"`
+	}
+
+	testCases := map[string]struct {
+		devs []DevWithoutRevision
+
+		inDevs  []model.DeviceUpdate
+		inAttrs model.DeviceAttributes
+
+		tenant string
+
+		outDevs []model.Device
+		err     error
+	}{
+		"dev exists, attributes exist, update both attrs (descr + val)": {
+			devs: []DevWithoutRevision{
+				{
+					ID: model.DeviceID("0003"),
+					Attributes: model.DeviceAttributes{
+						{
+							Name:        "mac",
+							Value:       "0003-mac",
+							Description: strPtr("descr"),
+							Scope:       model.AttrScopeInventory,
+						},
+						{
+							Name:        "sn",
+							Value:       "0003-sn",
+							Description: strPtr("descr"),
+							Scope:       model.AttrScopeInventory,
+						},
+					},
+					CreatedTs: createdTs,
+				},
+			},
+			inDevs: []model.DeviceUpdate{{Id: model.DeviceID("0003"), Revision: 1}},
+			inAttrs: model.DeviceAttributes{
+				{
+					Description: strPtr("mac description"),
+					Scope:       model.AttrScopeInventory,
+					Name:        "mac",
+					Value:       "0003-newmac",
+				},
+				{
+					Description: strPtr("sn description"),
+					Scope:       model.AttrScopeInventory,
+					Name:        "sn",
+					Value:       "0003-newsn",
+				},
+			},
+
+			outDevs: []model.Device{
+				{
+					ID: model.DeviceID("0003"),
+					Attributes: model.DeviceAttributes{
+						{
+							Description: strPtr("mac description"),
+							Scope:       model.AttrScopeInventory,
+							Name:        "mac",
+							Value:       "0003-newmac",
+						},
+						{
+							Description: strPtr("sn description"),
+							Scope:       model.AttrScopeInventory,
+							Name:        "sn",
+							Value:       "0003-newsn",
+						},
+					},
+					CreatedTs: createdTs,
+				},
+			},
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			//setup
+			db.Wipe()
+
+			s := db.Client()
+
+			var ctx context.Context
+			if tc.tenant != "" {
+				ctx = identity.WithContext(db.CTX(), &identity.Identity{
+					Tenant: tc.tenant,
+				})
+			} else {
+				ctx = identity.WithContext(db.CTX(), &identity.Identity{
+					Tenant: "",
+				})
+			}
+
+			//test
+			d := NewDataStoreMongoWithSession(s)
+			for _, dev := range tc.devs {
+				_, err := s.Database(DbName).Collection(DbDevicesColl).InsertOne(ctx, dev)
+				assert.NoError(t, err, "failed to setup input data")
+			}
+
+			_, err := d.UpsertDevicesAttributesWithRevision(ctx, tc.inDevs, tc.inAttrs)
+			if tc.err != nil {
+				assert.EqualError(t, err, tc.err.Error())
+			} else {
+				assert.NoError(t, err, "UpsertDevicesAttributesWithRevision failed")
+			}
+
+			//get the device back
+			var devs []model.Device
+			cur, err := s.Database(DbName).
+				Collection(DbDevicesColl).
+				Find(
+					nil,
+					bson.M{},
+					mopts.Find().SetSort(bson.M{"_id": 1}),
+				)
+			if err == nil {
+				err = cur.All(nil, &devs)
+			}
+			if !assert.NoError(t, err) {
+				t.FailNow()
+			}
+
+			if assert.Len(t, devs, len(tc.outDevs)) {
+				for i, dev := range tc.outDevs {
+					assert.Equal(t, dev.ID, devs[i].ID)
+					compareDevsWithoutTimestamps(t, &dev, &devs[i])
+					// check timestamp validity
+					// note that mongo stores time with lower
+					// precision- custom comparison
+					assert.Condition(t,
+						func() bool {
+							return devs[i].UpdatedTs.After(dev.CreatedTs) ||
+								devs[i].UpdatedTs == dev.CreatedTs
+						})
+				}
+			}
+		})
+	}
+}
