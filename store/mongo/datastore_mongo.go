@@ -337,16 +337,12 @@ func (db *DataStoreMongo) upsertAttributes(
 	case 1:
 		var res *mongo.UpdateResult
 		if withRevision {
-			filter = bson.D{
-				{Key: "$and", Value: []bson.M{
-					{
-						"_id": devices[0].Id,
-					},
-					{
-						DbDevRevision: bson.M{
-							"$lt": devices[0].Revision},
-					},
-				}},
+			filter = bson.M{
+				"_id": devices[0].Id,
+				"$or": []bson.M{
+					{DbDevRevision: bson.M{"$lt": devices[0].Revision}},
+					{DbDevRevision: nil},
+				},
 			}
 			update[DbDevRevision] = devices[0].Revision
 			update = bson.M{
@@ -395,16 +391,12 @@ func (db *DataStoreMongo) upsertAttributes(
 		for i, dev := range devices {
 			umod := mongo.NewUpdateOneModel()
 			if withRevision {
-				filter = bson.D{
-					{Key: "$and", Value: []bson.M{
-						{
-							"_id": dev.Id,
-						},
-						{
-							DbDevRevision: bson.M{
-								"$lt": dev.Revision},
-						},
-					}},
+				filter = bson.M{
+					"_id": dev.Id,
+					"$or": []bson.M{
+						{DbDevRevision: bson.M{"$lt": dev.Revision}},
+						{DbDevRevision: nil},
+					},
 				}
 				update[DbDevRevision] = dev.Revision
 				umod.Update = bson.M{
