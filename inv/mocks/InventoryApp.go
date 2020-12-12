@@ -392,27 +392,18 @@ func (_m *InventoryApp) UpsertAttributes(ctx context.Context, id model.DeviceID,
 	return r0
 }
 
-// UpsertDevicesAttributes provides a mock function with given fields: ctx, ids, attrs
-func (_m *InventoryApp) UpsertDevicesAttributes(ctx context.Context, ids []model.DeviceID, attrs model.DeviceAttributes) (*model.UpdateResult, error) {
-	ret := _m.Called(ctx, ids, attrs)
+// UpsertAttributesWithUpdated provides a mock function with given fields: ctx, id, attrs
+func (_m *InventoryApp) UpsertAttributesWithUpdated(ctx context.Context, id model.DeviceID, attrs model.DeviceAttributes) error {
+	ret := _m.Called(ctx, id, attrs)
 
-	var r0 *model.UpdateResult
-	if rf, ok := ret.Get(0).(func(context.Context, []model.DeviceID, model.DeviceAttributes) *model.UpdateResult); ok {
-		r0 = rf(ctx, ids, attrs)
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, model.DeviceID, model.DeviceAttributes) error); ok {
+		r0 = rf(ctx, id, attrs)
 	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*model.UpdateResult)
-		}
+		r0 = ret.Error(0)
 	}
 
-	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, []model.DeviceID, model.DeviceAttributes) error); ok {
-		r1 = rf(ctx, ids, attrs)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
+	return r0
 }
 
 // UpsertDevicesStatuses provides a mock function with given fields: ctx, devices, attrs

@@ -401,7 +401,7 @@ func (i *inventoryHandlers) UpdateDeviceAttributesHandler(w rest.ResponseWriter,
 
 	// upsert or replace the attributes
 	if r.Method == http.MethodPatch {
-		err = i.inventory.UpsertAttributes(ctx, model.DeviceID(idata.Subject), attrs)
+		err = i.inventory.UpsertAttributesWithUpdated(ctx, model.DeviceID(idata.Subject), attrs)
 	} else if r.Method == http.MethodPut {
 		err = i.inventory.ReplaceAttributes(ctx, model.DeviceID(idata.Subject), attrs, model.AttrScopeInventory)
 	} else {

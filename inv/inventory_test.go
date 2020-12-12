@@ -303,6 +303,50 @@ func TestInventoryUpsertAttributes(t *testing.T) {
 	}
 }
 
+func TestInventoryUpsertAttributeWithUpdated(t *testing.T) {
+	t.Parallel()
+
+	testCases := map[string]struct {
+		datastoreError error
+		outError       error
+	}{
+		"datastore success": {
+			datastoreError: nil,
+			outError:       nil,
+		},
+		"datastore error": {
+			datastoreError: errors.New("db connection failed"),
+			outError:       errors.New("failed to upsert attributes in db: db connection failed"),
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			t.Logf("test case: %s", name)
+
+			ctx := context.Background()
+
+			db := &mstore.DataStore{}
+			db.On("UpsertDevicesAttributesWithUpdated",
+				ctx,
+				mock.AnythingOfType("[]model.DeviceID"),
+				mock.AnythingOfType("model.DeviceAttributes")).
+				Return(nil, tc.datastoreError)
+			i := invForTest(db)
+
+			err := i.UpsertAttributesWithUpdated(ctx, "devid", model.DeviceAttributes{})
+
+			if tc.outError != nil {
+				if assert.Error(t, err) {
+					assert.EqualError(t, err, tc.outError.Error())
+				}
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
 func TestReplaceAttributes(t *testing.T) {
 	t.Parallel()
 
