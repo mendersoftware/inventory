@@ -268,7 +268,7 @@ func (db *DataStoreMongo) AddDevice(ctx context.Context, dev *model.Device) erro
 			Value: dev.Group,
 		})
 	}
-	_, err := db.UpsertDevicesAttributes(
+	_, err := db.UpsertDevicesAttributesWithUpdated(
 		ctx, []model.DeviceID{dev.ID}, dev.Attributes,
 	)
 	if err != nil {
@@ -282,7 +282,15 @@ func (db *DataStoreMongo) UpsertDevicesAttributesWithRevision(
 	devices []model.DeviceUpdate,
 	attrs model.DeviceAttributes,
 ) (*model.UpdateResult, error) {
-	return db.upsertAttributes(ctx, devices, attrs, true)
+	return db.upsertAttributes(ctx, devices, attrs, false, true)
+}
+
+func (db *DataStoreMongo) UpsertDevicesAttributesWithUpdated(
+	ctx context.Context,
+	ids []model.DeviceID,
+	attrs model.DeviceAttributes,
+) (*model.UpdateResult, error) {
+	return db.upsertAttributes(ctx, makeDevsWithIds(ids), attrs, true, false)
 }
 
 func (db *DataStoreMongo) UpsertDevicesAttributes(
@@ -290,7 +298,7 @@ func (db *DataStoreMongo) UpsertDevicesAttributes(
 	ids []model.DeviceID,
 	attrs model.DeviceAttributes,
 ) (*model.UpdateResult, error) {
-	return db.upsertAttributes(ctx, makeDevsWithIds(ids), attrs, false)
+	return db.upsertAttributes(ctx, makeDevsWithIds(ids), attrs, false, false)
 }
 
 func makeDevsWithIds(ids []model.DeviceID) []model.DeviceUpdate {
@@ -305,10 +313,10 @@ func (db *DataStoreMongo) upsertAttributes(
 	ctx context.Context,
 	devices []model.DeviceUpdate,
 	attrs model.DeviceAttributes,
+	withUpdated bool,
 	withRevision bool,
 ) (*model.UpdateResult, error) {
 	const systemScope = DbDevAttributes + "." + model.AttrScopeSystem
-	const updatedField = systemScope + "-" + model.AttrNameUpdated
 	const createdField = systemScope + "-" + model.AttrNameCreated
 	var (
 		result *model.UpdateResult
@@ -324,11 +332,15 @@ func (db *DataStoreMongo) upsertAttributes(
 	if err != nil {
 		return nil, err
 	}
+
 	now := time.Now()
-	update[updatedField] = model.DeviceAttribute{
-		Scope: model.AttrScopeSystem,
-		Name:  model.AttrNameUpdated,
-		Value: now,
+	if withUpdated {
+		const updatedField = systemScope + "-" + model.AttrNameUpdated
+		update[updatedField] = model.DeviceAttribute{
+			Scope: model.AttrScopeSystem,
+			Name:  model.AttrNameUpdated,
+			Value: now,
+		}
 	}
 
 	switch len(devices) {

@@ -978,7 +978,7 @@ func TestApiInventoryUpsertAttributes(t *testing.T) {
 		ctx := contextMatcher()
 
 		if tc.inReq.Method == http.MethodPatch {
-			inv.On("UpsertAttributes",
+			inv.On("UpsertAttributesWithUpdated",
 				ctx,
 				mock.AnythingOfType("model.DeviceID"),
 				mock.MatchedBy(

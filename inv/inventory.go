@@ -32,18 +32,10 @@ type InventoryApp interface {
 	GetDevice(ctx context.Context, id model.DeviceID) (*model.Device, error)
 	AddDevice(ctx context.Context, d *model.Device) error
 	UpsertAttributes(ctx context.Context, id model.DeviceID, attrs model.DeviceAttributes) error
+	UpsertAttributesWithUpdated(ctx context.Context, id model.DeviceID, attrs model.DeviceAttributes) error
+	UpsertDevicesStatuses(ctx context.Context, devices []model.DeviceUpdate, attrs model.DeviceAttributes) (*model.UpdateResult, error)
 	ReplaceAttributes(ctx context.Context, id model.DeviceID, upsertAttrs model.DeviceAttributes, scope string) error
 	GetFiltersAttributes(ctx context.Context) ([]model.FilterAttribute, error)
-	UpsertDevicesAttributes(
-		ctx context.Context,
-		ids []model.DeviceID,
-		attrs model.DeviceAttributes,
-	) (*model.UpdateResult, error)
-	UpsertDevicesStatuses(
-		ctx context.Context,
-		devices []model.DeviceUpdate,
-		attrs model.DeviceAttributes,
-	) (*model.UpdateResult, error)
 	UnsetDeviceGroup(ctx context.Context, id model.DeviceID, groupName model.GroupName) error
 	UnsetDevicesGroup(
 		ctx context.Context,
@@ -139,6 +131,15 @@ func (i *inventory) UpsertAttributes(ctx context.Context, id model.DeviceID, att
 	return nil
 }
 
+func (i *inventory) UpsertAttributesWithUpdated(ctx context.Context, id model.DeviceID, attrs model.DeviceAttributes) error {
+	if _, err := i.db.UpsertDevicesAttributesWithUpdated(
+		ctx, []model.DeviceID{id}, attrs,
+	); err != nil {
+		return errors.Wrap(err, "failed to upsert attributes in db")
+	}
+	return nil
+}
+
 func (i *inventory) ReplaceAttributes(ctx context.Context, id model.DeviceID, upsertAttrs model.DeviceAttributes, scope string) error {
 	device, err := i.db.GetDevice(ctx, id)
 	if err != nil && err != store.ErrDevNotFound {
@@ -172,14 +173,6 @@ func (i *inventory) GetFiltersAttributes(ctx context.Context) ([]model.FilterAtt
 		return nil, errors.Wrap(err, "failed to get filter attributes from the db")
 	}
 	return attributes, nil
-}
-
-func (i *inventory) UpsertDevicesAttributes(
-	ctx context.Context,
-	ids []model.DeviceID,
-	attrs model.DeviceAttributes,
-) (*model.UpdateResult, error) {
-	return i.db.UpsertDevicesAttributes(ctx, ids, attrs)
 }
 
 func (i *inventory) UpsertDevicesStatuses(

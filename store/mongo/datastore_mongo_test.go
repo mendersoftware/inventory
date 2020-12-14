@@ -1459,77 +1459,91 @@ func TestMongoUpsertDevicesAttributes(t *testing.T) {
 		},
 	}
 
+	withOrWithoutUpdated := []bool{true, false}
+
 	for name, tc := range testCases {
-		t.Run(name, func(t *testing.T) {
-			//setup
-			db.Wipe()
-
-			s := db.Client()
-
-			var ctx context.Context
-			if tc.tenant != "" {
-				ctx = identity.WithContext(db.CTX(), &identity.Identity{
-					Tenant: tc.tenant,
-				})
-			} else {
-				ctx = identity.WithContext(db.CTX(), &identity.Identity{
-					Tenant: "",
-				})
+		for _, withUpdated := range withOrWithoutUpdated {
+			if withUpdated {
+				name += " withUpdated"
 			}
+			t.Run(name, func(t *testing.T) {
+				//setup
+				db.Wipe()
 
-			//test
-			d := NewDataStoreMongoWithSession(s)
-			for _, dev := range tc.devs {
-				err := d.AddDevice(ctx, &dev)
-				assert.NoError(t, err, "failed to setup input data")
-			}
+				s := db.Client()
 
-			_, err := d.UpsertDevicesAttributes(ctx, tc.inDevIDs, tc.inAttrs)
-			if tc.err != nil {
-				assert.EqualError(t, err, tc.err.Error())
-			} else {
-				assert.NoError(t, err, "UpsertDeviceAttributes failed")
-			}
-
-			//get the device back
-			var devs []model.Device
-			cur, err := s.Database(DbName).
-				Collection(DbDevicesColl).
-				Find(
-					nil,
-					bson.M{},
-					mopts.Find().SetSort(bson.M{"_id": 1}),
-				)
-			if err == nil {
-				err = cur.All(nil, &devs)
-			}
-			if !assert.NoError(t, err) {
-				t.FailNow()
-			}
-
-			if assert.Len(t, devs, len(tc.outDevs)) {
-				for i, dev := range tc.outDevs {
-					assert.Equal(t, dev.ID, devs[i].ID)
-					if !compareAttrsWithoutTimestamp(
-						dev.Attributes,
-						devs[i].Attributes,
-					) {
-						t.Errorf("attributes mismatch, have: %v\nwant: %v",
-							devs[i].Attributes,
-							dev.Attributes,
-						)
-					}
-					// check timestamp validity
-					// note that mongo stores time with lower
-					// precision- custom comparison
-					assert.Condition(t,
-						func() bool {
-							return devs[i].UpdatedTs.After(dev.CreatedTs) ||
-								devs[i].UpdatedTs == dev.CreatedTs
-						})
+				var ctx context.Context
+				if tc.tenant != "" {
+					ctx = identity.WithContext(db.CTX(), &identity.Identity{
+						Tenant: tc.tenant,
+					})
+				} else {
+					ctx = identity.WithContext(db.CTX(), &identity.Identity{
+						Tenant: "",
+					})
 				}
-			}
-		})
+
+				//test
+				d := NewDataStoreMongoWithSession(s)
+				for _, dev := range tc.devs {
+					err := d.AddDevice(ctx, &dev)
+					assert.NoError(t, err, "failed to setup input data")
+				}
+
+				var err error
+				if withUpdated {
+					_, err = d.UpsertDevicesAttributesWithUpdated(ctx, tc.inDevIDs, tc.inAttrs)
+				} else {
+					_, err = d.UpsertDevicesAttributes(ctx, tc.inDevIDs, tc.inAttrs)
+				}
+				if tc.err != nil {
+					assert.EqualError(t, err, tc.err.Error())
+				} else {
+					assert.NoError(t, err, "UpsertDevicesAttributesWithUpdated failed")
+				}
+
+				//get the device back
+				var devs []model.Device
+				cur, err := s.Database(DbName).
+					Collection(DbDevicesColl).
+					Find(
+						nil,
+						bson.M{},
+						mopts.Find().SetSort(bson.M{"_id": 1}),
+					)
+				if err == nil {
+					err = cur.All(nil, &devs)
+				}
+				if !assert.NoError(t, err) {
+					t.FailNow()
+				}
+
+				if assert.Len(t, devs, len(tc.outDevs)) {
+					for i, dev := range tc.outDevs {
+						assert.Equal(t, dev.ID, devs[i].ID)
+						if !compareAttrsWithoutTimestamp(
+							dev.Attributes,
+							devs[i].Attributes,
+						) {
+							t.Errorf("attributes mismatch, have: %v\nwant: %v",
+								devs[i].Attributes,
+								dev.Attributes,
+							)
+						}
+						if withUpdated {
+							// check timestamp validity
+							// note that mongo stores time with lower
+							// precision- custom comparison
+							assert.Condition(t,
+								func() bool {
+									return devs[i].UpdatedTs.After(dev.CreatedTs) ||
+										devs[i].UpdatedTs == dev.CreatedTs
+								})
+						}
+					}
+				}
+			})
+		}
 	}
 }
 
@@ -4501,14 +4515,6 @@ func TestMongoUpsertDevicesAttributesWithRevision(t *testing.T) {
 				for i, dev := range tc.outDevs {
 					assert.Equal(t, dev.ID, devs[i].ID)
 					compareDevsWithoutTimestamps(t, &dev, &devs[i])
-					// check timestamp validity
-					// note that mongo stores time with lower
-					// precision- custom comparison
-					assert.Condition(t,
-						func() bool {
-							return devs[i].UpdatedTs.After(dev.CreatedTs) ||
-								devs[i].UpdatedTs == dev.CreatedTs
-						})
 				}
 			}
 		})
@@ -4655,14 +4661,6 @@ func TestMongoUpsertOldDevicesAttributesWithRevision(t *testing.T) {
 				for i, dev := range tc.outDevs {
 					assert.Equal(t, dev.ID, devs[i].ID)
 					compareDevsWithoutTimestamps(t, &dev, &devs[i])
-					// check timestamp validity
-					// note that mongo stores time with lower
-					// precision- custom comparison
-					assert.Condition(t,
-						func() bool {
-							return devs[i].UpdatedTs.After(dev.CreatedTs) ||
-								devs[i].UpdatedTs == dev.CreatedTs
-						})
 				}
 			}
 		})

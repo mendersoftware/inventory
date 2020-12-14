@@ -53,6 +53,14 @@ type DataStore interface {
 	// DeleteDevices removes devices with the given IDs from the database.
 	DeleteDevices(ctx context.Context, ids []model.DeviceID) (*model.UpdateResult, error)
 
+	// UpsertDevicesAttributesWithUpdated provides an interface to apply the same
+	// attribute update to multiple devices. Attribute updates are performed
+	// in a differential manner. Nonexistent attributes are created,
+	// existing are overwritten; the device resource is also created if
+	// necessary. It also sets the updated_ts timestamp to the current
+	// date and time.
+	UpsertDevicesAttributesWithUpdated(ctx context.Context, ids []model.DeviceID, attrs model.DeviceAttributes) (*model.UpdateResult, error)
+
 	// UpsertDevicesAttributes provides an interface to apply the same
 	// attribute update to multiple devices. Attribute updates are performed
 	// in a differential manner. Nonexistent attributes are created,
