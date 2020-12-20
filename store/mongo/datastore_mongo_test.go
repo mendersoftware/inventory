@@ -3490,6 +3490,7 @@ func TestMigrate(t *testing.T) {
 
 			outVers: []string{
 				"0.2.0",
+				"1.0.0",
 				DbVersion,
 			},
 		},
@@ -3500,6 +3501,7 @@ func TestMigrate(t *testing.T) {
 			outVers: []string{
 				"0.1.0",
 				"0.2.0",
+				"1.0.0",
 				DbVersion,
 			},
 		},
@@ -3516,6 +3518,7 @@ func TestMigrate(t *testing.T) {
 			outVers: []string{
 				"0.1.0",
 				"0.2.0",
+				"1.0.0",
 				DbVersion,
 			},
 		},
@@ -3527,6 +3530,7 @@ func TestMigrate(t *testing.T) {
 
 			outVers: []string{
 				"0.2.0",
+				"1.0.0",
 				DbVersion,
 			},
 		},
@@ -3539,6 +3543,7 @@ func TestMigrate(t *testing.T) {
 			outVers: []string{
 				"0.1.0",
 				"0.2.0",
+				"1.0.0",
 				DbVersion,
 			},
 		},

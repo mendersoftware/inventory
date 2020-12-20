@@ -37,7 +37,7 @@ import (
 )
 
 const (
-	DbVersion = "1.0.0"
+	DbVersion = "1.0.1"
 
 	DbName        = "inventory"
 	DbDevicesColl = "devices"
@@ -58,6 +58,8 @@ const (
 	DbScopeInventory = "inventory"
 
 	FiltersAttributesLimit = 500
+
+	attrIdentityStatus = "identity-status"
 )
 
 var (
@@ -989,10 +991,15 @@ func (db *DataStoreMongo) SearchDevices(ctx context.Context, searchParams model.
 func indexAttr(s *mongo.Client, ctx context.Context, attr string) error {
 	l := log.FromContext(ctx)
 	c := s.Database(mstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
-	indexField := fmt.Sprintf("attributes.%s.values", attr)
 
 	indexView := c.Indexes()
-	_, err := indexView.CreateOne(ctx, mongo.IndexModel{Keys: bson.M{indexField: 1}, Options: nil})
+	keys := bson.D{
+		{Key: indexAttrName(attrIdentityStatus), Value: 1},
+		{Key: indexAttrName(attr), Value: 1},
+	}
+	_, err := indexView.CreateOne(ctx, mongo.IndexModel{Keys: keys, Options: &mopts.IndexOptions{
+		Name: &attr,
+	}})
 
 	if err != nil {
 		if isTooManyIndexes(err) {
@@ -1003,6 +1010,10 @@ func indexAttr(s *mongo.Client, ctx context.Context, attr string) error {
 	}
 
 	return nil
+}
+
+func indexAttrName(attr string) string {
+	return fmt.Sprintf("attributes.%s.value", attr)
 }
 
 func isTooManyIndexes(e error) bool {
