@@ -336,9 +336,26 @@ func (db *DataStoreMongo) upsertAttributes(
 	}
 
 	now := time.Now()
+	oninsert := bson.M{
+		createdField: model.DeviceAttribute{
+			Scope: model.AttrScopeSystem,
+			Name:  model.AttrNameCreated,
+			Value: now,
+		},
+	}
+	if !withRevision {
+		oninsert["revision"] = 0
+	}
+
+	const updatedField = systemScope + "-" + model.AttrNameUpdated
 	if withUpdated {
-		const updatedField = systemScope + "-" + model.AttrNameUpdated
 		update[updatedField] = model.DeviceAttribute{
+			Scope: model.AttrScopeSystem,
+			Name:  model.AttrNameUpdated,
+			Value: now,
+		}
+	} else {
+		oninsert[updatedField] = model.DeviceAttribute{
 			Scope: model.AttrScopeSystem,
 			Name:  model.AttrNameUpdated,
 			Value: now,
@@ -360,27 +377,14 @@ func (db *DataStoreMongo) upsertAttributes(
 			}
 			update[DbDevRevision] = devices[0].Revision
 			update = bson.M{
-				"$set": update,
-				"$setOnInsert": bson.M{
-					createdField: model.DeviceAttribute{
-						Scope: model.AttrScopeSystem,
-						Name:  model.AttrNameCreated,
-						Value: now,
-					},
-				},
+				"$set":         update,
+				"$setOnInsert": oninsert,
 			}
 		} else {
 			filter = map[string]interface{}{"_id": devices[0].Id}
 			update = bson.M{
-				"$set": update,
-				"$setOnInsert": bson.M{
-					createdField: model.DeviceAttribute{
-						Scope: model.AttrScopeSystem,
-						Name:  model.AttrNameCreated,
-						Value: now,
-					},
-					DbDevRevision: 0,
-				},
+				"$set":         update,
+				"$setOnInsert": oninsert,
 			}
 		}
 		res, err = c.UpdateOne(ctx, filter, update, mopts.Update().SetUpsert(true))
@@ -414,27 +418,14 @@ func (db *DataStoreMongo) upsertAttributes(
 				}
 				update[DbDevRevision] = dev.Revision
 				umod.Update = bson.M{
-					"$set": update,
-					"$setOnInsert": bson.M{
-						createdField: model.DeviceAttribute{
-							Scope: model.AttrScopeSystem,
-							Name:  model.AttrNameCreated,
-							Value: now,
-						},
-					},
+					"$set":         update,
+					"$setOnInsert": oninsert,
 				}
 			} else {
 				filter = map[string]interface{}{"_id": dev.Id}
 				umod.Update = bson.M{
-					"$set": update,
-					"$setOnInsert": bson.M{
-						createdField: model.DeviceAttribute{
-							Scope: model.AttrScopeSystem,
-							Name:  model.AttrNameCreated,
-							Value: now,
-						},
-						DbDevRevision: 0,
-					},
+					"$set":         update,
+					"$setOnInsert": oninsert,
 				}
 			}
 			umod.Filter = filter
