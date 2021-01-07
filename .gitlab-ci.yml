@@ -23,3 +23,6 @@ include:
 
 test:unit:
   image: golang:1.13
+  variables:
+    MONGODB_DEBIAN_RELEASE: "stretch"
+    MONGODB_VERSION: "3.6"
