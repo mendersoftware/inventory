@@ -1,4 +1,4 @@
-// Copyright 2020 Northern.tech AS
+// Copyright 2021 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -3491,6 +3491,7 @@ func TestMigrate(t *testing.T) {
 			outVers: []string{
 				"0.2.0",
 				"1.0.0",
+				"1.0.1",
 				DbVersion,
 			},
 		},
@@ -3502,6 +3503,7 @@ func TestMigrate(t *testing.T) {
 				"0.1.0",
 				"0.2.0",
 				"1.0.0",
+				"1.0.1",
 				DbVersion,
 			},
 		},
@@ -3519,6 +3521,7 @@ func TestMigrate(t *testing.T) {
 				"0.1.0",
 				"0.2.0",
 				"1.0.0",
+				"1.0.1",
 				DbVersion,
 			},
 		},
@@ -3531,6 +3534,7 @@ func TestMigrate(t *testing.T) {
 			outVers: []string{
 				"0.2.0",
 				"1.0.0",
+				"1.0.1",
 				DbVersion,
 			},
 		},
@@ -3544,6 +3548,7 @@ func TestMigrate(t *testing.T) {
 				"0.1.0",
 				"0.2.0",
 				"1.0.0",
+				"1.0.1",
 				DbVersion,
 			},
 		},
@@ -4490,152 +4495,6 @@ func TestMongoUpsertDevicesAttributesWithRevision(t *testing.T) {
 			d := NewDataStoreMongoWithSession(s)
 			for _, dev := range tc.devs {
 				err := d.AddDevice(ctx, &dev)
-				assert.NoError(t, err, "failed to setup input data")
-			}
-
-			_, err := d.UpsertDevicesAttributesWithRevision(ctx, tc.inDevs, tc.inAttrs)
-			if tc.err != nil {
-				assert.EqualError(t, err, tc.err.Error())
-			} else {
-				assert.NoError(t, err, "UpsertDevicesAttributesWithRevision failed")
-			}
-
-			//get the device back
-			var devs []model.Device
-			cur, err := s.Database(DbName).
-				Collection(DbDevicesColl).
-				Find(
-					nil,
-					bson.M{},
-					mopts.Find().SetSort(bson.M{"_id": 1}),
-				)
-			if err == nil {
-				err = cur.All(nil, &devs)
-			}
-			if !assert.NoError(t, err) {
-				t.FailNow()
-			}
-
-			if assert.Len(t, devs, len(tc.outDevs)) {
-				for i, dev := range tc.outDevs {
-					assert.Equal(t, dev.ID, devs[i].ID)
-					compareDevsWithoutTimestamps(t, &dev, &devs[i])
-				}
-			}
-		})
-	}
-}
-
-// check if the devices without revision field will also be updated
-func TestMongoUpsertOldDevicesAttributesWithRevision(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping TestMongoUpsertOldDevicesAttributesWithRevision in short mode.")
-	}
-
-	//single create timestamp for all inserted devs
-	createdTs := time.Now()
-
-	type DevWithoutRevision struct {
-		ID         model.DeviceID         `json:"id" bson:"_id,omitempty"`
-		Attributes model.DeviceAttributes `json:"attributes,omitempty" bson:"attributes,omitempty"`
-		Group      model.GroupName        `json:"-" bson:"group,omitempty"`
-		CreatedTs  time.Time              `json:"-" bson:"created_ts,omitempty"`
-		UpdatedTs  time.Time              `json:"updated_ts" bson:"updated_ts,omitempty"`
-	}
-
-	testCases := map[string]struct {
-		devs []DevWithoutRevision
-
-		inDevs  []model.DeviceUpdate
-		inAttrs model.DeviceAttributes
-
-		tenant string
-
-		outDevs []model.Device
-		err     error
-	}{
-		"dev exists, attributes exist, update both attrs (descr + val)": {
-			devs: []DevWithoutRevision{
-				{
-					ID: model.DeviceID("0003"),
-					Attributes: model.DeviceAttributes{
-						{
-							Name:        "mac",
-							Value:       "0003-mac",
-							Description: strPtr("descr"),
-							Scope:       model.AttrScopeInventory,
-						},
-						{
-							Name:        "sn",
-							Value:       "0003-sn",
-							Description: strPtr("descr"),
-							Scope:       model.AttrScopeInventory,
-						},
-					},
-					CreatedTs: createdTs,
-				},
-			},
-			inDevs: []model.DeviceUpdate{{Id: model.DeviceID("0003"), Revision: 1}},
-			inAttrs: model.DeviceAttributes{
-				{
-					Description: strPtr("mac description"),
-					Scope:       model.AttrScopeInventory,
-					Name:        "mac",
-					Value:       "0003-newmac",
-				},
-				{
-					Description: strPtr("sn description"),
-					Scope:       model.AttrScopeInventory,
-					Name:        "sn",
-					Value:       "0003-newsn",
-				},
-			},
-
-			outDevs: []model.Device{
-				{
-					ID: model.DeviceID("0003"),
-					Attributes: model.DeviceAttributes{
-						{
-							Description: strPtr("mac description"),
-							Scope:       model.AttrScopeInventory,
-							Name:        "mac",
-							Value:       "0003-newmac",
-						},
-						{
-							Description: strPtr("sn description"),
-							Scope:       model.AttrScopeInventory,
-							Name:        "sn",
-							Value:       "0003-newsn",
-						},
-					},
-					CreatedTs: createdTs,
-				},
-			},
-		},
-	}
-
-	for name, tc := range testCases {
-		t.Run(name, func(t *testing.T) {
-			//setup
-			db.Wipe()
-
-			s := db.Client()
-
-			var ctx context.Context
-			if tc.tenant != "" {
-				ctx = identity.WithContext(db.CTX(), &identity.Identity{
-					Tenant: tc.tenant,
-				})
-			} else {
-				ctx = identity.WithContext(db.CTX(), &identity.Identity{
-					Tenant: "",
-				})
-			}
-
-			//test
-			d := NewDataStoreMongoWithSession(s)
-			for _, dev := range tc.devs {
-				_, err := s.Database(DbName).Collection(DbDevicesColl).InsertOne(ctx, dev)
 				assert.NoError(t, err, "failed to setup input data")
 			}
 
