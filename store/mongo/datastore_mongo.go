@@ -46,6 +46,7 @@ const (
 	DbDevAttributes      = "attributes"
 	DbDevGroup           = "group"
 	DbDevRevision        = "revision"
+	DbDevUpdatedTs       = "updated_ts"
 	DbDevAttributesDesc  = "description"
 	DbDevAttributesValue = "value"
 	DbDevAttributesScope = "scope"
@@ -943,6 +944,16 @@ func (db *DataStoreMongo) SearchDevices(ctx context.Context, searchParams model.
 	findOptions.SetSkip(int64((searchParams.Page - 1) * searchParams.PerPage))
 	findOptions.SetLimit(int64(searchParams.PerPage))
 
+	if len(searchParams.Attributes) > 0 {
+		projection := bson.M{DbDevUpdatedTs: 1}
+		for _, attribute := range searchParams.Attributes {
+			name := fmt.Sprintf("%s-%s", attribute.Scope, model.GetDeviceAttributeNameReplacer().Replace(attribute.Attribute))
+			field := fmt.Sprintf("%s.%s", DbDevAttributes, name)
+			projection[field] = 1
+		}
+		findOptions.SetProjection(projection)
+	}
+
 	if len(searchParams.Sort) > 0 {
 		sortField := bson.M{}
 		for _, sortQ := range searchParams.Sort {
@@ -969,6 +980,9 @@ func (db *DataStoreMongo) SearchDevices(ctx context.Context, searchParams model.
 	}
 
 	count, err := c.CountDocuments(ctx, findQuery)
+	if err != nil {
+		return nil, -1, errors.Wrap(err, "failed to search devices")
+	}
 
 	return devices, int(count), nil
 }

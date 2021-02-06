@@ -101,6 +101,11 @@ paths:
                 description: List of ordered sort criterias
                 items:
                   $ref: '#/definitions/SortCriteria'
+              attributes:
+                type: array
+                description: List of attributes to select and return
+                items:
+                  $ref: '#/definitions/SelectAttribute'
 
       responses:
         200:
@@ -233,18 +238,18 @@ definitions:
       - name
       - count
     properties:
-      scope:
-        type: string
-        description: Scope of the attribute.
       name:
         type: string
         description: Name of the attribute.
+      scope:
+        type: string
+        description: Scope of the attribute.
       count:
         type: integer
         description: Number of occurrences of the attribute in the database.
     example:
-      attribute: "serial_no"
-      name: "inventory"
+      name: "serial_no"
+      scope: "inventory"
       count: 10
 
   FilterPredicate:
@@ -255,12 +260,11 @@ definitions:
       - attribute
       - type
     properties:
-      scope:
-        type: string
-        description: Attribute scope.
       attribute:
         type: string
         description: Attribute name.
+      scope:
+        type: string
       type:
         type: string
         description: Type or operator of the filter predicate.
@@ -271,25 +275,42 @@ definitions:
             The value of the attribute to be used in filtering.
             Attribute type is implicit, inferred from the JSON type.
     example:
-      type: "$eq"
       attribute: "serial_no"
       scope: "inventory"
+      type: "$eq"
       value: "123456789"
+
+  SelectAttribute:
+    description: Inventory attribute
+    type: object
+    required:
+      - attribute
+      - scope
+    properties:
+      attribute:
+        type: string
+        description: Attribute name.
+      scope:
+        type: string
+        description: Attribute scope.
+    example:
+      attribute: "serial_no"
+      scope: "inventory"
 
   SortCriteria:
     description: Sort criteria definition
     type: object
     required:
-      - scope
       - attribute
+      - scope
       - order
     properties:
-      scope:
-        type: string
-        description: Attribute scope.
       attribute:
         type: string
         description: Attribute name.
+      scope:
+        type: string
+        description: Attribute scope.
       order:
         type: string
         description: Order direction, ascending ("asc") or descending ("desc").
