@@ -3772,11 +3772,12 @@ func TestMongoSearchDevices(t *testing.T) {
 	}
 
 	testCases := map[string]struct {
-		expected     []model.Device
-		devTotal     int
-		searchParams model.SearchParams
-		tenant       string
-		dbError      error
+		expected           []model.Device
+		expectedAttributes model.DeviceAttributes
+		devTotal           int
+		searchParams       model.SearchParams
+		tenant             string
+		dbError            error
 	}{
 		"single filter, single device": {
 			expected: []model.Device{inputDevs[0]},
@@ -3790,6 +3791,63 @@ func TestMongoSearchDevices(t *testing.T) {
 						Attribute: "MAC",
 						Type:      "$eq",
 						Value:     "000",
+					},
+				},
+				Sort: []model.SortCriteria{},
+			},
+		},
+		"single filter, single device, select single attribute": {
+			expected: []model.Device{inputDevs[0]},
+			expectedAttributes: []model.DeviceAttribute{
+				inputDevs[0].Attributes[0],
+			},
+			devTotal: 1,
+			searchParams: model.SearchParams{
+				Page:    1,
+				PerPage: 5,
+				Filters: []model.FilterPredicate{
+					{
+						Scope:     "inventory",
+						Attribute: "MAC",
+						Type:      "$eq",
+						Value:     "000",
+					},
+				},
+				Attributes: []model.SelectAttribute{
+					{
+						Scope:     "inventory",
+						Attribute: "MAC",
+					},
+				},
+				Sort: []model.SortCriteria{},
+			},
+		},
+		"single filter, single device, select single two attributes": {
+			expected: []model.Device{inputDevs[0]},
+			expectedAttributes: []model.DeviceAttribute{
+				inputDevs[0].Attributes[0],
+				inputDevs[0].Attributes[1],
+			},
+			devTotal: 1,
+			searchParams: model.SearchParams{
+				Page:    1,
+				PerPage: 5,
+				Filters: []model.FilterPredicate{
+					{
+						Scope:     "inventory",
+						Attribute: "MAC",
+						Type:      "$eq",
+						Value:     "000",
+					},
+				},
+				Attributes: []model.SelectAttribute{
+					{
+						Scope:     "inventory",
+						Attribute: "MAC",
+					},
+					{
+						Scope:     "inventory",
+						Attribute: "SN",
 					},
 				},
 				Sort: []model.SortCriteria{},
@@ -4029,6 +4087,11 @@ func TestMongoSearchDevices(t *testing.T) {
 			if len(tc.searchParams.Sort) > 0 {
 				for i, dev := range devs {
 					assert.Equal(t, tc.expected[i].ID, dev.ID)
+				}
+			}
+			if len(tc.searchParams.Attributes) > 0 {
+				for _, dev := range devs {
+					assert.Equal(t, tc.expectedAttributes, dev.Attributes)
 				}
 			}
 		}

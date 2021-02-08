@@ -1,4 +1,4 @@
-// Copyright 2020 Northern.tech AS
+// Copyright 2021 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -26,11 +26,12 @@ var validSelectors = []interface{}{
 var validSortOrders = []interface{}{"asc", "desc"}
 
 type SearchParams struct {
-	Page      int               `json:"page"`
-	PerPage   int               `json:"per_page"`
-	Filters   []FilterPredicate `json:"filters"`
-	Sort      []SortCriteria    `json:"sort"`
-	DeviceIDs []string          `json:"device_ids"`
+	Page       int               `json:"page"`
+	PerPage    int               `json:"per_page"`
+	Filters    []FilterPredicate `json:"filters"`
+	Sort       []SortCriteria    `json:"sort"`
+	Attributes []SelectAttribute `json:"attributes"`
+	DeviceIDs  []string          `json:"device_ids"`
 }
 
 type Filter struct {
@@ -52,6 +53,11 @@ type SortCriteria struct {
 	Order     string `json:"order"`
 }
 
+type SelectAttribute struct {
+	Scope     string `json:"scope" bson:"scope"`
+	Attribute string `json:"attribute" bson:"attribute"`
+}
+
 func (sp SearchParams) Validate() error {
 	for _, f := range sp.Filters {
 		err := f.Validate()
@@ -65,6 +71,15 @@ func (sp SearchParams) Validate() error {
 			validation.Field(&s.Scope, validation.Required),
 			validation.Field(&s.Attribute, validation.Required),
 			validation.Field(&s.Order, validation.Required, validation.In(validSortOrders...)))
+		if err != nil {
+			return err
+		}
+	}
+
+	for _, s := range sp.Attributes {
+		err := validation.ValidateStruct(&s,
+			validation.Field(&s.Scope, validation.Required),
+			validation.Field(&s.Attribute, validation.Required))
 		if err != nil {
 			return err
 		}
