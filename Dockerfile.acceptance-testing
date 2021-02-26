@@ -4,7 +4,7 @@ COPY . /go/src/github.com/mendersoftware/inventory
 RUN cd /go/src/github.com/mendersoftware/inventory && \
     env CGO_ENABLED=0 go test -c -o inventory-test -coverpkg $(go list ./... | grep -v vendor | grep -v mocks | grep -v test | tr  '\n' ,)
 
-FROM alpine:3.13.0
+FROM alpine:3.13.2
 
 EXPOSE 8080
 RUN mkdir /tests
