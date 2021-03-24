@@ -45,6 +45,7 @@ a55959c4e3e8917bfa857359bb641115336276a6cc97408fd8197e079fb18470  vendor/github.
 c8024e31c1de453fea90f22a221968835cc7af9d520274a2576c9ec9976055b0  vendor/github.com/shurcooL/sanitized_anchor_name/LICENSE
 1fd29c692f599736d92f7c02b7826836c0d2ccc838689b21822f4ce0253c39df  vendor/github.com/subosito/gotenv/LICENSE
 d18f6323b71b0b768bb5e9616e36da390fbd39369a81807cca352de4e4e6aa0b  vendor/gopkg.in/yaml.v3/LICENSE
+6d13d89b6c33df37f92553cc95cec278d8770ddc78c9de84620cc16dfb48cef6  vendor/github.com/youmark/pkcs8/LICENSE
 # 
 #
 # LGPL3 with static linking exception.

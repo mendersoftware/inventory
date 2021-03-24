@@ -210,10 +210,9 @@ func (db *DataStoreMongo) GetDevices(ctx context.Context, q store.ListQuery) ([]
 	if q.Sort != nil {
 		name := fmt.Sprintf("%s-%s", q.Sort.AttrScope, model.GetDeviceAttributeNameReplacer().Replace(q.Sort.AttrName))
 		sortField := fmt.Sprintf("%s.%s.%s", DbDevAttributes, name, DbDevAttributesValue)
-		sortFieldQuery := bson.M{}
-		sortFieldQuery[sortField] = 1
+		sortFieldQuery := bson.D{{Key: sortField, Value: 1}}
 		if !q.Sort.Ascending {
-			sortFieldQuery[sortField] = -1
+			sortFieldQuery[0].Value = -1
 		}
 		findOptions.SetSort(sortFieldQuery)
 	}
@@ -955,13 +954,13 @@ func (db *DataStoreMongo) SearchDevices(ctx context.Context, searchParams model.
 	}
 
 	if len(searchParams.Sort) > 0 {
-		sortField := bson.M{}
-		for _, sortQ := range searchParams.Sort {
+		sortField := make(bson.D, len(searchParams.Sort))
+		for i, sortQ := range searchParams.Sort {
 			name := fmt.Sprintf("%s-%s", sortQ.Scope, model.GetDeviceAttributeNameReplacer().Replace(sortQ.Attribute))
 			field := fmt.Sprintf("%s.%s.%s", DbDevAttributes, name, DbDevAttributesValue)
-			sortField[field] = 1
+			sortField[i] = bson.E{Key: field, Value: 1}
 			if sortQ.Order == "desc" {
-				sortField[field] = -1
+				sortField[i].Value = -1
 			}
 		}
 		findOptions.SetSort(sortField)
