@@ -154,6 +154,10 @@ paths:
           description: Malformed request body. See error for details.
           schema:
             $ref: '#/definitions/Error'
+        409:
+          description: Write conflict, the request needs to be retried.
+          schema:
+            $ref: '#/definitions/Error'
         500:
           description: Internal server error.
           schema:
