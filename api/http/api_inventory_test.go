@@ -1,4 +1,4 @@
-// Copyright 2020 Northern.tech AS
+// Copyright 2021 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -2354,6 +2354,20 @@ func TestApiInventoryInternalDevicesStatus(t *testing.T) {
 			resp: utils.JSONResponseParams{
 				OutputStatus:     http.StatusInternalServerError,
 				OutputBodyObject: RestError("internal error"),
+			},
+			callsInventory: true,
+		},
+		"error, conflict": {
+			inputDevices: []model.DeviceUpdate{
+				{Id: model.DeviceID(oid.NewUUIDv5("1").String()), Revision: 1},
+				{Id: model.DeviceID(oid.NewUUIDv5("2").String()), Revision: 1},
+			},
+			tenantID:     tenantId,
+			status:       acceptedStatus,
+			inventoryErr: store.ErrWriteConflict,
+			resp: utils.JSONResponseParams{
+				OutputStatus:     http.StatusConflict,
+				OutputBodyObject: RestError("write conflict"),
 			},
 			callsInventory: true,
 		},
