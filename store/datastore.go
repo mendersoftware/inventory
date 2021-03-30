@@ -1,4 +1,4 @@
-// Copyright 2020 Northern.tech AS
+// Copyright 2021 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -27,9 +27,12 @@ var (
 
 	ErrGroupNotFound = errors.New("group not found")
 
-	// ErrNoAttrName is return if attributes are attempted upserted without
+	// ErrNoAttrName is returned if attributes are attempted upserted without
 	// a Name identifier.
 	ErrNoAttrName = errors.New("attribute name not present")
+
+	// ErrWriteConflict represents a write conflict in the storage layer
+	ErrWriteConflict = errors.New("write conflict")
 )
 
 //go:generate ../utils/mockgen.sh

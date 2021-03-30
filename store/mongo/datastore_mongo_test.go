@@ -4482,6 +4482,8 @@ func TestMongoUpsertDevicesAttributesWithRevision(t *testing.T) {
 					CreatedTs: createdTs,
 				},
 			},
+
+			err: store.ErrWriteConflict,
 		},
 		"Update multiple device attributes": {
 			devs: []model.Device{{

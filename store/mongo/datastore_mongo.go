@@ -387,7 +387,7 @@ func (db *DataStoreMongo) upsertAttributes(
 		res, err = c.UpdateOne(ctx, filter, update, mopts.Update().SetUpsert(true))
 		if err != nil {
 			if strings.Contains(err.Error(), "duplicate key error") {
-				return &model.UpdateResult{}, nil
+				return nil, store.ErrWriteConflict
 			} else {
 				return nil, err
 			}
@@ -431,7 +431,10 @@ func (db *DataStoreMongo) upsertAttributes(
 		)
 		if err != nil {
 			if strings.Contains(err.Error(), "duplicate key error") {
-				return &model.UpdateResult{}, nil
+				// bulk mode, swallow the error as we already updated the other devices
+				// and the Matchedcount and CreatedCount values will tell the caller if
+				// all the operations succeeded or not
+				err = nil
 			} else {
 				return nil, err
 			}
