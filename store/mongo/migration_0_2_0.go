@@ -19,7 +19,7 @@ import (
 	"fmt"
 
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
-	mstore "github.com/mendersoftware/go-lib-micro/store"
+	mstore "github.com/mendersoftware/go-lib-micro/store/v2"
 	"github.com/pkg/errors"
 	"go.mongodb.org/mongo-driver/bson"
 )

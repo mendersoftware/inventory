@@ -29,7 +29,7 @@ import (
 	mopts "go.mongodb.org/mongo-driver/mongo/options"
 
 	"github.com/mendersoftware/go-lib-micro/log"
-	mstore "github.com/mendersoftware/go-lib-micro/store"
+	mstore "github.com/mendersoftware/go-lib-micro/store/v2"
 	"github.com/pkg/errors"
 
 	"github.com/mendersoftware/inventory/model"
@@ -217,7 +217,8 @@ func (db *DataStoreMongo) GetDevices(ctx context.Context, q store.ListQuery) ([]
 		findOptions.SetSort(sortFieldQuery)
 	}
 
-	cursor, err := c.Find(ctx, findQuery, findOptions)
+	findQueryWithTenantID := mstore.WithTenantID(ctx, findQuery)
+	cursor, err := c.Find(ctx, findQueryWithTenantID, findOptions)
 	if err != nil {
 		return nil, -1, errors.Wrap(err, "failed to search devices")
 	}
@@ -228,7 +229,7 @@ func (db *DataStoreMongo) GetDevices(ctx context.Context, q store.ListQuery) ([]
 		return nil, -1, errors.Wrap(err, "failed to search devices")
 	}
 
-	count, err := c.CountDocuments(ctx, findQuery)
+	count, err := c.CountDocuments(ctx, findQueryWithTenantID)
 	if err != nil {
 		return nil, -1, errors.Wrap(err, "failed to count devices")
 	}
@@ -249,7 +250,8 @@ func (db *DataStoreMongo) GetDevice(
 	if id == model.NilDeviceID {
 		return nil, nil
 	}
-	if err := c.FindOne(ctx, bson.M{DbDevId: id}).Decode(&res); err != nil {
+	filter := mstore.WithTenantID(ctx, bson.M{DbDevId: id})
+	if err := c.FindOne(ctx, filter).Decode(&res); err != nil {
 		switch err {
 		case mongo.ErrNoDocuments:
 			return nil, nil
@@ -375,16 +377,17 @@ func (db *DataStoreMongo) upsertAttributes(
 			update[DbDevRevision] = devices[0].Revision
 			update = bson.M{
 				"$set":         update,
-				"$setOnInsert": oninsert,
+				"$setOnInsert": mstore.WithTenantID(ctx, oninsert),
 			}
 		} else {
 			filter = map[string]interface{}{"_id": devices[0].Id}
 			update = bson.M{
 				"$set":         update,
-				"$setOnInsert": oninsert,
+				"$setOnInsert": mstore.WithTenantID(ctx, oninsert),
 			}
 		}
-		res, err = c.UpdateOne(ctx, filter, update, mopts.Update().SetUpsert(true))
+		filterWithTenantID := mstore.WithTenantID(ctx, filter)
+		res, err = c.UpdateOne(ctx, filterWithTenantID, update, mopts.Update().SetUpsert(true))
 		if err != nil {
 			if strings.Contains(err.Error(), "duplicate key error") {
 				return nil, store.ErrWriteConflict
@@ -413,16 +416,17 @@ func (db *DataStoreMongo) upsertAttributes(
 				update[DbDevRevision] = dev.Revision
 				umod.Update = bson.M{
 					"$set":         update,
-					"$setOnInsert": oninsert,
+					"$setOnInsert": mstore.WithTenantID(ctx, oninsert),
 				}
 			} else {
 				filter = map[string]interface{}{"_id": dev.Id}
 				umod.Update = bson.M{
 					"$set":         update,
-					"$setOnInsert": oninsert,
+					"$setOnInsert": mstore.WithTenantID(ctx, oninsert),
 				}
 			}
-			umod.Filter = filter
+			filterWithTenantID := mstore.WithTenantID(ctx, filter)
+			umod.Filter = filterWithTenantID
 			umod.SetUpsert(true)
 			models[i] = umod
 		}
@@ -573,22 +577,23 @@ func (db *DataStoreMongo) UpsertRemoveDeviceAttributes(
 		Name:  model.AttrNameUpdated,
 		Value: now,
 	}
-	update = bson.M{
-		"$set": update,
-		"$setOnInsert": bson.M{
-			createdField: model.DeviceAttribute{
-				Scope: model.AttrScopeSystem,
-				Name:  model.AttrNameCreated,
-				Value: now,
-			},
+	oninsert := mstore.WithTenantID(ctx, bson.M{
+		createdField: model.DeviceAttribute{
+			Scope: model.AttrScopeSystem,
+			Name:  model.AttrNameCreated,
+			Value: now,
 		},
+	})
+	update = bson.M{
+		"$set":         update,
+		"$setOnInsert": oninsert,
 	}
 	if len(remove) > 0 {
 		update["$unset"] = remove
 	}
 
 	var res *mongo.UpdateResult
-	filter := map[string]interface{}{"_id": id}
+	filter := mstore.WithTenantID(ctx, bson.M{DbDevId: id})
 	res, err = c.UpdateOne(ctx, filter, update, mopts.Update().SetUpsert(true))
 	if err == nil {
 		result = &model.UpdateResult{
@@ -625,7 +630,8 @@ func (db *DataStoreMongo) UpdateDevicesGroup(
 			},
 		},
 	}
-	res, err := collDevs.UpdateMany(ctx, filter, update)
+	filterWithTenantID := mstore.WithTenantID(ctx, filter)
+	res, err := collDevs.UpdateMany(ctx, filterWithTenantID, update)
 	if err != nil {
 		return nil, err
 	}
@@ -642,6 +648,9 @@ func (db *DataStoreMongo) GetFiltersAttributes(ctx context.Context) ([]model.Fil
 	const DbCount = "count"
 
 	cur, err := collDevs.Aggregate(ctx, []bson.M{
+		{
+			"$match": mstore.WithTenantID(ctx, bson.M{}),
+		},
 		{
 			"$project": bson.M{
 				"attributes": bson.M{
@@ -731,6 +740,7 @@ func (db *DataStoreMongo) UnsetDevicesGroup(
 			DbDevAttributesGroup: "",
 		},
 	}
+	filter = mstore.WithTenantID(ctx, filter)
 	res, err := collDevs.UpdateMany(ctx, filter, update)
 	if err != nil {
 		return nil, err
@@ -761,9 +771,9 @@ func (db *DataStoreMongo) ListGroups(
 		Database(mstore.DbFromContext(ctx, DbName)).
 		Collection(DbDevicesColl)
 
-	fltr := bson.D{{
+	fltr := mstore.WithTenantID(ctx, bson.D{{
 		Key: DbDevAttributesGroupValue, Value: bson.M{"$exists": true},
-	}}
+	}})
 	if len(fltr) > 0 {
 		for _, p := range filters {
 			q, err := predicateToQuery(p)
@@ -794,7 +804,7 @@ func (db *DataStoreMongo) GetDevicesByGroup(ctx context.Context, group model.Gro
 		Database(mstore.DbFromContext(ctx, DbName)).
 		Collection(DbDevicesColl)
 
-	filter := bson.M{DbDevAttributesGroupValue: group}
+	filter := mstore.WithTenantID(ctx, bson.M{DbDevAttributesGroupValue: group})
 	result := c.FindOne(ctx, filter)
 	if result == nil {
 		return nil, -1, store.ErrGroupNotFound
@@ -851,7 +861,8 @@ func (db *DataStoreMongo) DeleteDevices(
 	default:
 		filter[DbDevId] = bson.M{"$in": ids}
 	}
-	res, err := collDevs.DeleteMany(ctx, filter)
+	filterWithTenantID := mstore.WithTenantID(ctx, filter)
+	res, err := collDevs.DeleteMany(ctx, filterWithTenantID)
 	if err != nil {
 		return nil, err
 	}
@@ -862,6 +873,10 @@ func (db *DataStoreMongo) DeleteDevices(
 
 func (db *DataStoreMongo) GetAllAttributeNames(ctx context.Context) ([]string, error) {
 	c := db.client.Database(mstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
+
+	match := bson.M{
+		"$match": mstore.WithTenantID(ctx, bson.M{}),
+	}
 
 	project := bson.M{
 		"$project": bson.M{
@@ -886,6 +901,7 @@ func (db *DataStoreMongo) GetAllAttributeNames(ctx context.Context) ([]string, e
 
 	l := log.FromContext(ctx)
 	cursor, err := c.Aggregate(ctx, []bson.M{
+		match,
 		project,
 		unwind,
 		group,
@@ -969,7 +985,8 @@ func (db *DataStoreMongo) SearchDevices(ctx context.Context, searchParams model.
 		findOptions.SetSort(sortField)
 	}
 
-	cursor, err := c.Find(ctx, findQuery, findOptions)
+	filterWithTenantID := mstore.WithTenantID(ctx, findQuery)
+	cursor, err := c.Find(ctx, filterWithTenantID, findOptions)
 	if err != nil {
 		return nil, -1, errors.Wrap(err, "failed to search devices")
 	}
@@ -981,7 +998,7 @@ func (db *DataStoreMongo) SearchDevices(ctx context.Context, searchParams model.
 		return nil, -1, errors.Wrap(err, "failed to search devices")
 	}
 
-	count, err := c.CountDocuments(ctx, findQuery)
+	count, err := c.CountDocuments(ctx, filterWithTenantID)
 	if err != nil {
 		return nil, -1, errors.Wrap(err, "failed to search devices")
 	}
