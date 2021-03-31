@@ -34,7 +34,7 @@ import (
 
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
 	"github.com/mendersoftware/go-lib-micro/mongo/oid"
-	mstore "github.com/mendersoftware/go-lib-micro/store"
+	mstore "github.com/mendersoftware/go-lib-micro/store/v2"
 	"github.com/pkg/errors"
 )
 
@@ -468,7 +468,9 @@ func TestMongoGetDevice(t *testing.T) {
 		}
 
 		if testCase.InputDevice != nil {
-			_, _ = client.Database(mstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl).InsertOne(ctx, testCase.InputDevice)
+			_, _ = client.Database(mstore.DbFromContext(ctx, DbName)).
+				Collection(DbDevicesColl).
+				InsertOne(ctx, mstore.WithTenantID(ctx, testCase.InputDevice))
 		}
 
 		dbdev, err := store.GetDevice(ctx, testCase.InputID)
@@ -690,7 +692,7 @@ func TestMongoAddDevice(t *testing.T) {
 		}
 
 		c := client.Database(mstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
-		_, err := c.InsertOne(ctx, existing)
+		_, err := c.InsertOne(ctx, mstore.WithTenantID(ctx, existing))
 		assert.NoError(t, err)
 
 		err = store.AddDevice(ctx, testCase.InputDevice)
@@ -2585,7 +2587,7 @@ func TestMongoUpdateDeviceGroup(t *testing.T) {
 			}
 			_, err := client.Database(mstore.DbFromContext(ctx, DbName)).
 				Collection(DbDevicesColl).
-				InsertMany(ctx, ins)
+				InsertMany(ctx, mstore.ArrayWithTenantID(ctx, ins))
 			if err != nil {
 				panic(err)
 			}
@@ -2744,7 +2746,7 @@ func TestMongoUnsetDevicesGroupWithGroupName(t *testing.T) {
 				}
 				_, err := client.Database(mstore.DbFromContext(ctx, DbName)).
 					Collection(DbDevicesColl).
-					InsertMany(ctx, ins)
+					InsertMany(ctx, mstore.ArrayWithTenantID(ctx, ins))
 				if err != nil {
 					panic(err)
 				}
@@ -2972,7 +2974,7 @@ func TestMongoListGroups(t *testing.T) {
 			for _, d := range testCase.InputDevices {
 				client.Database(mstore.DbFromContext(ctx, DbName)).
 					Collection(DbDevicesColl).
-					InsertOne(ctx, d)
+					InsertOne(ctx, mstore.WithTenantID(ctx, d))
 			}
 
 			// Make sure we start test with empty database
@@ -3154,7 +3156,9 @@ func TestGetDevicesByGroup(t *testing.T) {
 	client := db.Client()
 
 	for _, d := range inputDevices {
-		_, err := client.Database(DbName).Collection(DbDevicesColl).InsertOne(db.CTX(), d)
+		_, err := client.Database(DbName).
+			Collection(DbDevicesColl).
+			InsertOne(db.CTX(), mstore.WithTenantID(db.CTX(), d))
 		assert.NoError(t, err, "failed to setup input data")
 	}
 
@@ -3291,8 +3295,14 @@ func TestGetDevicesByGroupWithTenant(t *testing.T) {
 	db.Wipe()
 	client := db.Client()
 
+	ctx := identity.WithContext(db.CTX(), &identity.Identity{
+		Tenant: "foo",
+	})
+
 	for _, d := range inputDevices {
-		_, err := client.Database(DbName+"-foo").Collection(DbDevicesColl).InsertOne(db.CTX(), d)
+		_, err := client.Database(DbName).
+			Collection(DbDevicesColl).
+			InsertOne(ctx, mstore.WithTenantID(ctx, d))
 		assert.NoError(t, err, "failed to setup input data")
 	}
 
@@ -3300,10 +3310,6 @@ func TestGetDevicesByGroupWithTenant(t *testing.T) {
 		t.Logf("test case: %s", name)
 
 		store := NewDataStoreMongoWithSession(client)
-
-		ctx := identity.WithContext(db.CTX(), &identity.Identity{
-			Tenant: "foo",
-		})
 		devs, totalCount, err := store.GetDevicesByGroup(ctx, tc.InputGroupName, tc.InputSkip, tc.InputLimit)
 
 		if tc.OutputError != nil {
@@ -3421,9 +3427,14 @@ func TestGetDeviceGroupWithTenant(t *testing.T) {
 
 	db.Wipe()
 	client := db.Client()
+	ctx := identity.WithContext(db.CTX(), &identity.Identity{
+		Tenant: "foo",
+	})
 
 	for _, d := range inputDevices {
-		_, err := client.Database(DbName+"-foo").Collection(DbDevicesColl).InsertOne(db.CTX(), d)
+		_, err := client.Database(DbName).
+			Collection(DbDevicesColl).
+			InsertOne(ctx, mstore.WithTenantID(ctx, d))
 		assert.NoError(t, err, "failed to setup input data")
 	}
 
@@ -3431,10 +3442,6 @@ func TestGetDeviceGroupWithTenant(t *testing.T) {
 		t.Logf("test case: %s", name)
 
 		store := NewDataStoreMongoWithSession(client)
-
-		ctx := identity.WithContext(db.CTX(), &identity.Identity{
-			Tenant: "foo",
-		})
 		group, err := store.GetDeviceGroup(ctx, tc.InputDeviceID)
 
 		if tc.OutputError != nil {
@@ -4069,7 +4076,9 @@ func TestMongoSearchDevices(t *testing.T) {
 		}
 
 		for _, d := range inputDevs {
-			_, err := client.Database(mstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl).InsertOne(ctx, d)
+			_, err := client.Database(mstore.DbFromContext(ctx, DbName)).
+				Collection(DbDevicesColl).
+				InsertOne(ctx, mstore.WithTenantID(ctx, d))
 			assert.NoError(t, err, "failed to setup input data")
 		}
 
@@ -4203,7 +4212,7 @@ func TestUpdateDevicesGroup(t *testing.T) {
 			collDevs := client.
 				Database(mstore.DbFromContext(ctx, DbName)).
 				Collection(DbDevicesColl)
-			if _, err := collDevs.InsertMany(ctx, deviceSet); err != nil {
+			if _, err := collDevs.InsertMany(ctx, mstore.ArrayWithTenantID(ctx, deviceSet)); err != nil {
 				t.Fatalf("Failed to initialize test context, error: %v", err)
 			}
 			result, err := store.UpdateDevicesGroup(
@@ -4317,7 +4326,7 @@ func TestClearDevicesGroup(t *testing.T) {
 			collDevs := client.
 				Database(mstore.DbFromContext(ctx, DbName)).
 				Collection(DbDevicesColl)
-			if _, err := collDevs.InsertMany(ctx, deviceSet); err != nil {
+			if _, err := collDevs.InsertMany(ctx, mstore.ArrayWithTenantID(ctx, deviceSet)); err != nil {
 				t.Fatalf("Failed to initialize test context, error: %v", err)
 			}
 			updated, err := store.UnsetDevicesGroup(

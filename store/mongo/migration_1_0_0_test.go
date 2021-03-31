@@ -23,7 +23,7 @@ import (
 
 	"github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
-	mstore "github.com/mendersoftware/go-lib-micro/store"
+	mstore "github.com/mendersoftware/go-lib-micro/store/v2"
 	"github.com/stretchr/testify/assert"
 	"go.mongodb.org/mongo-driver/bson"
 
@@ -266,7 +266,7 @@ func TestMigration_1_0_0(t *testing.T) {
 			}
 
 			c := s.Database(mstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
-			_, err := c.InsertMany(ctx, tc.inDevs)
+			_, err := c.InsertMany(ctx, mstore.ArrayWithTenantID(ctx, tc.inDevs))
 			assert.NoError(t, err)
 
 			err = migrator.Apply(ctx, migrate.MakeVersion(1, 0, 0), migrations)
@@ -521,7 +521,7 @@ func TestMaintenance_1_0_0(t *testing.T) {
 			}
 
 			c := s.Database(mstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
-			_, err = c.InsertMany(ctx, tc.inDevs)
+			_, err = c.InsertMany(ctx, mstore.ArrayWithTenantID(ctx, tc.inDevs))
 			assert.NoError(t, err)
 
 			err = migrator.Apply(ctx, migrate.MakeVersion(0, 2, 0), migrations)

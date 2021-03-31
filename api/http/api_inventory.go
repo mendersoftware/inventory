@@ -825,13 +825,9 @@ func getTenantContext(ctx context.Context, tenantId string) context.Context {
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	if tenantId == "" {
-		return ctx
-	}
 	id := &midentity.Identity{
 		Tenant: tenantId,
 	}
-
 	ctx = midentity.WithContext(ctx, id)
 
 	return ctx
