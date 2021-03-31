@@ -1,4 +1,4 @@
-// Copyright 2020 Northern.tech AS
+// Copyright 2021 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -887,7 +887,10 @@ func (i *inventoryHandlers) InternalDevicesStatusHandler(w rest.ResponseWriter, 
 		)
 		return
 	}
-	if err != nil {
+	if err == store.ErrWriteConflict {
+		u.RestErrWithLog(w, r, l, err, http.StatusConflict)
+		return
+	} else if err != nil {
 		u.RestErrWithLogInternal(w, r, l, err)
 		return
 	}
