@@ -22,7 +22,8 @@ import (
 	"github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/log"
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
-	mstore "github.com/mendersoftware/go-lib-micro/store"
+	mstorev1 "github.com/mendersoftware/go-lib-micro/store"
+	mstore "github.com/mendersoftware/go-lib-micro/store/v2"
 	"github.com/mendersoftware/inventory/store"
 )
 
@@ -38,7 +39,7 @@ func (db *DataStoreMongo) WithAutomigrate() store.DataStore {
 func (db *DataStoreMongo) MigrateTenant(ctx context.Context, version string, tenantId string) error {
 	l := log.FromContext(ctx)
 
-	database := mstore.DbNameForTenant(tenantId, DbName)
+	database := mstorev1.DbNameForTenant(tenantId, DbName)
 
 	l.Infof("migrating %s", database)
 
@@ -74,6 +75,10 @@ func (db *DataStoreMongo) MigrateTenant(ctx context.Context, version string, ten
 			ms:  db,
 			ctx: ctx,
 		},
+		&migration_2_0_0{
+			ms:  db,
+			ctx: ctx,
+		},
 	}
 
 	err = m.Apply(ctx, *ver, migrations)
@@ -92,10 +97,7 @@ func (db *DataStoreMongo) Migrate(ctx context.Context, version string) error {
 		return errors.Wrap(err, "failed go retrieve tenant DBs")
 	}
 
-	if len(dbs) == 0 {
-		dbs = []string{DbName}
-	}
-
+	dbs = append([]string{DbName}, dbs...)
 	if db.automigrate {
 		l.Infof("automigrate is ON, will apply migrations")
 	} else {
