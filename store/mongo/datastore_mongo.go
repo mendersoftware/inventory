@@ -37,7 +37,7 @@ import (
 )
 
 const (
-	DbVersion = "1.0.2"
+	DbVersion = "2.0.0"
 
 	DbName        = "inventory"
 	DbDevicesColl = "devices"
