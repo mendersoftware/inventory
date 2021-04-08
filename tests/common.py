@@ -27,13 +27,13 @@ def mongo():
 
 
 def mongo_cleanup(mongo):
-    dbs = mongo.database_names()
+    dbs = mongo.list_database_names()
     dbs = [d for d in dbs if d not in ["local", "admin", "config"]]
     for d in dbs:
         mongo.drop_database(d)
 
 
-@pytest.yield_fixture(scope="function")
+@pytest.fixture(scope="function")
 def clean_db(mongo):
     mongo_cleanup(mongo)
     yield mongo
