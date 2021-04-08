@@ -29,31 +29,29 @@ requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
 
 class ManagementClient:
-    config = {
-        "also_return_response": True,
-        "validate_responses": False,
-        "validate_requests": False,
-        "validate_swagger_spec": True,
-        "use_models": True,
-    }
-
-    http_client = RequestsClient()
-    http_client.session.verify = False
-
-    client = SwaggerClient.from_spec(
-        load_file(pytest.config.getoption("--management-spec")),
-        config=config,
-        http_client=http_client,
-    )
-    client.swagger_spec.api_url = "http://%s/api/%s" % (
-        pytest.config.getoption("host"),
-        pytest.config.getoption("api"),
-    )
-
-    group = client.get_model("Group")
-    inventoryAttribute = client.get_model("Attribute")
-
     log = logging.getLogger("Client")
+
+    def __init__(self, host, spec, api):
+        config = {
+            "also_return_response": True,
+            "validate_responses": False,
+            "validate_requests": False,
+            "validate_swagger_spec": True,
+            "use_models": True,
+        }
+
+        http_client = RequestsClient()
+        http_client.session.verify = False
+
+        self.client = SwaggerClient.from_spec(
+            load_file(spec),
+            config=config,
+            http_client=http_client,
+        )
+        self.client.swagger_spec.api_url = "http://%s/api/%s" % (host, api)
+
+        self.group = self.client.get_model("Group")
+        self.inventoryAttribute = self.client.get_model("Attribute")
 
     def deleteAllGroups(self):
         groups = self.client.Management_API.List_Groups().result()[0]
@@ -148,45 +146,41 @@ class CliClient:
 
 
 class ApiClient:
-    config = {
-        "also_return_response": True,
-        "validate_responses": True,
-        "validate_requests": False,
-        "validate_swagger_spec": False,
-        "use_models": True,
-    }
 
     log = logging.getLogger("client.ApiClient")
-    # override spec_option for internal vs management clients
-    spec_option = "internal-spec"
-    api_url = "http://%s/api/0.1.0/" % pytest.config.getoption("host")
 
     def make_api_url(self, path):
         return os.path.join(
             self.api_url, path if not path.startswith("/") else path[1:]
         )
 
-    def setup_swagger(self):
+    def setup_swagger(self, host, spec):
+        config = {
+            "also_return_response": True,
+            "validate_responses": True,
+            "validate_requests": False,
+            "validate_swagger_spec": False,
+            "use_models": True,
+        }
+
         self.http_client = RequestsClient()
         self.http_client.session.verify = False
 
-        spec = pytest.config.getoption(self.spec_option)
         self.client = SwaggerClient.from_spec(
-            load_file(spec), config=self.config, http_client=self.http_client
+            load_file(spec), config=config, http_client=self.http_client
         )
         self.client.swagger_spec.api_url = self.api_url
 
-    def __init__(self):
-        self.setup_swagger()
+    def __init__(self, host, spec):
+        self.setup_swagger(host, spec)
 
 
 class InternalApiClient(ApiClient):
     log = logging.getLogger("client.InternalClient")
-    spec_option = "internal_spec"
-    api_url = "http://%s/api/internal/v1/inventory/" % pytest.config.getoption("host")
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, host, spec):
+        self.api_url = "http://%s/api/internal/v1/inventory/" % host
+        super().__init__(host, spec)
 
     def verify(self, token, uri="/api/management/1.0/auth/verify", method="POST"):
         if not token.startswith("Bearer "):
@@ -207,7 +201,9 @@ class InternalApiClient(ApiClient):
 
     def create_tenant(self, tenant_id):
         return self.client.Internal_API.Create_Tenant(
-            tenant={"tenant_id": tenant_id,}
+            tenant={
+                "tenant_id": tenant_id,
+            }
         ).result()
 
     def create_device(self, device_id, attributes, description="test device"):
