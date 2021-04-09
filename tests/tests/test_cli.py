@@ -22,10 +22,10 @@ DB_VERSION = "0.2.0"
 class TestMigration:
     @staticmethod
     def verify_db_and_collections(client, dbname):
-        dbs = client.database_names()
+        dbs = client.list_database_names()
         assert dbname in dbs
 
-        colls = client[dbname].collection_names()
+        colls = client[dbname].list_collection_names()
         assert MIGRATION_COLLECTION in colls
 
     @staticmethod

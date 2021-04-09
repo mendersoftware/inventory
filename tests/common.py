@@ -23,17 +23,17 @@ from client import CliClient, ManagementClient, InternalApiClient
 
 @pytest.fixture(scope="session")
 def mongo():
-    return MongoClient('mender-mongo:27017')
+    return MongoClient("mender-mongo:27017")
 
 
 def mongo_cleanup(mongo):
-    dbs = mongo.database_names()
-    dbs = [d for d in dbs if d not in ['local', 'admin', 'config']]
+    dbs = mongo.list_database_names()
+    dbs = [d for d in dbs if d not in ["local", "admin", "config"]]
     for d in dbs:
         mongo.drop_database(d)
 
 
-@pytest.yield_fixture(scope='function')
+@pytest.fixture(scope="function")
 def clean_db(mongo):
     mongo_cleanup(mongo)
     yield mongo
@@ -46,29 +46,36 @@ def cli():
 
 
 @pytest.fixture(scope="session")
-def management_client():
-    return ManagementClient()
+def management_client(request):
+    return ManagementClient(
+        request.config.getoption("host"),
+        request.config.getoption("management_spec"),
+        request.config.getoption("api"),
+    )
+
 
 @pytest.fixture(scope="session")
-def internal_client():
-    return InternalApiClient()
+def internal_client(request):
+    return InternalApiClient(
+        request.config.getoption("host"),
+        request.config.getoption("internal_spec"),
+    )
 
 
 @pytest.fixture(scope="session")
-def inventory_attributes(management_client):
+def inventory_attributes(management_client, request):
     attributeList = []
 
-    filename = pytest.config.getoption('--inventory-items')
+    filename = request.config.getoption("--inventory-items")
 
     with open(filename) as inf:
         r = csv.reader(inf)
         for row in r:
             n, v, d = row[0], row[1], row[2] if len(row) == 3 else None
             # does it matter if you pass a field name = None?
-            attr = management_client.inventoryAttribute(name=n,
-                                                        value=v,
-                                                        scope='inventory',
-                                                        description=d)
+            attr = management_client.inventoryAttribute(
+                name=n, value=v, scope="inventory", description=d
+            )
             attributeList.append(attr)
 
     return attributeList

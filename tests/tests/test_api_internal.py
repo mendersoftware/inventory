@@ -30,8 +30,8 @@ class TestInternalApiTenantCreate:
         _, r = internal_client.create_tenant("foobar")
         assert r.status_code == 201
 
-        assert "inventory-foobar" in clean_db.database_names()
-        assert "migration_info" in clean_db["inventory-foobar"].collection_names()
+        assert "inventory-foobar" in clean_db.list_database_names()
+        assert "migration_info" in clean_db["inventory-foobar"].list_collection_names()
 
     def test_create_twice(self, internal_client, clean_db):
 
@@ -51,7 +51,11 @@ class TestInternalApiTenantCreate:
 
 class TestInternalApiDeviceCreate:
     def test_create_ok(
-        self, internal_client, management_client, clean_db, inventory_attributes,
+        self,
+        internal_client,
+        management_client,
+        clean_db,
+        inventory_attributes,
     ):
         devid = "".join([format(i, "02x") for i in os.urandom(128)])
         _, r = internal_client.create_device(
@@ -64,7 +68,11 @@ class TestInternalApiDeviceCreate:
         self._verify_inventory(inventory_attributes, dev.attributes)
 
     def test_create_twice_ok(
-        self, internal_client, management_client, clean_db, inventory_attributes,
+        self,
+        internal_client,
+        management_client,
+        clean_db,
+        inventory_attributes,
     ):
         # insert first device
         devid = "".join([format(i, "02x") for i in os.urandom(128)])
@@ -75,7 +83,10 @@ class TestInternalApiDeviceCreate:
 
         # add extra attribute, modify existing
         new_attr = management_client.inventoryAttribute(
-            name="new attr", value="new value", scope="inventory", description="desc",
+            name="new attr",
+            value="new value",
+            scope="inventory",
+            description="desc",
         )
 
         existing = inventory_attributes[0]
