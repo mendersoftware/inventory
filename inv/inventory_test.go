@@ -334,7 +334,7 @@ func TestInventoryUpsertAttributeWithUpdated(t *testing.T) {
 				Return(nil, tc.datastoreError)
 			i := invForTest(db)
 
-			err := i.UpsertAttributesWithUpdated(ctx, "devid", model.DeviceAttributes{})
+			err := i.UpsertAttributesWithUpdated(ctx, "devid", model.DeviceAttributes{}, model.AttrScopeInventory)
 
 			if tc.outError != nil {
 				if assert.Error(t, err) {
