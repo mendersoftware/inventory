@@ -62,7 +62,13 @@ type DataStore interface {
 	// existing are overwritten; the device resource is also created if
 	// necessary. It also sets the updated_ts timestamp to the current
 	// date and time.
-	UpsertDevicesAttributesWithUpdated(ctx context.Context, ids []model.DeviceID, attrs model.DeviceAttributes) (*model.UpdateResult, error)
+	UpsertDevicesAttributesWithUpdated(
+		ctx context.Context,
+		ids []model.DeviceID,
+		attrs model.DeviceAttributes,
+		scope string,
+		etag string,
+	) (*model.UpdateResult, error)
 
 	// UpsertDevicesAttributes provides an interface to apply the same
 	// attribute update to multiple devices. Attribute updates are performed
@@ -76,7 +82,14 @@ type DataStore interface {
 	// to upsert, and a list of attributes to remove. Nonexistent attributes
 	// are created, existing are overwritten; the device resource is also
 	// created if necessary
-	UpsertRemoveDeviceAttributes(ctx context.Context, id model.DeviceID, updateAttrs model.DeviceAttributes, removeAttrs model.DeviceAttributes) (*model.UpdateResult, error)
+	UpsertRemoveDeviceAttributes(
+		ctx context.Context,
+		id model.DeviceID,
+		updateAttrs model.DeviceAttributes,
+		removeAttrs model.DeviceAttributes,
+		scope string,
+		etag string,
+	) (*model.UpdateResult, error)
 	// UpsertDevicesAttributesWithRevision upserts attributes for devices in the same way
 	// UpsertDevicesAttributes does.
 	// The only difference between this method and UpsertDevicesAttributes

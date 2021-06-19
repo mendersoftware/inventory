@@ -991,6 +991,7 @@ func TestApiInventoryUpsertAttributes(t *testing.T) {
 						return true
 					},
 				),
+				model.AttrScopeInventory,
 			).Return(tc.inventoryErr)
 		} else {
 			inv.On("ReplaceAttributes",

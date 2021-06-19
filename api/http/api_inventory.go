@@ -39,6 +39,7 @@ import (
 const (
 	uriDevices       = "/api/0.1.0/devices"
 	uriDevice        = "/api/0.1.0/devices/:id"
+	uriDeviceTags    = "/api/0.1.0/devices/:id/tags"
 	uriDeviceGroups  = "/api/0.1.0/devices/:id/group"
 	uriDeviceGroup   = "/api/0.1.0/devices/:id/group/:name"
 	uriAttributes    = "/api/0.1.0/attributes"
@@ -113,6 +114,9 @@ func (i *inventoryHandlers) GetApp() (rest.App, error) {
 		rest.Patch(urlInternalAttributes, i.PatchDeviceAttributesInternalHandler),
 		rest.Put(uriDeviceGroups, i.AddDeviceToGroupHandler),
 		rest.Patch(uriGroupsDevices, i.AppendDevicesToGroup),
+		rest.Put(uriDeviceTags, i.UpdateDeviceTagsHandler),
+		rest.Patch(uriDeviceTags, i.UpdateDeviceTagsHandler),
+
 		rest.Get(uriDeviceGroups, i.GetDeviceGroupHandler),
 		rest.Get(uriGroups, i.GetGroupsHandler),
 		rest.Get(uriGroupsDevices, i.GetDevicesByGroup),
@@ -335,6 +339,9 @@ func (i *inventoryHandlers) GetDeviceHandler(w rest.ResponseWriter, r *rest.Requ
 		u.RestErrWithLog(w, r, l, store.ErrDevNotFound, http.StatusNotFound)
 		return
 	}
+	if dev.TagsEtag != "" {
+		w.Header().Set("ETag", dev.TagsEtag)
+	}
 
 	w.WriteJson(dev)
 }
@@ -384,36 +391,84 @@ func (i *inventoryHandlers) AddDeviceHandler(w rest.ResponseWriter, r *rest.Requ
 
 func (i *inventoryHandlers) UpdateDeviceAttributesHandler(w rest.ResponseWriter, r *rest.Request) {
 	ctx := r.Context()
-
 	l := log.FromContext(ctx)
-
 	//get device ID from JWT token
 	idata, err := identity.ExtractIdentityFromHeaders(r.Header)
 	if err != nil {
 		u.RestErrWithLogMsg(w, r, l, err, http.StatusUnauthorized, "unauthorized")
 		return
 	}
-
+	deviceID := model.DeviceID(idata.Subject)
 	//extract attributes from body
 	attrs, err := parseAttributes(r)
 	if err != nil {
 		u.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
 		return
 	}
+	i.updateDeviceAttributes(w, r, ctx, attrs, deviceID, model.AttrScopeInventory, "")
+}
+
+func (i *inventoryHandlers) UpdateDeviceTagsHandler(w rest.ResponseWriter, r *rest.Request) {
+	ctx := r.Context()
+	l := log.FromContext(ctx)
+
+	// get device ID from uri
+	deviceID := model.DeviceID(r.PathParam("id"))
+	if len(deviceID) < 1 {
+		u.RestErrWithLog(w, r, l, errors.New("device id cannot be empty"), http.StatusBadRequest)
+		return
+	}
+
+	ifMatchHeader := r.Header.Get("If-Match")
+
+	// extract attributes from body
+	attrs, err := parseAttributes(r)
+	if err != nil {
+		u.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
+		return
+	}
+
+	// set scope and timestamp for tags attributes
+	now := time.Now()
+	for i := range attrs {
+		attrs[i].Scope = model.AttrScopeTags
+		if attrs[i].Timestamp == nil {
+			attrs[i].Timestamp = &now
+		}
+	}
+
+	i.updateDeviceAttributes(w, r, ctx, attrs, deviceID, model.AttrScopeTags, ifMatchHeader)
+}
+
+func (i *inventoryHandlers) updateDeviceAttributes(
+	w rest.ResponseWriter,
+	r *rest.Request,
+	ctx context.Context,
+	attrs model.DeviceAttributes,
+	deviceID model.DeviceID,
+	scope string,
+	etag string,
+) {
+	l := log.FromContext(ctx)
+	var err error
 
 	// upsert or replace the attributes
 	if r.Method == http.MethodPatch {
-		err = i.inventory.UpsertAttributesWithUpdated(ctx, model.DeviceID(idata.Subject), attrs)
+		err = i.inventory.UpsertAttributesWithUpdated(ctx, deviceID, attrs, scope, etag)
 	} else if r.Method == http.MethodPut {
-		err = i.inventory.ReplaceAttributes(ctx, model.DeviceID(idata.Subject), attrs, model.AttrScopeInventory)
+		err = i.inventory.ReplaceAttributes(ctx, deviceID, attrs, scope, etag)
 	} else {
 		u.RestErrWithLog(w, r, l, errors.New("method not alllowed"), http.StatusMethodNotAllowed)
 		return
 	}
+
 	cause := errors.Cause(err)
 	switch cause {
 	case store.ErrNoAttrName:
 		u.RestErrWithLog(w, r, l, cause, http.StatusBadRequest)
+		return
+	case inventory.ErrETagDoesntMatch:
+		u.RestErrWithInfoMsg(w, r, l, cause, http.StatusPreconditionFailed, cause.Error())
 		return
 	}
 	if err != nil {

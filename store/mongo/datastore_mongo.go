@@ -28,6 +28,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	mopts "go.mongodb.org/mongo-driver/mongo/options"
 
+	"github.com/google/uuid"
 	"github.com/mendersoftware/go-lib-micro/log"
 	mstore "github.com/mendersoftware/go-lib-micro/store"
 	"github.com/pkg/errors"
@@ -47,6 +48,7 @@ const (
 	DbDevGroup           = "group"
 	DbDevRevision        = "revision"
 	DbDevUpdatedTs       = "updated_ts"
+	DbDevAttributesTs    = "timestamp"
 	DbDevAttributesDesc  = "description"
 	DbDevAttributesValue = "value"
 	DbDevAttributesScope = "scope"
@@ -271,7 +273,7 @@ func (db *DataStoreMongo) AddDevice(ctx context.Context, dev *model.Device) erro
 		})
 	}
 	_, err := db.UpsertDevicesAttributesWithUpdated(
-		ctx, []model.DeviceID{dev.ID}, dev.Attributes,
+		ctx, []model.DeviceID{dev.ID}, dev.Attributes, "", "",
 	)
 	if err != nil {
 		return errors.Wrap(err, "failed to store device")
@@ -284,15 +286,17 @@ func (db *DataStoreMongo) UpsertDevicesAttributesWithRevision(
 	devices []model.DeviceUpdate,
 	attrs model.DeviceAttributes,
 ) (*model.UpdateResult, error) {
-	return db.upsertAttributes(ctx, devices, attrs, false, true)
+	return db.upsertAttributes(ctx, devices, attrs, false, true, "", "")
 }
 
 func (db *DataStoreMongo) UpsertDevicesAttributesWithUpdated(
 	ctx context.Context,
 	ids []model.DeviceID,
 	attrs model.DeviceAttributes,
+	scope string,
+	etag string,
 ) (*model.UpdateResult, error) {
-	return db.upsertAttributes(ctx, makeDevsWithIds(ids), attrs, true, false)
+	return db.upsertAttributes(ctx, makeDevsWithIds(ids), attrs, true, false, scope, etag)
 }
 
 func (db *DataStoreMongo) UpsertDevicesAttributes(
@@ -300,7 +304,7 @@ func (db *DataStoreMongo) UpsertDevicesAttributes(
 	ids []model.DeviceID,
 	attrs model.DeviceAttributes,
 ) (*model.UpdateResult, error) {
-	return db.upsertAttributes(ctx, makeDevsWithIds(ids), attrs, false, false)
+	return db.upsertAttributes(ctx, makeDevsWithIds(ids), attrs, false, false, "", "")
 }
 
 func makeDevsWithIds(ids []model.DeviceID) []model.DeviceUpdate {
@@ -317,9 +321,12 @@ func (db *DataStoreMongo) upsertAttributes(
 	attrs model.DeviceAttributes,
 	withUpdated bool,
 	withRevision bool,
+	scope string,
+	etag string,
 ) (*model.UpdateResult, error) {
 	const systemScope = DbDevAttributes + "." + model.AttrScopeSystem
 	const createdField = systemScope + "-" + model.AttrNameCreated
+	const etagField = model.AttrNameTagsEtag
 	var (
 		result *model.UpdateResult
 		filter interface{}
@@ -367,24 +374,30 @@ func (db *DataStoreMongo) upsertAttributes(
 		return &model.UpdateResult{}, nil
 	case 1:
 		var res *mongo.UpdateResult
-		if withRevision {
-			filter = bson.M{
-				"_id":         devices[0].Id,
-				DbDevRevision: bson.M{"$lt": devices[0].Revision},
-			}
-			update[DbDevRevision] = devices[0].Revision
-			update = bson.M{
-				"$set":         update,
-				"$setOnInsert": oninsert,
-			}
-		} else {
-			filter = map[string]interface{}{"_id": devices[0].Id}
-			update = bson.M{
-				"$set":         update,
-				"$setOnInsert": oninsert,
-			}
+
+		filter := bson.M{
+			"_id": devices[0].Id,
 		}
-		res, err = c.UpdateOne(ctx, filter, update, mopts.Update().SetUpsert(true))
+		updateOpts := mopts.Update().SetUpsert(true)
+
+		if withRevision {
+			filter[DbDevRevision] = bson.M{"$lt": devices[0].Revision}
+			update[DbDevRevision] = devices[0].Revision
+		}
+		if scope == model.AttrScopeTags {
+			update[etagField] = uuid.New().String()
+			updateOpts = mopts.Update().SetUpsert(false)
+		}
+		if etag != "" {
+			filter[etagField] = bson.M{"$eq": etag}
+		}
+
+		update = bson.M{
+			"$set":         update,
+			"$setOnInsert": oninsert,
+		}
+
+		res, err = c.UpdateOne(ctx, filter, update, updateOpts)
 		if err != nil {
 			if strings.Contains(err.Error(), "duplicate key error") {
 				return nil, store.ErrWriteConflict
@@ -502,7 +515,15 @@ func makeAttrUpsert(attrs model.DeviceAttributes) (bson.M, error) {
 				DbDevAttributesDesc,
 			)
 			upsert[fieldName] = attrs[i].Description
+		}
 
+		if attrs[i].Timestamp != nil {
+			fieldName = makeAttrField(
+				attrs[i].Name,
+				attrs[i].Scope,
+				DbDevAttributesTs,
+			)
+			upsert[fieldName] = attrs[i].Timestamp
 		}
 	}
 	return upsert, nil
@@ -545,10 +566,13 @@ func (db *DataStoreMongo) UpsertRemoveDeviceAttributes(
 	id model.DeviceID,
 	updateAttrs model.DeviceAttributes,
 	removeAttrs model.DeviceAttributes,
+	scope string,
+	etag string,
 ) (*model.UpdateResult, error) {
 	const systemScope = DbDevAttributes + "." + model.AttrScopeSystem
 	const updatedField = systemScope + "-" + model.AttrNameUpdated
 	const createdField = systemScope + "-" + model.AttrNameCreated
+	const etagField = model.AttrNameTagsEtag
 	var (
 		result *model.UpdateResult
 		err    error
@@ -566,12 +590,23 @@ func (db *DataStoreMongo) UpsertRemoveDeviceAttributes(
 	if err != nil {
 		return nil, err
 	}
+	updateOpts := mopts.Update().SetUpsert(true)
+	filter := bson.M{"_id": id}
+	if etag != "" {
+		filter[etagField] = bson.M{"$eq": etag}
+	}
 
+	if scope == model.AttrScopeTags {
+		update[etagField] = uuid.New().String()
+		updateOpts = mopts.Update().SetUpsert(false)
+	}
 	now := time.Now()
-	update[updatedField] = model.DeviceAttribute{
-		Scope: model.AttrScopeSystem,
-		Name:  model.AttrNameUpdated,
-		Value: now,
+	if scope != model.AttrScopeTags {
+		update[updatedField] = model.DeviceAttribute{
+			Scope: model.AttrScopeSystem,
+			Name:  model.AttrNameUpdated,
+			Value: now,
+		}
 	}
 	update = bson.M{
 		"$set": update,
@@ -588,8 +623,7 @@ func (db *DataStoreMongo) UpsertRemoveDeviceAttributes(
 	}
 
 	var res *mongo.UpdateResult
-	filter := map[string]interface{}{"_id": id}
-	res, err = c.UpdateOne(ctx, filter, update, mopts.Update().SetUpsert(true))
+	res, err = c.UpdateOne(ctx, filter, update, updateOpts)
 	if err == nil {
 		result = &model.UpdateResult{
 			MatchedCount: res.MatchedCount,
