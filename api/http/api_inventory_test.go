@@ -1829,6 +1829,75 @@ func TestApiGetDeviceGroup(t *testing.T) {
 	}
 }
 
+func TestApiGetDeviceGroupInternal(t *testing.T) {
+	rest.ErrorFieldName = "error"
+
+	tcases := map[string]struct {
+		utils.JSONResponseParams
+
+		inReq *http.Request
+
+		inventoryGroup model.GroupName
+		inventoryErr   error
+	}{
+		"device with group": {
+			inReq:          test.MakeSimpleRequest("GET", "http://1.2.3.4/api/internal/v1/inventory/tenants/foo/devices/1/groups", nil),
+			inventoryGroup: model.GroupName("dev"),
+			inventoryErr:   nil,
+
+			JSONResponseParams: utils.JSONResponseParams{
+				OutputStatus:     http.StatusOK,
+				OutputBodyObject: model.DeviceGroups{Groups: []string{"dev"}},
+			},
+		},
+		"device without group": {
+			inReq:          test.MakeSimpleRequest("GET", "http://1.2.3.4/api/internal/v1/inventory/tenants/foo/devices/1/groups", nil),
+			inventoryGroup: model.GroupName(""),
+			inventoryErr:   nil,
+
+			JSONResponseParams: utils.JSONResponseParams{
+				OutputStatus:     http.StatusOK,
+				OutputBodyObject: model.DeviceGroups{},
+			},
+		},
+		"device not found": {
+			inReq:          test.MakeSimpleRequest("GET", "http://1.2.3.4/api/internal/v1/inventory/tenants/foo/devices/1/groups", nil),
+			inventoryGroup: model.GroupName(""),
+			inventoryErr:   store.ErrDevNotFound,
+
+			JSONResponseParams: utils.JSONResponseParams{
+				OutputStatus:     http.StatusNotFound,
+				OutputBodyObject: RestError(store.ErrDevNotFound.Error()),
+			},
+		},
+		"generic inventory error": {
+			inReq:          test.MakeSimpleRequest("GET", "http://1.2.3.4/api/internal/v1/inventory/tenants/foo/devices/1/groups", nil),
+			inventoryGroup: model.GroupName(""),
+			inventoryErr:   errors.New("inventory: internal error"),
+
+			JSONResponseParams: utils.JSONResponseParams{
+				OutputStatus:     http.StatusInternalServerError,
+				OutputBodyObject: RestError("internal error"),
+			},
+		},
+	}
+
+	for name, tc := range tcases {
+		t.Logf("test case: %s", name)
+		inv := minventory.InventoryApp{}
+
+		ctx := contextMatcher()
+
+		inv.On("GetDeviceGroup",
+			ctx,
+			mock.AnythingOfType("model.DeviceID")).Return(tc.inventoryGroup, tc.inventoryErr)
+
+		apih := makeMockApiHandler(t, &inv)
+
+		runTestRequest(t, apih, tc.inReq, tc.JSONResponseParams)
+	}
+}
+
 func TestApiDeleteDevice(t *testing.T) {
 	t.Parallel()
 	rest.ErrorFieldName = "error"
@@ -2378,7 +2447,7 @@ func TestApiInventoryInternalDevicesStatus(t *testing.T) {
 			var (
 				inReq = test.MakeSimpleRequest("POST",
 					"http://1.2.3.4/api/internal/v1/inventory/tenants/"+
-						tc.tenantID+"/devices/"+tc.status,
+						tc.tenantID+"/devices/status/"+tc.status,
 					tc.inputDevices,
 				)
 				deviceAttributes = model.DeviceAttributes{{

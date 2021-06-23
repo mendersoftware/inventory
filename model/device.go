@@ -1,4 +1,4 @@
-// Copyright 2020 Northern.tech AS
+// Copyright 2021 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -51,6 +51,10 @@ type DeviceID string
 var NilDeviceID DeviceID //TODO: how to make it NilDeviceID:=DeviceID(primitive.NilObjectID)
 
 type GroupName string
+
+type DeviceGroups struct {
+	Groups []string `json:"groups" bson:"-"`
+}
 
 type DeviceAttribute struct {
 	Name        string      `json:"name" bson:",omitempty"`

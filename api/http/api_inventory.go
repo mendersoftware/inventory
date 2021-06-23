@@ -49,8 +49,9 @@ const (
 	uriInternalHealth        = "/api/internal/v1/inventory/health"
 	uriInternalTenants       = "/api/internal/v1/inventory/tenants"
 	uriInternalDevices       = "/api/internal/v1/inventory/devices"
-	urlInternalDevicesStatus = "/api/internal/v1/inventory/tenants/:tenant_id/devices/:status"
-	urlInternalAttributes    = "/api/internal/v1/inventory/tenants/:tenant_id/device/:did/attribute/scope/:scope"
+	urlInternalDevicesStatus = "/api/internal/v1/inventory/tenants/:tenant_id/devices/status/:status"
+	uriInternalDeviceGroups  = "/api/internal/v1/inventory/tenants/:tenant_id/devices/:device_id/groups"
+	urlInternalAttributes    = "/api/internal/v1/inventory/tenants/:tenant_id/device/:device_id/attribute/scope/:scope"
 	apiUrlManagementV2       = "/api/management/v2/inventory"
 	urlFiltersAttributes     = apiUrlManagementV2 + "/filters/attributes"
 	urlFiltersSearch         = apiUrlManagementV2 + "/filters/search"
@@ -119,6 +120,7 @@ func (i *inventoryHandlers) GetApp() (rest.App, error) {
 		rest.Post(uriInternalTenants, i.CreateTenantHandler),
 		rest.Post(uriInternalDevices, i.AddDeviceHandler),
 		rest.Post(urlInternalDevicesStatus, i.InternalDevicesStatusHandler),
+		rest.Get(uriInternalDeviceGroups, i.GetDeviceGroupsInternalHandler),
 		rest.Get(urlFiltersAttributes, i.FiltersAttributesHandler),
 		rest.Post(urlFiltersSearch, i.FiltersSearchHandler),
 
@@ -429,7 +431,7 @@ func (i *inventoryHandlers) PatchDeviceAttributesInternalHandler(w rest.Response
 
 	l := log.FromContext(ctx)
 
-	deviceId := r.PathParam("did")
+	deviceId := r.PathParam("device_id")
 	if len(deviceId) < 1 {
 		u.RestErrWithLog(w, r, l, errors.New("device id cannot be empty"), http.StatusBadRequest)
 		return
@@ -897,6 +899,33 @@ func (i *inventoryHandlers) InternalDevicesStatusHandler(w rest.ResponseWriter, 
 
 	w.WriteHeader(http.StatusOK)
 	w.WriteJson(result)
+}
+
+func (i *inventoryHandlers) GetDeviceGroupsInternalHandler(w rest.ResponseWriter, r *rest.Request) {
+	ctx := r.Context()
+
+	l := log.FromContext(ctx)
+
+	tenantId := r.PathParam("tenant_id")
+	ctx = getTenantContext(ctx, tenantId)
+
+	deviceID := r.PathParam("device_id")
+	group, err := i.inventory.GetDeviceGroup(ctx, model.DeviceID(deviceID))
+	if err != nil {
+		if err == store.ErrDevNotFound {
+			u.RestErrWithLog(w, r, l, store.ErrDevNotFound, http.StatusNotFound)
+		} else {
+			u.RestErrWithLogInternal(w, r, l, err)
+		}
+		return
+	}
+
+	res := model.DeviceGroups{}
+	if group != "" {
+		res.Groups = append(res.Groups, string(group))
+	}
+
+	w.WriteJson(res)
 }
 
 func getIdsFromDevices(devices []model.DeviceUpdate) []model.DeviceID {

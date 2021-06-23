@@ -111,7 +111,7 @@ paths:
           schema:
             $ref: '#/definitions/Error'
 
-  /tenants/{tenant_id}/devices/{status}:
+  /tenants/{tenant_id}/devices/status/{status}:
     post:
       operationId: Update Status of Devices
       tags:
@@ -207,6 +207,40 @@ paths:
         500:
           $ref: '#/definitions/Error'
 
+  /tenants/{tenant_id}/devices/{device_id}/groups:
+    get:
+      operationId: Get Device Groups
+      tags:
+        - Internal API
+      summary: Get a list of groups the device belongs to
+      parameters:
+        - name: tenant_id
+          in: path
+          description: ID of given tenant.
+          required: true
+          type: string
+        - name: device_id
+          in: path
+          description: Device identifier.
+          required: true
+          type: string
+      responses:
+        200:
+          description: >
+            Successful response.
+          schema:
+            $ref: "#/definitions/Groups"
+        400:
+          description: Missing or malformed request params or body. See the error message for details.
+        404:
+          description: The device was not found.
+          schema:
+            $ref: "#/definitions/Error"
+        500:
+          description: Internal server error.
+          schema:
+            $ref: "#/definitions/Error"
+
 definitions:
   Error:
     description: Error descriptor.
@@ -292,3 +326,17 @@ definitions:
         type: number
         format: integer
         description: Device object revision.
+  Groups:
+    type: object
+    properties:
+      groups:
+        type: array
+        description: List of device's groups.
+        items:
+          type: string
+    required:
+      - groups
+    example:
+      groups:
+        - "test"
+        - "production"
