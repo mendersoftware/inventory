@@ -425,13 +425,13 @@ func (_m *DataStore) UpsertDevicesAttributesWithRevision(ctx context.Context, id
 	return r0, r1
 }
 
-// UpsertDevicesAttributesWithUpdated provides a mock function with given fields: ctx, ids, attrs
-func (_m *DataStore) UpsertDevicesAttributesWithUpdated(ctx context.Context, ids []model.DeviceID, attrs model.DeviceAttributes) (*model.UpdateResult, error) {
-	ret := _m.Called(ctx, ids, attrs)
+// UpsertDevicesAttributesWithUpdated provides a mock function with given fields: ctx, ids, attrs, scope, etag
+func (_m *DataStore) UpsertDevicesAttributesWithUpdated(ctx context.Context, ids []model.DeviceID, attrs model.DeviceAttributes, scope string, etag string) (*model.UpdateResult, error) {
+	ret := _m.Called(ctx, ids, attrs, scope, etag)
 
 	var r0 *model.UpdateResult
-	if rf, ok := ret.Get(0).(func(context.Context, []model.DeviceID, model.DeviceAttributes) *model.UpdateResult); ok {
-		r0 = rf(ctx, ids, attrs)
+	if rf, ok := ret.Get(0).(func(context.Context, []model.DeviceID, model.DeviceAttributes, string, string) *model.UpdateResult); ok {
+		r0 = rf(ctx, ids, attrs, scope, etag)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*model.UpdateResult)
@@ -439,8 +439,8 @@ func (_m *DataStore) UpsertDevicesAttributesWithUpdated(ctx context.Context, ids
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, []model.DeviceID, model.DeviceAttributes) error); ok {
-		r1 = rf(ctx, ids, attrs)
+	if rf, ok := ret.Get(1).(func(context.Context, []model.DeviceID, model.DeviceAttributes, string, string) error); ok {
+		r1 = rf(ctx, ids, attrs, scope, etag)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -448,13 +448,13 @@ func (_m *DataStore) UpsertDevicesAttributesWithUpdated(ctx context.Context, ids
 	return r0, r1
 }
 
-// UpsertRemoveDeviceAttributes provides a mock function with given fields: ctx, id, updateAttrs, removeAttrs
-func (_m *DataStore) UpsertRemoveDeviceAttributes(ctx context.Context, id model.DeviceID, updateAttrs model.DeviceAttributes, removeAttrs model.DeviceAttributes) (*model.UpdateResult, error) {
-	ret := _m.Called(ctx, id, updateAttrs, removeAttrs)
+// UpsertRemoveDeviceAttributes provides a mock function with given fields: ctx, id, updateAttrs, removeAttrs, scope, etag
+func (_m *DataStore) UpsertRemoveDeviceAttributes(ctx context.Context, id model.DeviceID, updateAttrs model.DeviceAttributes, removeAttrs model.DeviceAttributes, scope string, etag string) (*model.UpdateResult, error) {
+	ret := _m.Called(ctx, id, updateAttrs, removeAttrs, scope, etag)
 
 	var r0 *model.UpdateResult
-	if rf, ok := ret.Get(0).(func(context.Context, model.DeviceID, model.DeviceAttributes, model.DeviceAttributes) *model.UpdateResult); ok {
-		r0 = rf(ctx, id, updateAttrs, removeAttrs)
+	if rf, ok := ret.Get(0).(func(context.Context, model.DeviceID, model.DeviceAttributes, model.DeviceAttributes, string, string) *model.UpdateResult); ok {
+		r0 = rf(ctx, id, updateAttrs, removeAttrs, scope, etag)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*model.UpdateResult)
@@ -462,8 +462,8 @@ func (_m *DataStore) UpsertRemoveDeviceAttributes(ctx context.Context, id model.
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, model.DeviceID, model.DeviceAttributes, model.DeviceAttributes) error); ok {
-		r1 = rf(ctx, id, updateAttrs, removeAttrs)
+	if rf, ok := ret.Get(1).(func(context.Context, model.DeviceID, model.DeviceAttributes, model.DeviceAttributes, string, string) error); ok {
+		r1 = rf(ctx, id, updateAttrs, removeAttrs, scope, etag)
 	} else {
 		r1 = ret.Error(1)
 	}

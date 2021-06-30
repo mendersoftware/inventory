@@ -19,7 +19,6 @@ from requests.utils import parse_header_links
 import os
 import requests
 import pytest
-import csv
 import logging
 import subprocess
 
@@ -52,6 +51,7 @@ class ManagementClient:
 
         self.group = self.client.get_model("Group")
         self.inventoryAttribute = self.client.get_model("Attribute")
+        self.inventoryAttributeTag = self.client.get_model("Tag")
 
     def deleteAllGroups(self):
         groups = self.client.Management_API.List_Groups().result()[0]
@@ -81,6 +81,18 @@ class ManagementClient:
             Authorization = "Bearer " + Authorization
         r, _ = self.client.Management_API.Get_Device_Inventory(
             id=device_id, Authorization=Authorization
+        ).result()
+        return r
+
+    def updateTagAttributes(self, device_id, tags, eTag=None, JWT="foo.bar.baz"):
+        r, _ = self.client.Management_API.Add_Tags(
+            id=device_id, If_Match=eTag, tags=tags, Authorization=JWT,
+        ).result()
+        return r
+
+    def setTagAttributes(self, device_id, tags, eTag=None, JWT="foo.bar.baz"):
+        r, _ = self.client.Management_API.Assign_Tags(
+            id=device_id, If_Match=eTag, tags=tags, Authorization=JWT,
         ).result()
         return r
 

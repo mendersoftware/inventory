@@ -1,4 +1,4 @@
-// Copyright 2020 Northern.tech AS
+// Copyright 2021 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -303,20 +303,43 @@ func TestInventoryUpsertAttributes(t *testing.T) {
 	}
 }
 
-func TestInventoryUpsertAttributeWithUpdated(t *testing.T) {
+func TestInventoryUpsertAttributesWithUpdated(t *testing.T) {
 	t.Parallel()
+
+	dsResultFailed := model.UpdateResult{MatchedCount: 0}
+	dsResultsuccess := model.UpdateResult{MatchedCount: 1}
 
 	testCases := map[string]struct {
 		datastoreError error
 		outError       error
+
+		datastoreResult *model.UpdateResult
+
+		scope string
+		etag  string
 	}{
 		"datastore success": {
-			datastoreError: nil,
-			outError:       nil,
+			datastoreResult: nil,
+			datastoreError:  nil,
+			outError:        nil,
+			scope:           model.AttrScopeInventory,
 		},
 		"datastore error": {
 			datastoreError: errors.New("db connection failed"),
 			outError:       errors.New("failed to upsert attributes in db: db connection failed"),
+			scope:          model.AttrScopeInventory,
+		},
+		"incorrect etag": {
+			datastoreResult: &dsResultFailed,
+			datastoreError:  errors.New("failed to replace attributes in db"),
+			scope:           model.AttrScopeTags,
+			etag:            "f7238315-062d-4440-875a-676006f84c34",
+		},
+		"correct etag": {
+			datastoreResult: &dsResultsuccess,
+			datastoreError:  nil,
+			scope:           model.AttrScopeTags,
+			etag:            "f7238315-062d-4440-875a-676006f84c34",
 		},
 	}
 
@@ -330,19 +353,27 @@ func TestInventoryUpsertAttributeWithUpdated(t *testing.T) {
 			db.On("UpsertDevicesAttributesWithUpdated",
 				ctx,
 				mock.AnythingOfType("[]model.DeviceID"),
-				mock.AnythingOfType("model.DeviceAttributes")).
-				Return(nil, tc.datastoreError)
+				mock.AnythingOfType("model.DeviceAttributes"),
+				tc.scope,
+				tc.etag,
+			).Return(tc.datastoreResult, tc.datastoreError)
+
 			i := invForTest(db)
 
-			err := i.UpsertAttributesWithUpdated(ctx, "devid", model.DeviceAttributes{}, model.AttrScopeInventory)
+			err := i.UpsertAttributesWithUpdated(ctx, "devid", model.DeviceAttributes{}, tc.scope, tc.etag)
 
 			if tc.outError != nil {
 				if assert.Error(t, err) {
 					assert.EqualError(t, err, tc.outError.Error())
 				}
 			} else {
-				assert.NoError(t, err)
+				if tc.etag != "" && tc.datastoreError != nil {
+					assert.EqualError(t, err, "failed to upsert attributes in db: failed to replace attributes in db")
+				} else {
+					assert.NoError(t, err)
+				}
 			}
+
 		})
 	}
 }
@@ -359,6 +390,10 @@ func TestReplaceAttributes(t *testing.T) {
 		upsertAttrs model.DeviceAttributes
 		removeAttrs model.DeviceAttributes
 		outError    error
+
+		scope    string
+		etag     string
+		dbResult *model.UpdateResult
 	}{
 		"ok, device not found": {
 			deviceID:     "1",
@@ -381,6 +416,8 @@ func TestReplaceAttributes(t *testing.T) {
 
 			datastoreError: nil,
 			outError:       nil,
+
+			scope: model.AttrScopeInventory,
 		},
 		"ok, device found": {
 			deviceID: "1",
@@ -405,6 +442,8 @@ func TestReplaceAttributes(t *testing.T) {
 
 			datastoreError: nil,
 			outError:       nil,
+
+			scope: model.AttrScopeInventory,
 		},
 		"ok, device found, replace attributes": {
 			deviceID: "1",
@@ -446,6 +485,8 @@ func TestReplaceAttributes(t *testing.T) {
 
 			datastoreError: nil,
 			outError:       nil,
+
+			scope: model.AttrScopeInventory,
 		},
 		"ko, get device error": {
 			deviceID:     "1",
@@ -454,6 +495,8 @@ func TestReplaceAttributes(t *testing.T) {
 
 			datastoreError: nil,
 			outError:       errors.New("failed to get the device: get device error"),
+
+			scope: model.AttrScopeInventory,
 		},
 		"ko, datastore error": {
 			deviceID:     "1",
@@ -476,6 +519,157 @@ func TestReplaceAttributes(t *testing.T) {
 
 			datastoreError: errors.New("get device error"),
 			outError:       errors.New("failed to replace attributes in db: get device error"),
+
+			scope: model.AttrScopeInventory,
+		},
+		"ok, add tags, no etag": {
+			deviceID: "1",
+			getDevice: &model.Device{
+				Attributes: model.DeviceAttributes{},
+			},
+			upsertAttrs: model.DeviceAttributes{
+				model.DeviceAttribute{
+					Name:  "name",
+					Value: "foo",
+					Scope: model.AttrScopeTags,
+				},
+				model.DeviceAttribute{
+					Name:  "region",
+					Value: "bar",
+					Scope: model.AttrScopeTags,
+				},
+			},
+			removeAttrs: model.DeviceAttributes{},
+			scope:       model.AttrScopeTags,
+		},
+		"ok, replace tags, with etag": {
+			deviceID: "1",
+			getDevice: &model.Device{
+				Attributes: model.DeviceAttributes{
+					model.DeviceAttribute{
+						Name:  "name",
+						Value: "foo",
+						Scope: model.AttrScopeTags,
+					},
+				},
+				TagsEtag: "f7238315-062d-4440-875a-676006f84c34",
+			},
+			upsertAttrs: model.DeviceAttributes{
+				model.DeviceAttribute{
+					Name:  "region",
+					Value: "bar",
+					Scope: model.AttrScopeTags,
+				},
+			},
+			removeAttrs: model.DeviceAttributes{
+				model.DeviceAttribute{
+					Name:  "name",
+					Value: "foo",
+					Scope: model.AttrScopeTags,
+				},
+			},
+			scope: model.AttrScopeTags,
+			etag:  "f7238315-062d-4440-875a-676006f84c34",
+		},
+		"ok, delete tags, no etag": {
+			deviceID: "1",
+			getDevice: &model.Device{
+				Attributes: model.DeviceAttributes{
+					model.DeviceAttribute{
+						Name:  "name",
+						Value: "foo",
+						Scope: model.AttrScopeTags,
+					},
+					model.DeviceAttribute{
+						Name:  "region",
+						Value: "bar",
+						Scope: model.AttrScopeTags,
+					},
+				},
+			},
+			upsertAttrs: model.DeviceAttributes{},
+			removeAttrs: model.DeviceAttributes{
+				model.DeviceAttribute{
+					Name:  "name",
+					Value: "foo",
+					Scope: model.AttrScopeTags,
+				},
+				model.DeviceAttribute{
+					Name:  "region",
+					Value: "bar",
+					Scope: model.AttrScopeTags,
+				},
+			},
+			scope: model.AttrScopeTags,
+		},
+		"ok, delete tags, with etag": {
+			deviceID: "1",
+			getDevice: &model.Device{
+				Attributes: model.DeviceAttributes{
+					model.DeviceAttribute{
+						Name:  "name",
+						Value: "foo",
+						Scope: model.AttrScopeTags,
+					},
+					model.DeviceAttribute{
+						Name:  "region",
+						Value: "bar",
+						Scope: model.AttrScopeTags,
+					},
+				},
+				TagsEtag: "f7238315-062d-4440-875a-676006f84c34",
+			},
+			upsertAttrs: model.DeviceAttributes{},
+			removeAttrs: model.DeviceAttributes{
+				model.DeviceAttribute{
+					Name:  "name",
+					Value: "foo",
+					Scope: model.AttrScopeTags,
+				},
+				model.DeviceAttribute{
+					Name:  "region",
+					Value: "bar",
+					Scope: model.AttrScopeTags,
+				},
+			},
+			scope: model.AttrScopeTags,
+			etag:  "f7238315-062d-4440-875a-676006f84c34",
+		},
+		"fail, modify tags, etag doesn't match": {
+			deviceID: "1",
+			getDevice: &model.Device{
+				Attributes: model.DeviceAttributes{
+					model.DeviceAttribute{
+						Name:  "name",
+						Value: "foo",
+						Scope: model.AttrScopeTags,
+					},
+					model.DeviceAttribute{
+						Name:  "region",
+						Value: "bar",
+						Scope: model.AttrScopeTags,
+					},
+				},
+				TagsEtag: "f7238315-062d-4440-875a-676006f84c34",
+			},
+			upsertAttrs: model.DeviceAttributes{
+				model.DeviceAttribute{
+					Name:  "name",
+					Value: "new-foo",
+					Scope: model.AttrScopeTags,
+				},
+			},
+			removeAttrs: model.DeviceAttributes{
+				model.DeviceAttribute{
+					Name:  "region",
+					Value: "bar",
+					Scope: model.AttrScopeTags,
+				},
+			},
+			scope:          model.AttrScopeTags,
+			etag:           "e5f05b31-398a-4df9-a0fd-52c38ef77123",
+			datastoreError: errors.New("failed to replace attributes in db: failed to replace attributes in db: get device error"),
+			outError:       errors.New("failed to replace attributes in db: failed to replace attributes in db: failed to replace attributes in db: get device error"),
 		},
 	}
 
@@ -497,11 +691,13 @@ func TestReplaceAttributes(t *testing.T) {
 					tc.deviceID,
 					tc.upsertAttrs,
 					tc.removeAttrs,
-				).Return(nil, tc.datastoreError)
+					tc.scope,
+					tc.etag,
+				).Return(tc.dbResult, tc.datastoreError)
 			}
 
 			i := invForTest(db)
-			err := i.ReplaceAttributes(ctx, tc.deviceID, tc.upsertAttrs, model.AttrScopeInventory)
+			err := i.ReplaceAttributes(ctx, tc.deviceID, tc.upsertAttrs, tc.scope, tc.etag)
 
 			if tc.outError != nil {
 				if assert.Error(t, err) {
