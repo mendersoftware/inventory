@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"reflect"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/ant0ine/go-json-rest/rest"
@@ -672,6 +673,252 @@ func TestApiInventoryAddDevice(t *testing.T) {
 	}
 }
 
+func TestApiInventoryUpdateDeviceTags(t *testing.T) {
+
+	testCases := map[string]struct {
+		inReq         *http.Request
+		inHdrs        map[string]string
+		deviceID      model.DeviceID
+		attrsToUpsert model.DeviceAttributes
+		scope         string
+		etag          string
+		inventoryErr  error
+		resp          utils.JSONResponseParams
+	}{
+		"Replace tags, PUT, failed ETag": {
+			inReq: test.MakeSimpleRequest("PUT",
+				"http://1.2.3.4/api/0.1.0/devices/:id/tags",
+				[]model.DeviceAttribute{
+					{
+						Name:  "tag_1",
+						Value: "value_1",
+					},
+					{
+						Name:  "tag_2",
+						Value: "value_2",
+					},
+				},
+			),
+			deviceID: "ad22a170-37b5-4c8b-9eab-612bad1eac19",
+			inHdrs: map[string]string{
+				"If-Match": "f7238315-062d-4440-875a-676006f84c34",
+			},
+			attrsToUpsert: model.DeviceAttributes{
+				{Name: "tag_1", Value: "value_1", Scope: model.AttrScopeTags},
+				{Name: "tag_2", Value: "value_2", Scope: model.AttrScopeTags},
+			},
+			scope:        model.AttrScopeTags,
+			inventoryErr: inventory.ErrETagDoesntMatch,
+			etag:         "f7238315-062d-4440-875a-676006f84c34",
+			resp: utils.JSONResponseParams{
+				OutputStatus:     http.StatusPreconditionFailed,
+				OutputBodyObject: RestError("ETag does not match"),
+			},
+		},
+		"ok, replace tags, PUT, with ETag": {
+			inReq: test.MakeSimpleRequest("PUT",
+				"http://1.2.3.4/api/0.1.0/devices/:id/tags",
+				[]model.DeviceAttribute{
+					{
+						Name:  "tag_1",
+						Value: "value_1",
+					},
+					{
+						Name:  "tag_2",
+						Value: "value_2",
+					},
+				},
+			),
+			deviceID: "ad22a170-37b5-4c8b-9eab-612bad1eac19",
+			inHdrs: map[string]string{
+				"If-Match": "f7238315-062d-4440-875a-676006f84c34",
+			},
+			attrsToUpsert: model.DeviceAttributes{
+				{Name: "tag_1", Value: "value_1", Scope: model.AttrScopeTags},
+				{Name: "tag_2", Value: "value_2", Scope: model.AttrScopeTags},
+			},
+			scope:        model.AttrScopeTags,
+			inventoryErr: nil,
+			etag:         "f7238315-062d-4440-875a-676006f84c34",
+			resp: utils.JSONResponseParams{
+				OutputStatus: http.StatusOK,
+			},
+		},
+		"ok, replace tags, PUT, without ETag": {
+			inReq: test.MakeSimpleRequest("PUT",
+				"http://1.2.3.4/api/0.1.0/devices/:id/tags",
+				[]model.DeviceAttribute{
+					{
+						Name:  "tag_1",
+						Value: "value_1",
+					},
+					{
+						Name:  "tag_2",
+						Value: "value_2",
+					},
+				},
+			),
+			deviceID: "ad22a170-37b5-4c8b-9eab-612bad1eac19",
+			attrsToUpsert: model.DeviceAttributes{
+				{Name: "tag_1", Value: "value_1", Scope: model.AttrScopeTags},
+				{Name: "tag_2", Value: "value_2", Scope: model.AttrScopeTags},
+			},
+			scope:        model.AttrScopeTags,
+			inventoryErr: nil,
+			etag:         "",
+			resp: utils.JSONResponseParams{
+				OutputStatus: http.StatusOK,
+			},
+		},
+		"Upsert tags, PATCH, failed ETag": {
+			inReq: test.MakeSimpleRequest("PATCH",
+				"http://1.2.3.4/api/0.1.0/devices/:id/tags",
+				[]model.DeviceAttribute{
+					{
+						Name:  "tag_1",
+						Value: "value_1",
+					},
+					{
+						Name:  "tag_2",
+						Value: "value_2",
+					},
+				},
+			),
+			deviceID: "ad22a170-37b5-4c8b-9eab-612bad1eac19",
+			inHdrs: map[string]string{
+				"If-Match": "f7238315-062d-4440-875a-676006f84c34",
+			},
+			attrsToUpsert: model.DeviceAttributes{
+				{Name: "tag_1", Value: "value_1", Scope: model.AttrScopeTags},
+				{Name: "tag_2", Value: "value_2", Scope: model.AttrScopeTags},
+			},
+			scope:        model.AttrScopeTags,
+			inventoryErr: inventory.ErrETagDoesntMatch,
+			etag:         "f7238315-062d-4440-875a-676006f84c34",
+			resp: utils.JSONResponseParams{
+				OutputStatus:     http.StatusPreconditionFailed,
+				OutputBodyObject: RestError("ETag does not match"),
+			},
+		},
+		"ok, upsert tags, PATCH, with ETag": {
+			inReq: test.MakeSimpleRequest("PATCH",
+				"http://1.2.3.4/api/0.1.0/devices/:id/tags",
+				[]model.DeviceAttribute{
+					{
+						Name:  "tag_1",
+						Value: "value_1",
+					},
+					{
+						Name:  "tag_2",
+						Value: "value_2",
+					},
+				},
+			),
+			deviceID: "ad22a170-37b5-4c8b-9eab-612bad1eac19",
+			inHdrs: map[string]string{
+				"If-Match": "f7238315-062d-4440-875a-676006f84c34",
+			},
+			attrsToUpsert: model.DeviceAttributes{
+				{Name: "tag_1", Value: "value_1", Scope: model.AttrScopeTags},
+				{Name: "tag_2", Value: "value_2", Scope: model.AttrScopeTags},
+			},
+			scope:        model.AttrScopeTags,
+			inventoryErr: nil,
+			etag:         "f7238315-062d-4440-875a-676006f84c34",
+			resp: utils.JSONResponseParams{
+				OutputStatus: http.StatusOK,
+			},
+		},
+		"ok, upsert tags, PATCH, without ETag": {
+			inReq: test.MakeSimpleRequest("PATCH",
+				"http://1.2.3.4/api/0.1.0/devices/:id/tags",
+				[]model.DeviceAttribute{
+					{
+						Name:  "tag_1",
+						Value: "value_1",
+					},
+					{
+						Name:  "tag_2",
+						Value: "value_2",
+					},
+				},
+			),
+			deviceID: "ad22a170-37b5-4c8b-9eab-612bad1eac19",
+			attrsToUpsert: model.DeviceAttributes{
+				{Name: "tag_1", Value: "value_1", Scope: model.AttrScopeTags},
+				{Name: "tag_2", Value: "value_2", Scope: model.AttrScopeTags},
+			},
+			scope:        model.AttrScopeTags,
+			inventoryErr: nil,
+			etag:         "",
+			resp: utils.JSONResponseParams{
+				OutputStatus: http.StatusOK,
+			},
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Logf("test case: %s", name)
+		inv := minventory.InventoryApp{}
+		ctx := contextMatcher()
+
+		if tc.inReq.Method == http.MethodPatch {
+			inv.On("UpsertAttributesWithUpdated",
+				ctx,
+				tc.deviceID,
+				mock.MatchedBy(
+					func(attrs model.DeviceAttributes) bool {
+						if tc.attrsToUpsert != nil {
+							for k, _ := range tc.attrsToUpsert {
+								assert.Equal(t, tc.attrsToUpsert[k].Name, attrs[k].Name)
+								assert.Equal(t, tc.attrsToUpsert[k].Value, attrs[k].Value)
+								assert.Equal(t, tc.attrsToUpsert[k].Description, attrs[k].Description)
+								assert.Equal(t, tc.attrsToUpsert[k].Scope, attrs[k].Scope)
+							}
+						}
+						return true
+					},
+				),
+				tc.scope,
+				tc.etag,
+			).Return(tc.inventoryErr)
+		} else {
+			inv.On("ReplaceAttributes",
+				ctx,
+				tc.deviceID,
+				mock.MatchedBy(
+					func(attrs model.DeviceAttributes) bool {
+						if tc.attrsToUpsert != nil {
+							for k, _ := range tc.attrsToUpsert {
+								assert.Equal(t, tc.attrsToUpsert[k].Name, attrs[k].Name)
+								assert.Equal(t, tc.attrsToUpsert[k].Value, attrs[k].Value)
+								assert.Equal(t, tc.attrsToUpsert[k].Description, attrs[k].Description)
+								assert.Equal(t, tc.attrsToUpsert[k].Scope, attrs[k].Scope)
+							}
+						}
+						return true
+					},
+				),
+				tc.scope,
+				tc.etag,
+			).Return(tc.inventoryErr)
+		}
+
+		apih := makeMockApiHandler(t, &inv)
+
+		if tc.inHdrs != nil {
+			for k, v := range tc.inHdrs {
+				tc.inReq.Header.Set(k, v)
+			}
+		}
+
+		tc.inReq.URL.Path = strings.Replace(tc.inReq.URL.Path, ":id", tc.deviceID.String(), -1)
+
+		runTestRequest(t, apih, tc.inReq, tc.resp)
+
+	}
+}
+
 func TestApiInventoryUpsertAttributes(t *testing.T) {
 	t.Parallel()
 
@@ -680,6 +927,9 @@ func TestApiInventoryUpsertAttributes(t *testing.T) {
 	testCases := map[string]struct {
 		inReq  *http.Request
 		inHdrs map[string]string
+
+		scope string
+		etag  string
 
 		inventoryErr error
 
@@ -695,6 +945,7 @@ func TestApiInventoryUpsertAttributes(t *testing.T) {
 				OutputStatus:     http.StatusUnauthorized,
 				OutputBodyObject: RestError("unauthorized"),
 			},
+			scope: model.AttrScopeInventory,
 		},
 
 		"invalid auth": {
@@ -709,6 +960,7 @@ func TestApiInventoryUpsertAttributes(t *testing.T) {
 				OutputStatus:     http.StatusUnauthorized,
 				OutputBodyObject: RestError("unauthorized"),
 			},
+			scope: model.AttrScopeInventory,
 		},
 
 		"empty body": {
@@ -723,6 +975,7 @@ func TestApiInventoryUpsertAttributes(t *testing.T) {
 				OutputStatus:     http.StatusBadRequest,
 				OutputBodyObject: RestError("failed to decode request body: JSON payload is empty"),
 			},
+			scope: model.AttrScopeInventory,
 		},
 
 		"garbled body": {
@@ -737,6 +990,7 @@ func TestApiInventoryUpsertAttributes(t *testing.T) {
 				OutputStatus:     http.StatusBadRequest,
 				OutputBodyObject: RestError("failed to decode request body: json: cannot unmarshal string into Go value of type []model.DeviceAttribute"),
 			},
+			scope: model.AttrScopeInventory,
 		},
 
 		"body formatted ok, attribute name missing": {
@@ -762,6 +1016,7 @@ func TestApiInventoryUpsertAttributes(t *testing.T) {
 				OutputStatus:     http.StatusBadRequest,
 				OutputBodyObject: RestError("name: cannot be blank."),
 			},
+			scope: model.AttrScopeInventory,
 		},
 
 		"body formatted ok, attribute value missing": {
@@ -782,6 +1037,7 @@ func TestApiInventoryUpsertAttributes(t *testing.T) {
 				OutputStatus:     http.StatusBadRequest,
 				OutputBodyObject: RestError("value: supported types are string, float64, and arrays thereof."),
 			},
+			scope: model.AttrScopeInventory,
 		},
 
 		"body formatted ok, attributes ok (all fields)": {
@@ -812,6 +1068,7 @@ func TestApiInventoryUpsertAttributes(t *testing.T) {
 				{Name: "name1", Value: "value1", Description: strPtr("descr1"), Scope: model.AttrScopeInventory},
 				{Name: "name2", Value: float64(2), Description: strPtr("descr2"), Scope: model.AttrScopeInventory},
 			},
+			scope: model.AttrScopeInventory,
 		},
 
 		"body formatted ok, attributes ok (all fields), with scope": {
@@ -844,6 +1101,7 @@ func TestApiInventoryUpsertAttributes(t *testing.T) {
 				{Name: "name1", Value: "value1", Description: strPtr("descr1"), Scope: model.AttrScopeInventory},
 				{Name: "name2", Value: float64(2), Description: strPtr("descr2"), Scope: model.AttrScopeInventory},
 			},
+			scope: model.AttrScopeInventory,
 		},
 
 		"body formatted ok, attributes ok (all fields, arrays)": {
@@ -870,6 +1128,7 @@ func TestApiInventoryUpsertAttributes(t *testing.T) {
 				OutputStatus:     http.StatusOK,
 				OutputBodyObject: nil,
 			},
+			scope: model.AttrScopeInventory,
 		},
 
 		"body formatted ok, attributes ok (values only)": {
@@ -894,6 +1153,7 @@ func TestApiInventoryUpsertAttributes(t *testing.T) {
 				OutputStatus:     http.StatusOK,
 				OutputBodyObject: nil,
 			},
+			scope: model.AttrScopeInventory,
 		},
 
 		"body formatted ok, attributes ok, but values are empty": {
@@ -918,6 +1178,7 @@ func TestApiInventoryUpsertAttributes(t *testing.T) {
 				OutputStatus:     http.StatusOK,
 				OutputBodyObject: nil,
 			},
+			scope: model.AttrScopeInventory,
 		},
 
 		"body formatted ok, attributes ok (all fields), inventory err": {
@@ -944,6 +1205,7 @@ func TestApiInventoryUpsertAttributes(t *testing.T) {
 				OutputStatus:     http.StatusInternalServerError,
 				OutputBodyObject: RestError("internal error"),
 			},
+			scope: model.AttrScopeInventory,
 		},
 
 		"body formatted ok, attributes ok (values only), PUT": {
@@ -968,6 +1230,7 @@ func TestApiInventoryUpsertAttributes(t *testing.T) {
 				OutputStatus:     http.StatusOK,
 				OutputBodyObject: nil,
 			},
+			scope: model.AttrScopeInventory,
 		},
 	}
 
@@ -991,7 +1254,8 @@ func TestApiInventoryUpsertAttributes(t *testing.T) {
 						return true
 					},
 				),
-				model.AttrScopeInventory,
+				tc.scope,
+				tc.etag,
 			).Return(tc.inventoryErr)
 		} else {
 			inv.On("ReplaceAttributes",
@@ -1007,7 +1271,8 @@ func TestApiInventoryUpsertAttributes(t *testing.T) {
 						return true
 					},
 				),
-				model.AttrScopeInventory,
+				tc.scope,
+				tc.etag,
 			).Return(tc.inventoryErr)
 		}
 
