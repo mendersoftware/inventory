@@ -22,7 +22,7 @@ import (
 
 	"github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
-	mstore "github.com/mendersoftware/go-lib-micro/store"
+	mstore "github.com/mendersoftware/go-lib-micro/store/v2"
 	"github.com/stretchr/testify/assert"
 	"go.mongodb.org/mongo-driver/bson"
 

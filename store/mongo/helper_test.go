@@ -1,4 +1,4 @@
-// Copyright 2020 Northern.tech AS
+// Copyright 2021 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 
-	mstore "github.com/mendersoftware/go-lib-micro/store"
+	mstore "github.com/mendersoftware/go-lib-micro/store/v2"
 	"github.com/mendersoftware/inventory/model"
 )
 

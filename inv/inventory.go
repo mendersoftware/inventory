@@ -1,4 +1,4 @@
-// Copyright 2020 Northern.tech AS
+// Copyright 2021 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -267,9 +267,12 @@ func (i *inventory) GetDeviceGroup(ctx context.Context, id model.DeviceID) (mode
 }
 
 func (i *inventory) CreateTenant(ctx context.Context, tenant model.NewTenant) error {
-	if err := i.db.WithAutomigrate().
-		MigrateTenant(ctx, mongo.DbVersion, tenant.ID); err != nil {
-		return errors.Wrapf(err, "failed to apply migrations for tenant %v", tenant.ID)
+	db := i.db.WithAutomigrate()
+	// before provisioning new tenants, make sure the global database is already migrated
+	for _, tenantID := range []string{"", tenant.ID} {
+		if err := db.MigrateTenant(ctx, mongo.DbVersion, tenantID); err != nil {
+			return errors.Wrapf(err, "failed to apply migrations for tenant %v", tenant.ID)
+		}
 	}
 	return nil
 }
