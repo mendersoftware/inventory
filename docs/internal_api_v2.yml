@@ -7,9 +7,9 @@ info:
     Not exposed via the API Gateway - intended for internal use only.
 
 basePath: '/api/internal/v2/inventory'
-host: 'docker.mender.io'
+host: 'mender-inventory:8080'
 schemes:
-  - https
+  - http
 
 consumes:
   - application/json
