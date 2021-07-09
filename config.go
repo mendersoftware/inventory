@@ -44,6 +44,9 @@ const (
 
 	SettingDevicemonitorAddr        = "devicemonitor_addr"
 	SettingDevicemonitorAddrDefault = "http://mender-devicemonitor:8080"
+
+	SettingEnableReporting        = "enable_reporting"
+	SettingEnableReportingDefault = false
 )
 
 var (
@@ -56,5 +59,6 @@ var (
 		{Key: SettingLimitAttributes, Value: SettingLimitAttributesDefault},
 		{Key: SettingLimitTags, Value: SettingLimitTagsDefault},
 		{Key: SettingDevicemonitorAddr, Value: SettingDevicemonitorAddrDefault},
+		{Key: SettingEnableReporting, Value: SettingEnableReportingDefault},
 	}
 )
