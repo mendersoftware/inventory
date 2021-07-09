@@ -53,3 +53,8 @@ mongo: mongo-inventory:27017
 # Defaults to: false
 # Overwrite with environment variable: INVENTORY_ENABLE_REPORTING
 # enable_reporting: true
+
+# Workflows service address
+# Defaults to: http://mender-workflows-server:8080
+# Overwrite with environment variable: INVENTORY_ORCHESTRATOR_ADDR
+# orchestrator_addr: http://mender-workflows-server:8080

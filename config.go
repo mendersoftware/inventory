@@ -47,6 +47,9 @@ const (
 
 	SettingEnableReporting        = "enable_reporting"
 	SettingEnableReportingDefault = false
+
+	SettingOrchestratorAddr        = "orchestrator_addr"
+	SettingOrchestratorAddrDefault = "http://mender-workflows-server:8080"
 )
 
 var (
@@ -60,5 +63,6 @@ var (
 		{Key: SettingLimitTags, Value: SettingLimitTagsDefault},
 		{Key: SettingDevicemonitorAddr, Value: SettingDevicemonitorAddrDefault},
 		{Key: SettingEnableReporting, Value: SettingEnableReportingDefault},
+		{Key: SettingOrchestratorAddr, Value: SettingOrchestratorAddr},
 	}
 )
