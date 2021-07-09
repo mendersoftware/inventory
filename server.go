@@ -22,6 +22,7 @@ import (
 
 	api_http "github.com/mendersoftware/inventory/api/http"
 	"github.com/mendersoftware/inventory/client/devicemonitor"
+	"github.com/mendersoftware/inventory/client/workflows"
 	"github.com/mendersoftware/inventory/config"
 	inventory "github.com/mendersoftware/inventory/inv"
 	"github.com/mendersoftware/inventory/store/mongo"
@@ -61,6 +62,16 @@ func RunServer(c config.Reader) error {
 	if devicemonitorAddr != "" {
 		c := devicemonitor.NewClient(devicemonitorAddr)
 		inv = inv.WithDevicemonitor(c)
+	}
+
+	if reporting := c.GetBool(SettingEnableReporting); reporting {
+		orchestrator := c.GetString(SettingOrchestratorAddr)
+		if orchestrator == "" {
+			return errors.New("reporting integration needs orchestrator address")
+		}
+
+		c := workflows.NewClient(orchestrator)
+		inv = inv.WithReporting(c)
 	}
 
 	api, err := SetupAPI(c.GetString(SettingMiddleware))

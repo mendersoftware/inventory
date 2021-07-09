@@ -20,6 +20,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/mendersoftware/inventory/client/devicemonitor"
+	"github.com/mendersoftware/inventory/client/workflows"
 	"github.com/mendersoftware/inventory/model"
 	"github.com/mendersoftware/inventory/store"
 	"github.com/mendersoftware/inventory/store/mongo"
@@ -33,6 +34,7 @@ var (
 // this inventory service interface
 //go:generate ../utils/mockgen.sh
 type InventoryApp interface {
+	WithReporting(c workflows.Client) InventoryApp
 	HealthCheck(ctx context.Context) error
 	ListDevices(ctx context.Context, q store.ListQuery) ([]model.Device, int, error)
 	GetDevice(ctx context.Context, id model.DeviceID) (*model.Device, error)
@@ -74,6 +76,8 @@ type inventory struct {
 	limitAttributes int
 	limitTags       int
 	dmClient        devicemonitor.Client
+	enableReporting bool
+	wfClient        workflows.Client
 }
 
 func NewInventory(d store.DataStore) InventoryApp {
@@ -88,6 +92,12 @@ func (i *inventory) WithDevicemonitor(client devicemonitor.Client) InventoryApp 
 func (i *inventory) WithLimits(limitAttributes, limitTags int) InventoryApp {
 	i.limitAttributes = limitAttributes
 	i.limitTags = limitTags
+	return i
+}
+
+func (i *inventory) WithReporting(client workflows.Client) InventoryApp {
+	i.enableReporting = true
+	i.wfClient = client
 	return i
 }
 
