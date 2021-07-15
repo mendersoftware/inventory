@@ -107,6 +107,14 @@ func (i *inventory) HealthCheck(ctx context.Context) error {
 	if err != nil {
 		return errors.Wrap(err, "error reaching MongoDB")
 	}
+
+	if i.enableReporting {
+		err := i.wfClient.CheckHealth(ctx)
+		if err != nil {
+			return errors.Wrap(err, "error reaching workflows")
+		}
+	}
+
 	return nil
 }
 
