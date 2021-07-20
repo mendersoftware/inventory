@@ -134,6 +134,7 @@ paths:
           description: Internal error.
           schema:
             $ref: '#/definitions/Error'
+
   /devices/{id}:
     get:
       operationId: Get Device Inventory
@@ -153,6 +154,12 @@ paths:
           description: Successful response - the device was found.
           schema:
             $ref: "#/definitions/DeviceInventory"
+          headers:
+            ETag:
+              type: string
+              description: |
+                  Contains the device object's current ETag.
+                  Applicable only to attributes with 'tags' scope, changing other attributes doesn't affect the ETag.
           examples:
             application/json:
               id: "291ae0e5956c69c2267489213df4459d19ed48a806603def19d417d004a4b67e"
@@ -165,6 +172,11 @@ paths:
                   scope: "inventory"
                   value: "00.01:02:03:04:05"
                   description: "MAC address"
+                - name: "environment"
+                  scope: "tags"
+                  value: "test"
+                  description: "Test environment"
+                  timestamp: "2016-10-19T17:23:01.639Z"
               updated_ts: "2016-10-03T16:58:51.639Z"
         404:
           description: The device was not found.
@@ -197,6 +209,115 @@ paths:
             description: Internal server error.
             schema:
               $ref: "#/definitions/Error"
+
+  /devices/{id}/tags:
+    patch:
+      operationId: Add Tags
+      tags:
+        - Management API
+      security:
+        - ManagementJWT: []
+      summary: Adds a set of tags for a device
+      description: |
+        Saves the provided tags set for the authenticated device.
+
+        This method has upsert semantic:
+        * it overwrites the values of existing attributes
+        * it creates attributes assigned for the first time
+      parameters:
+        - name: If-Match
+          in: header
+          description: Contains the device object's current ETag, and performs the update only if it matches the one stored in the database.
+          type: string
+        - name: id
+          in: path
+          description: Device identifier.
+          required: true
+          type: string
+        - name: tags
+          in: body
+          description: A list of tag descriptors.
+          required: true
+          schema:
+            title: ListOfTags
+            type: array
+            items:
+              $ref: '#/definitions/Tag'
+            example:
+              - name: "location"
+                value: "germany"
+                description: "Germany region"
+              - name: "environment"
+                value: "test"
+      responses:
+        200:
+          description: Tags were updated successfully.
+        400:
+          description: Missing or malformed request params or body. See the error message for details.
+        404:
+          description: The device was not found.
+          schema:
+            $ref: "#/definitions/Error"
+        412:
+          description: ETag doesn't match.
+        500:
+          description: Internal server error.
+          schema:
+            $ref: "#/definitions/Error"
+    put:
+      operationId: Assign Tags
+      tags:
+        - Management API
+      security:
+        - ManagementJWT: []
+      summary: Replace the set of tags for a device
+      description: |
+        Replaces the tags associated to the device.
+
+        This method replaces all the tags with the new set:
+        * it removes from the db the attributes not provided
+        * it overwrites the values of existing attributes
+        * it creates attributes assigned for the first time
+      parameters:
+        - name: If-Match
+          in: header
+          description: Contains the device object's current ETag, and performs the update only if it matches the one stored in the database.
+          type: string
+        - name: id
+          in: path
+          description: Device identifier.
+          required: true
+          type: string
+        - name: tags
+          in: body
+          description: A list of tags descriptors.
+          required: true
+          schema:
+            title: ListOfTags
+            type: array
+            items:
+              $ref: '#/definitions/Tag'
+            example:
+              - name: "location"
+                value: "germany"
+                description: "Germany region"
+              - name: "environment"
+                value: "test"
+      responses:
+        200:
+          description: Tags were updated successfully.
+        400:
+          description: Missing or malformed request params or body. See the error message for details.
+        404:
+          description: The device was not found.
+          schema:
+            $ref: "#/definitions/Error"
+        412:
+          description: ETag doesn't match.
+        500:
+          description: Internal server error.
+          schema:
+            $ref: "#/definitions/Error"
 
   /devices/{id}/group:
     get:
@@ -268,6 +389,7 @@ paths:
           description: Internal server error.
           schema:
             $ref: "#/definitions/Error"
+
   /devices/{id}/group/{name}:
     delete:
       operationId: Clear Group
@@ -300,6 +422,7 @@ paths:
           description: Internal error.
           schema:
             $ref: '#/definitions/Error'
+
   /groups:
     get:
       operationId: List Groups
@@ -333,7 +456,6 @@ paths:
           description: Internal server error.
           schema:
             $ref: '#/definitions/Error'
-
 
   /groups/{name}/devices:
     get:
@@ -528,10 +650,45 @@ definitions:
 
             Supported types: number, string, array of numbers, array of strings.
             Mixed type arrays are not allowed.
+      timestamp:
+        type: string
+        format: date-time
+        description: |
+            The date and time of last tag update in RFC3339 format.
     example:
       name: "ip_addr_eth"
       description: "Device IP address on ethernet interface"
       value: "127.0.0.1"
+      timestamp: "2016-10-19T17:23:01.639Z"
+  Tag:
+    description: Tag descriptor.
+    type: object
+    required:
+      - name
+      - value
+    properties:
+      name:
+        type: string
+        description: |
+            Tag is an attribute with 'tags' scope.
+
+            A human readable, unique tag ID, e.g. 'location', 'environment', etc.
+      description:
+        type: string
+        description: Tag description.
+      value:
+        type: string
+        description: The current value of the tag.
+      timestamp:
+        type: string
+        format: date-time
+        description: |
+            The date and time of last tag update in RFC3339 format.
+    example:
+      name: "environment"
+      description: "Test environment"
+      value: "test"
+      timestamp: "2016-10-19T17:23:01.639Z"
   DeviceInventory:
     type: object
     properties:

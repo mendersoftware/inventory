@@ -1,4 +1,4 @@
-// Copyright 2020 Northern.tech AS
+// Copyright 2021 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -24,6 +24,10 @@ import (
 	"github.com/mendersoftware/inventory/store/mongo"
 )
 
+var (
+	ErrETagDoesntMatch = errors.New("ETag does not match")
+)
+
 // this inventory service interface
 //go:generate ../utils/mockgen.sh
 type InventoryApp interface {
@@ -32,9 +36,9 @@ type InventoryApp interface {
 	GetDevice(ctx context.Context, id model.DeviceID) (*model.Device, error)
 	AddDevice(ctx context.Context, d *model.Device) error
 	UpsertAttributes(ctx context.Context, id model.DeviceID, attrs model.DeviceAttributes) error
-	UpsertAttributesWithUpdated(ctx context.Context, id model.DeviceID, attrs model.DeviceAttributes) error
+	UpsertAttributesWithUpdated(ctx context.Context, id model.DeviceID, attrs model.DeviceAttributes, scope string, etag string) error
 	UpsertDevicesStatuses(ctx context.Context, devices []model.DeviceUpdate, attrs model.DeviceAttributes) (*model.UpdateResult, error)
-	ReplaceAttributes(ctx context.Context, id model.DeviceID, upsertAttrs model.DeviceAttributes, scope string) error
+	ReplaceAttributes(ctx context.Context, id model.DeviceID, upsertAttrs model.DeviceAttributes, scope string, etag string) error
 	GetFiltersAttributes(ctx context.Context) ([]model.FilterAttribute, error)
 	UnsetDeviceGroup(ctx context.Context, id model.DeviceID, groupName model.GroupName) error
 	UnsetDevicesGroup(
@@ -131,16 +135,28 @@ func (i *inventory) UpsertAttributes(ctx context.Context, id model.DeviceID, att
 	return nil
 }
 
-func (i *inventory) UpsertAttributesWithUpdated(ctx context.Context, id model.DeviceID, attrs model.DeviceAttributes) error {
-	if _, err := i.db.UpsertDevicesAttributesWithUpdated(
-		ctx, []model.DeviceID{id}, attrs,
-	); err != nil {
+func (i *inventory) UpsertAttributesWithUpdated(
+	ctx context.Context,
+	id model.DeviceID,
+	attrs model.DeviceAttributes,
+	scope string,
+	etag string,
+) error {
+	res, err := i.db.UpsertDevicesAttributesWithUpdated(
+		ctx, []model.DeviceID{id}, attrs, scope, etag,
+	)
+	if err != nil {
 		return errors.Wrap(err, "failed to upsert attributes in db")
+	}
+	if scope == model.AttrScopeTags {
+		if res != nil && res.MatchedCount == 0 && etag != "" {
+			return ErrETagDoesntMatch
+		}
 	}
 	return nil
 }
 
-func (i *inventory) ReplaceAttributes(ctx context.Context, id model.DeviceID, upsertAttrs model.DeviceAttributes, scope string) error {
+func (i *inventory) ReplaceAttributes(ctx context.Context, id model.DeviceID, upsertAttrs model.DeviceAttributes, scope string, etag string) error {
 	device, err := i.db.GetDevice(ctx, id)
 	if err != nil && err != store.ErrDevNotFound {
 		return errors.Wrap(err, "failed to get the device")
@@ -153,6 +169,7 @@ func (i *inventory) ReplaceAttributes(ctx context.Context, id model.DeviceID, up
 				for _, upsertAttr := range upsertAttrs {
 					if upsertAttr.Name == attr.Name {
 						update = true
+						break
 					}
 				}
 				if !update {
@@ -161,8 +178,15 @@ func (i *inventory) ReplaceAttributes(ctx context.Context, id model.DeviceID, up
 			}
 		}
 	}
-	if _, err := i.db.UpsertRemoveDeviceAttributes(ctx, id, upsertAttrs, removeAttrs); err != nil {
+
+	res, err := i.db.UpsertRemoveDeviceAttributes(ctx, id, upsertAttrs, removeAttrs, scope, etag)
+	if err != nil {
 		return errors.Wrap(err, "failed to replace attributes in db")
+	}
+	if scope == model.AttrScopeTags {
+		if res != nil && res.MatchedCount == 0 && etag != "" {
+			return ErrETagDoesntMatch
+		}
 	}
 	return nil
 }

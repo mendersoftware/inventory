@@ -32,11 +32,13 @@ const (
 	AttrScopeInventory = "inventory"
 	AttrScopeIdentity  = "identity"
 	AttrScopeSystem    = "system"
+	AttrScopeTags      = "tags"
 
-	AttrNameID      = "id"
-	AttrNameGroup   = "group"
-	AttrNameUpdated = "updated_ts"
-	AttrNameCreated = "created_ts"
+	AttrNameID       = "id"
+	AttrNameGroup    = "group"
+	AttrNameUpdated  = "updated_ts"
+	AttrNameCreated  = "created_ts"
+	AttrNameTagsEtag = "tags_etag"
 )
 
 const (
@@ -61,6 +63,7 @@ type DeviceAttribute struct {
 	Description *string     `json:"description,omitempty" bson:",omitempty"`
 	Value       interface{} `json:"value" bson:",omitempty"`
 	Scope       string      `json:"scope" bson:",omitempty"`
+	Timestamp   *time.Time  `json:"timestamp,omitempty" bson:",omitempty"`
 }
 
 func (da DeviceAttribute) Validate() error {
@@ -68,6 +71,7 @@ func (da DeviceAttribute) Validate() error {
 		validation.Field(&da.Name, validation.Required, validation.Length(1, 1024)),
 		validation.Field(&da.Scope, validation.Required, validation.Length(1, 1024)),
 		validation.Field(&da.Value, validation.By(validateDeviceAttrVal)),
+		validation.Field(&da.Timestamp, validation.Date(time.RFC3339)),
 	)
 }
 
@@ -144,6 +148,9 @@ type Device struct {
 
 	//device object revision
 	Revision uint `json:"-" bson:"revision,omitempty"`
+
+	//tags attributes ETag
+	TagsEtag string `json:"-" bson:"tags_etag,omitempty"`
 }
 
 // internalDevice is only used internally to avoid recursive type-loops for
@@ -190,6 +197,7 @@ func (d Device) Validate() error {
 	return validation.ValidateStruct(&d,
 		validation.Field(&d.ID, validation.Required, validation.Length(1, 1024)),
 		validation.Field(&d.Attributes),
+		validation.Field(&d.TagsEtag, validation.Length(0, 1024)),
 	)
 }
 
@@ -289,6 +297,7 @@ func (d DeviceAttributes) MarshalBSONValue() (bsontype.Type, []byte, error) {
 			Description: d[i].Description,
 			Value:       d[i].Value,
 			Scope:       d[i].Scope,
+			Timestamp:   d[i].Timestamp,
 		}
 		attrs[i].Key = attr.Scope + "-" + replacer.Replace(d[i].Name)
 		attrs[i].Value = &attr
