@@ -19,6 +19,7 @@ DB_NAME = "inventory"
 MIGRATION_COLLECTION = "migration_info"
 DB_VERSION = "0.2.0"
 
+
 class TestMigration:
     @staticmethod
     def verify_db_and_collections(client, dbname):
@@ -30,7 +31,7 @@ class TestMigration:
 
     @staticmethod
     def verify_migration(db, expected_version):
-        major, minor, patch = [int(x) for x in expected_version.split('.')]
+        major, minor, patch = [int(x) for x in expected_version.split(".")]
         version = {
             "version.major": major,
             "version.minor": minor,
@@ -38,7 +39,7 @@ class TestMigration:
         }
 
         mi = db[MIGRATION_COLLECTION].find_one(version)
-        print('found migration:', mi)
+        print("found migration:", mi)
         assert mi
 
 
@@ -54,6 +55,6 @@ class TestCliMigrationMultitenant(TestMigration):
     def test_migrate(self, cli, clean_db, mongo):
         cli.migrate(tenant_id="foobar")
 
-        tenant_db = DB_NAME + '-foobar'
+        tenant_db = DB_NAME + "-foobar"
         TestMigration.verify_db_and_collections(mongo, tenant_db)
         TestMigration.verify_migration(mongo[tenant_db], DB_VERSION)

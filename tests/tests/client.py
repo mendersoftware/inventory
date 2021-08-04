@@ -43,9 +43,7 @@ class ManagementClient:
         http_client.session.verify = False
 
         self.client = SwaggerClient.from_spec(
-            load_file(spec),
-            config=config,
-            http_client=http_client,
+            load_file(spec), config=config, http_client=http_client,
         )
         self.client.swagger_spec.api_url = "http://%s/api/%s" % (host, api)
 
@@ -213,9 +211,7 @@ class InternalApiClient(ApiClient):
 
     def create_tenant(self, tenant_id):
         return self.client.Internal_API.Create_Tenant(
-            tenant={
-                "tenant_id": tenant_id,
-            }
+            tenant={"tenant_id": tenant_id,}
         ).result()
 
     def create_device(self, device_id, attributes, description="test device"):
