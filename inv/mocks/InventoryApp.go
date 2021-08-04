@@ -19,6 +19,7 @@ package mocks
 import (
 	context "context"
 
+	inv "github.com/mendersoftware/inventory/inv"
 	mock "github.com/stretchr/testify/mock"
 
 	model "github.com/mendersoftware/inventory/model"
@@ -427,4 +428,20 @@ func (_m *InventoryApp) UpsertDevicesStatuses(ctx context.Context, devices []mod
 	}
 
 	return r0, r1
+}
+
+// WithLimits provides a mock function with given fields: attributes, tags
+func (_m *InventoryApp) WithLimits(attributes int, tags int) inv.InventoryApp {
+	ret := _m.Called(attributes, tags)
+
+	var r0 inv.InventoryApp
+	if rf, ok := ret.Get(0).(func(int, int) inv.InventoryApp); ok {
+		r0 = rf(attributes, tags)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(inv.InventoryApp)
+		}
+	}
+
+	return r0
 }
