@@ -1,4 +1,4 @@
-// Copyright 2017 Northern.tech AS
+// Copyright 2021 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -35,15 +35,22 @@ const (
 
 	SettingDbUsername = "mongo_username"
 	SettingDbPassword = "mongo_password"
+
+	SettingLimitAttributes        = "limit_attributes"
+	SettingLimitAttributesDefault = 100
+
+	SettingLimitTags        = "limit_tags"
+	SettingLimitTagsDefault = 20
 )
 
 var (
-	configValidators = []config.Validator{}
-	configDefaults   = []config.Default{
+	configDefaults = []config.Default{
 		{Key: SettingListen, Value: SettingListenDefault},
 		{Key: SettingMiddleware, Value: SettingMiddlewareDefault},
 		{Key: SettingDb, Value: SettingDbDefault},
 		{Key: SettingDbSSL, Value: SettingDbSSLDefault},
 		{Key: SettingDbSSLSkipVerify, Value: SettingDbSSLSkipVerifyDefault},
+		{Key: SettingLimitAttributes, Value: SettingLimitAttributesDefault},
+		{Key: SettingLimitTags, Value: SettingLimitTagsDefault},
 	}
 )

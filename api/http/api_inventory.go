@@ -465,6 +465,7 @@ func (i *inventoryHandlers) updateDeviceAttributes(
 	cause := errors.Cause(err)
 	switch cause {
 	case store.ErrNoAttrName:
+	case inventory.ErrTooManyAttributes:
 		u.RestErrWithLog(w, r, l, cause, http.StatusBadRequest)
 		return
 	case inventory.ErrETagDoesntMatch:

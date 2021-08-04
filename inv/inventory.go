@@ -25,7 +25,8 @@ import (
 )
 
 var (
-	ErrETagDoesntMatch = errors.New("ETag does not match")
+	ErrETagDoesntMatch   = errors.New("ETag does not match")
+	ErrTooManyAttributes = errors.New("the number of attributes in the scope is above the limit")
 )
 
 // this inventory service interface
@@ -62,14 +63,23 @@ type InventoryApp interface {
 	) (*model.UpdateResult, error)
 	CreateTenant(ctx context.Context, tenant model.NewTenant) error
 	SearchDevices(ctx context.Context, searchParams model.SearchParams) ([]model.Device, int, error)
+	WithLimits(attributes, tags int) InventoryApp
 }
 
 type inventory struct {
-	db store.DataStore
+	db              store.DataStore
+	limitAttributes int
+	limitTags       int
 }
 
 func NewInventory(d store.DataStore) InventoryApp {
 	return &inventory{db: d}
+}
+
+func (i *inventory) WithLimits(limitAttributes, limitTags int) InventoryApp {
+	i.limitAttributes = limitAttributes
+	i.limitTags = limitTags
+	return i
 }
 
 func (i *inventory) HealthCheck(ctx context.Context) error {
@@ -135,6 +145,52 @@ func (i *inventory) UpsertAttributes(ctx context.Context, id model.DeviceID, att
 	return nil
 }
 
+func (i *inventory) checkAttributesLimits(ctx context.Context, id model.DeviceID, attrs model.DeviceAttributes, scope string) error {
+	limit := 0
+	switch scope {
+	case model.AttrScopeInventory:
+		limit = i.limitAttributes
+	case model.AttrScopeTags:
+		limit = i.limitTags
+	}
+	if limit == 0 {
+		return nil
+	}
+	device, err := i.db.GetDevice(ctx, id)
+	if err != nil && err != store.ErrDevNotFound {
+		return errors.Wrap(err, "failed to get the device")
+	} else if device == nil {
+		return nil
+	}
+	count := 0
+	for _, attr := range device.Attributes {
+		if attr.Scope == scope {
+			count += 1
+			if count > limit {
+				break
+			}
+		}
+	}
+	for _, attr := range attrs {
+		if count > limit {
+			break
+		}
+		found := false
+		for _, devAttr := range device.Attributes {
+			if attr.Scope == scope && attr.Name == devAttr.Name {
+				found = true
+			}
+		}
+		if !found {
+			count++
+		}
+	}
+	if count > limit {
+		return ErrTooManyAttributes
+	}
+	return nil
+}
+
 func (i *inventory) UpsertAttributesWithUpdated(
 	ctx context.Context,
 	id model.DeviceID,
@@ -142,6 +198,9 @@ func (i *inventory) UpsertAttributesWithUpdated(
 	scope string,
 	etag string,
 ) error {
+	if err := i.checkAttributesLimits(ctx, id, attrs, scope); err != nil {
+		return err
+	}
 	res, err := i.db.UpsertDevicesAttributesWithUpdated(
 		ctx, []model.DeviceID{id}, attrs, scope, etag,
 	)
@@ -157,10 +216,22 @@ func (i *inventory) UpsertAttributesWithUpdated(
 }
 
 func (i *inventory) ReplaceAttributes(ctx context.Context, id model.DeviceID, upsertAttrs model.DeviceAttributes, scope string, etag string) error {
+	limit := 0
+	switch scope {
+	case model.AttrScopeInventory:
+		limit = i.limitAttributes
+	case model.AttrScopeTags:
+		limit = i.limitTags
+	}
+	if limit > 0 && len(upsertAttrs) > limit {
+		return ErrTooManyAttributes
+	}
+
 	device, err := i.db.GetDevice(ctx, id)
 	if err != nil && err != store.ErrDevNotFound {
 		return errors.Wrap(err, "failed to get the device")
 	}
+
 	removeAttrs := model.DeviceAttributes{}
 	if device != nil {
 		for _, attr := range device.Attributes {

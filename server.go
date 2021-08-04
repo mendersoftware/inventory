@@ -1,4 +1,4 @@
-// Copyright 2019 Northern.tech AS
+// Copyright 2021 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -50,7 +50,10 @@ func RunServer(c config.Reader) error {
 		return errors.Wrap(err, "database connection failed")
 	}
 
-	inv := inventory.NewInventory(db)
+	limitAttributes := c.GetInt(SettingLimitAttributes)
+	limitTags := c.GetInt(SettingLimitTags)
+
+	inv := inventory.NewInventory(db).WithLimits(limitAttributes, limitTags)
 
 	invapi := api_http.NewInventoryApiHandlers(inv)
 
