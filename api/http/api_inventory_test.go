@@ -3693,3 +3693,142 @@ func makeReq(method, url, auth string, body interface{}) *http.Request {
 func restError(status string) map[string]interface{} {
 	return map[string]interface{}{"error": status, "request_id": "test"}
 }
+
+func TestApiInventoryInternalReindex(t *testing.T) {
+	t.Parallel()
+
+	testCases := map[string]struct {
+		tenantID    string
+		deviceID    string
+		serviceName string
+
+		callsUpsertAttributes bool
+		upsertAttributesErr   error
+
+		callsCheckAlerts bool
+		alertsCount      int
+		checkAlertsError error
+
+		deviceAttributes model.DeviceAttributes
+
+		resp utils.JSONResponseParams
+	}{
+		"ok, alerts": {
+			tenantID:    "foo",
+			deviceID:    "bar",
+			serviceName: "devicemonitor",
+			resp: utils.JSONResponseParams{
+				OutputStatus: http.StatusOK,
+			},
+			callsUpsertAttributes: true,
+			callsCheckAlerts:      true,
+			alertsCount:           3,
+			deviceAttributes: model.DeviceAttributes{
+				{Name: model.AttrNameNumberOfAlerts, Value: 3, Scope: model.AttrScopeMonitor},
+				{Name: model.AttrNameAlerts, Value: true, Scope: model.AttrScopeMonitor},
+			},
+		},
+		"ok, no alerts": {
+			tenantID:    "foo",
+			deviceID:    "bar",
+			serviceName: "devicemonitor",
+			resp: utils.JSONResponseParams{
+				OutputStatus: http.StatusOK,
+			},
+			callsUpsertAttributes: true,
+			callsCheckAlerts:      true,
+			alertsCount:           0,
+			deviceAttributes: model.DeviceAttributes{
+				{Name: model.AttrNameNumberOfAlerts, Value: 0, Scope: model.AttrScopeMonitor},
+				{Name: model.AttrNameAlerts, Value: false, Scope: model.AttrScopeMonitor},
+			},
+		},
+		"wrong service": {
+			tenantID:    "foo",
+			deviceID:    "bar",
+			serviceName: "baz",
+			resp: utils.JSONResponseParams{
+				OutputStatus:     http.StatusBadRequest,
+				OutputBodyObject: RestError("unsupported service"),
+			},
+		},
+		"no device id": {
+			tenantID:    "foo",
+			serviceName: "baz",
+			resp: utils.JSONResponseParams{
+				OutputStatus:     http.StatusBadRequest,
+				OutputBodyObject: RestError("device id cannot be empty"),
+			},
+		},
+		"ko, upsert attributes error": {
+			tenantID:              "foo",
+			deviceID:              "bar",
+			serviceName:           "devicemonitor",
+			callsCheckAlerts:      true,
+			alertsCount:           0,
+			callsUpsertAttributes: true,
+			upsertAttributesErr:   errors.New("upsert attributes error"),
+			resp: utils.JSONResponseParams{
+				OutputStatus:     http.StatusInternalServerError,
+				OutputBodyObject: RestError("internal error"),
+			},
+		},
+		"ko, check allerts error": {
+			tenantID:         "foo",
+			deviceID:         "bar",
+			serviceName:      "devicemonitor",
+			callsCheckAlerts: true,
+			checkAlertsError: errors.New("check allerts error"),
+			resp: utils.JSONResponseParams{
+				OutputStatus:     http.StatusInternalServerError,
+				OutputBodyObject: RestError("internal error"),
+			},
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			var (
+				inReq = test.MakeSimpleRequest("POST",
+					"http://1.2.3.4/api/internal/v1/inventory/tenants/"+
+						tc.tenantID+"/devices/"+tc.deviceID+"/reindex?service="+tc.serviceName,
+					nil,
+				)
+			)
+
+			inv := minventory.InventoryApp{}
+			ctx := contextMatcher()
+
+			if tc.callsUpsertAttributes {
+				inv.On("UpsertAttributes",
+					ctx,
+					mock.AnythingOfType("model.DeviceID"),
+					mock.MatchedBy(
+						func(attrs model.DeviceAttributes) bool {
+							if tc.deviceAttributes != nil {
+								if !reflect.DeepEqual(tc.deviceAttributes, attrs) {
+									assert.FailNow(t, "", "attributes not equal: %v \n%v\n", tc.deviceAttributes, attrs)
+								}
+							}
+							return true
+						},
+					),
+				).Return(tc.upsertAttributesErr)
+			}
+			if tc.callsCheckAlerts {
+				inv.On("CheckAlerts",
+					ctx,
+					tc.deviceID,
+				).Return(tc.alertsCount, tc.checkAlertsError)
+			}
+
+			apih := makeMockApiHandler(t, &inv)
+
+			rest.ErrorFieldName = "error"
+
+			runTestRequest(t, apih, inReq, tc.resp)
+
+			inv.AssertExpectations(t)
+		})
+	}
+}

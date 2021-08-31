@@ -275,6 +275,45 @@ paths:
           schema:
             $ref: "#/definitions/Error"
 
+  /tenants/{tenant_id}/devices/{device_id}/reindex:
+    post:
+      tags:
+        - Internal API
+      summary: Start reindexing device attributes.
+      operationId: Start Re-indexing
+      parameters:
+        - in: query
+          name: service
+          schema:
+            type: string
+            example: "devicemonitor"
+          description: The name of the calling service.
+        - in: path
+          name: device_id
+          required: true
+          description: ID of the device that needs reindexing.
+          schema:
+            type: string
+            example: "4396a839-8147-4d01-ac7d-fd3edf8f7ad0"
+        - in: path
+          name: tenant_id
+          required: true
+          description: ID of tenant owning the device.
+          schema:
+            type: string
+            example: "123456789012345678901234"
+      responses:
+        200:
+          description: Attributes have been re-indexed.
+        400:
+          description: Invalid Request.
+          schema:
+            $ref: "#/definitions/Error"
+        500:
+          description: Internal server error.
+          schema:
+            $ref: "#/definitions/Error"
+
 definitions:
   Error:
     description: Error descriptor.

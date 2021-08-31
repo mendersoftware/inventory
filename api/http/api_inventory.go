@@ -54,6 +54,7 @@ const (
 	uriInternalDeviceDetails = "/api/internal/v1/inventory/tenants/:tenant_id/devices/:device_id"
 	uriInternalDeviceGroups  = "/api/internal/v1/inventory/tenants/:tenant_id/devices/:device_id/groups"
 	urlInternalAttributes    = "/api/internal/v1/inventory/tenants/:tenant_id/device/:device_id/attribute/scope/:scope"
+	urlInternalReindex       = "/api/internal/v1/inventory/tenants/:tenant_id/devices/:device_id/reindex"
 	apiUrlManagementV2       = "/api/management/v2/inventory"
 	urlFiltersAttributes     = apiUrlManagementV2 + "/filters/attributes"
 	urlFiltersSearch         = apiUrlManagementV2 + "/filters/search"
@@ -113,6 +114,7 @@ func (i *inventoryHandlers) GetApp() (rest.App, error) {
 		rest.Patch(uriAttributes, i.UpdateDeviceAttributesHandler),
 		rest.Put(uriAttributes, i.UpdateDeviceAttributesHandler),
 		rest.Patch(urlInternalAttributes, i.PatchDeviceAttributesInternalHandler),
+		rest.Post(urlInternalReindex, i.ReindexDeviceDataHandler),
 		rest.Put(uriDeviceGroups, i.AddDeviceToGroupHandler),
 		rest.Patch(uriGroupsDevices, i.AppendDevicesToGroup),
 		rest.Put(uriDeviceTags, i.UpdateDeviceTagsHandler),
@@ -1015,6 +1017,66 @@ func (i *inventoryHandlers) GetDeviceGroupsInternalHandler(w rest.ResponseWriter
 	}
 
 	w.WriteJson(res)
+}
+
+func (i *inventoryHandlers) ReindexDeviceDataHandler(w rest.ResponseWriter, r *rest.Request) {
+	ctx := r.Context()
+	tenantId := r.PathParam("tenant_id")
+	ctx = getTenantContext(ctx, tenantId)
+
+	l := log.FromContext(ctx)
+
+	deviceId := r.PathParam("device_id")
+	if len(deviceId) < 1 {
+		u.RestErrWithLog(w, r, l, errors.New("device id cannot be empty"), http.StatusBadRequest)
+		return
+	}
+
+	serviceName, err := utils.ParseQueryParmStr(r, "service", false, nil)
+	// inventory service accepts only reindex requests from devicemonitor
+	if err != nil || serviceName != "devicemonitor" {
+		u.RestErrWithLog(w, r, l, errors.New("unsupported service"), http.StatusBadRequest)
+		return
+	}
+
+	// check devicemonitor alerts
+	alertsCount, err := i.inventory.CheckAlerts(ctx, deviceId)
+	if err != nil {
+		u.RestErrWithLogInternal(w, r, l, err)
+		return
+	}
+
+	alertsPresent := false
+	if alertsCount > 0 {
+		alertsPresent = true
+	}
+	attrs := model.DeviceAttributes{
+		model.DeviceAttribute{
+			Name:  model.AttrNameNumberOfAlerts,
+			Scope: model.AttrScopeMonitor,
+			Value: alertsCount,
+		},
+		model.DeviceAttribute{
+			Name:  model.AttrNameAlerts,
+			Scope: model.AttrScopeMonitor,
+			Value: alertsPresent,
+		},
+	}
+
+	// upsert monitor attributes
+	err = i.inventory.UpsertAttributes(ctx, model.DeviceID(deviceId), attrs)
+	cause := errors.Cause(err)
+	switch cause {
+	case store.ErrNoAttrName:
+		u.RestErrWithLog(w, r, l, cause, http.StatusBadRequest)
+		return
+	}
+	if err != nil {
+		u.RestErrWithLogInternal(w, r, l, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
 }
 
 func getIdsFromDevices(devices []model.DeviceUpdate) []model.DeviceID {
