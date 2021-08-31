@@ -4260,6 +4260,27 @@ func TestMongoSearchDevices(t *testing.T) {
 				PerPage: 5,
 			},
 		},
+		"no filter, sort by ID desc": {
+			expected: []model.Device{
+				inputDevs[4],
+				inputDevs[3],
+				inputDevs[2],
+				inputDevs[1],
+				inputDevs[0],
+			},
+			devTotal: 5,
+			searchParams: model.SearchParams{
+				Page:    1,
+				PerPage: 5,
+				Sort: []model.SortCriteria{
+					{
+						Scope:     "identity",
+						Attribute: "id",
+						Order:     "desc",
+					},
+				},
+			},
+		},
 	}
 
 	for name, tc := range testCases {
