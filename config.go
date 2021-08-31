@@ -41,6 +41,9 @@ const (
 
 	SettingLimitTags        = "limit_tags"
 	SettingLimitTagsDefault = 20
+
+	SettingDevicemonitorAddr        = "devicemonitor_addr"
+	SettingDevicemonitorAddrDefault = "http://mender-devicemonitor:8080"
 )
 
 var (
@@ -52,5 +55,6 @@ var (
 		{Key: SettingDbSSLSkipVerify, Value: SettingDbSSLSkipVerifyDefault},
 		{Key: SettingLimitAttributes, Value: SettingLimitAttributesDefault},
 		{Key: SettingLimitTags, Value: SettingLimitTagsDefault},
+		{Key: SettingDevicemonitorAddr, Value: SettingDevicemonitorAddrDefault},
 	}
 )

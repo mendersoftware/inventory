@@ -21,6 +21,7 @@ import (
 	"github.com/pkg/errors"
 
 	api_http "github.com/mendersoftware/inventory/api/http"
+	"github.com/mendersoftware/inventory/client/devicemonitor"
 	"github.com/mendersoftware/inventory/config"
 	inventory "github.com/mendersoftware/inventory/inv"
 	"github.com/mendersoftware/inventory/store/mongo"
@@ -56,6 +57,11 @@ func RunServer(c config.Reader) error {
 	inv := inventory.NewInventory(db).WithLimits(limitAttributes, limitTags)
 
 	invapi := api_http.NewInventoryApiHandlers(inv)
+	devicemonitorAddr := c.GetString(SettingDevicemonitorAddr)
+	if devicemonitorAddr != "" {
+		c := devicemonitor.NewClient(devicemonitorAddr)
+		inv = inv.WithDevicemonitor(c)
+	}
 
 	api, err := SetupAPI(c.GetString(SettingMiddleware))
 	if err != nil {
