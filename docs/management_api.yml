@@ -193,9 +193,6 @@ paths:
       security:
         - ManagementJWT: []
       summary: Remove selected device's inventory
-      description:  |
-        This endpoint is deprecated and should no longer be used.
-        Using it will leave the system in an undefined state.
       parameters:
         - name: id
           in: path

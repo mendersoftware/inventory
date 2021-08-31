@@ -49,8 +49,9 @@ const (
 	uriInternalAlive         = "/api/internal/v1/inventory/alive"
 	uriInternalHealth        = "/api/internal/v1/inventory/health"
 	uriInternalTenants       = "/api/internal/v1/inventory/tenants"
-	uriInternalDevices       = "/api/internal/v1/inventory/devices"
+	uriInternalDevices       = "/api/internal/v1/inventory/tenants/:tenant_id/devices"
 	urlInternalDevicesStatus = "/api/internal/v1/inventory/tenants/:tenant_id/devices/status/:status"
+	uriInternalDeviceDetails = "/api/internal/v1/inventory/tenants/:tenant_id/devices/:device_id"
 	uriInternalDeviceGroups  = "/api/internal/v1/inventory/tenants/:tenant_id/devices/:device_id/groups"
 	urlInternalAttributes    = "/api/internal/v1/inventory/tenants/:tenant_id/device/:device_id/attribute/scope/:scope"
 	apiUrlManagementV2       = "/api/management/v2/inventory"
@@ -106,7 +107,7 @@ func (i *inventoryHandlers) GetApp() (rest.App, error) {
 
 		rest.Get(uriDevices, i.GetDevicesHandler),
 		rest.Get(uriDevice, i.GetDeviceHandler),
-		rest.Delete(uriDevice, i.DeleteDeviceHandler),
+		rest.Delete(uriDevice, i.DeleteDeviceInventoryHandler),
 		rest.Delete(uriDeviceGroup, i.DeleteDeviceGroupHandler),
 		rest.Delete(uriGroupsDevices, i.ClearDevicesGroup),
 		rest.Patch(uriAttributes, i.UpdateDeviceAttributesHandler),
@@ -123,6 +124,7 @@ func (i *inventoryHandlers) GetApp() (rest.App, error) {
 
 		rest.Post(uriInternalTenants, i.CreateTenantHandler),
 		rest.Post(uriInternalDevices, i.AddDeviceHandler),
+		rest.Delete(uriInternalDeviceDetails, i.DeleteDeviceHandler),
 		rest.Post(urlInternalDevicesStatus, i.InternalDevicesStatusHandler),
 		rest.Get(uriInternalDeviceGroups, i.GetDeviceGroupsInternalHandler),
 		rest.Get(urlFiltersAttributes, i.FiltersAttributesHandler),
@@ -346,12 +348,36 @@ func (i *inventoryHandlers) GetDeviceHandler(w rest.ResponseWriter, r *rest.Requ
 	w.WriteJson(dev)
 }
 
-func (i *inventoryHandlers) DeleteDeviceHandler(w rest.ResponseWriter, r *rest.Request) {
+func (i *inventoryHandlers) DeleteDeviceInventoryHandler(w rest.ResponseWriter, r *rest.Request) {
 	ctx := r.Context()
 
 	l := log.FromContext(ctx)
 
 	deviceID := r.PathParam("id")
+
+	err := i.inventory.ReplaceAttributes(ctx, model.DeviceID(deviceID),
+		model.DeviceAttributes{}, model.AttrScopeInventory, "")
+	if err != nil && err != store.ErrDevNotFound {
+		u.RestErrWithLogInternal(w, r, l, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (i *inventoryHandlers) DeleteDeviceHandler(w rest.ResponseWriter, r *rest.Request) {
+	ctx := r.Context()
+	tenantId := r.PathParam("tenant_id")
+	if tenantId != "" {
+		id := &midentity.Identity{
+			Tenant: tenantId,
+		}
+		ctx = midentity.WithContext(ctx, id)
+	}
+
+	l := log.FromContext(ctx)
+
+	deviceID := r.PathParam("device_id")
 
 	err := i.inventory.DeleteDevice(ctx, model.DeviceID(deviceID))
 	if err != nil && err != store.ErrDevNotFound {
@@ -364,6 +390,13 @@ func (i *inventoryHandlers) DeleteDeviceHandler(w rest.ResponseWriter, r *rest.R
 
 func (i *inventoryHandlers) AddDeviceHandler(w rest.ResponseWriter, r *rest.Request) {
 	ctx := r.Context()
+	tenantId := r.PathParam("tenant_id")
+	if tenantId != "" {
+		id := &midentity.Identity{
+			Tenant: tenantId,
+		}
+		ctx = midentity.WithContext(ctx, id)
+	}
 
 	l := log.FromContext(ctx)
 

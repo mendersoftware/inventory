@@ -43,7 +43,9 @@ class ManagementClient:
         http_client.session.verify = False
 
         self.client = SwaggerClient.from_spec(
-            load_file(spec), config=config, http_client=http_client,
+            load_file(spec),
+            config=config,
+            http_client=http_client,
         )
         self.client.swagger_spec.api_url = "http://%s/api/%s" % (host, api)
 
@@ -84,13 +86,19 @@ class ManagementClient:
 
     def updateTagAttributes(self, device_id, tags, eTag=None, JWT="foo.bar.baz"):
         r, _ = self.client.Management_API.Add_Tags(
-            id=device_id, If_Match=eTag, tags=tags, Authorization=JWT,
+            id=device_id,
+            If_Match=eTag,
+            tags=tags,
+            Authorization=JWT,
         ).result()
         return r
 
     def setTagAttributes(self, device_id, tags, eTag=None, JWT="foo.bar.baz"):
         r, _ = self.client.Management_API.Assign_Tags(
-            id=device_id, If_Match=eTag, tags=tags, Authorization=JWT,
+            id=device_id,
+            If_Match=eTag,
+            tags=tags,
+            Authorization=JWT,
         ).result()
         return r
 
@@ -211,7 +219,9 @@ class InternalApiClient(ApiClient):
 
     def create_tenant(self, tenant_id):
         return self.client.Internal_API.Create_Tenant(
-            tenant={"tenant_id": tenant_id,}
+            tenant={
+                "tenant_id": tenant_id,
+            }
         ).result()
 
     def create_device(self, device_id, attributes, description="test device"):
@@ -219,4 +229,6 @@ class InternalApiClient(ApiClient):
             id=device_id, description=description, attributes=attributes
         )
 
-        return self.client.Internal_API.Initialize_Device(device=device).result()
+        return self.client.Internal_API.Initialize_Device(
+            tenant_id="", device=device
+        ).result()
