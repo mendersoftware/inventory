@@ -993,8 +993,13 @@ func (db *DataStoreMongo) SearchDevices(ctx context.Context, searchParams model.
 	if len(searchParams.Sort) > 0 {
 		sortField := make(bson.D, len(searchParams.Sort))
 		for i, sortQ := range searchParams.Sort {
-			name := fmt.Sprintf("%s-%s", sortQ.Scope, model.GetDeviceAttributeNameReplacer().Replace(sortQ.Attribute))
-			field := fmt.Sprintf("%s.%s.%s", DbDevAttributes, name, DbDevAttributesValue)
+			var field string
+			if sortQ.Scope == model.AttrScopeIdentity && sortQ.Attribute == model.AttrNameID {
+				field = DbDevId
+			} else {
+				name := fmt.Sprintf("%s-%s", sortQ.Scope, model.GetDeviceAttributeNameReplacer().Replace(sortQ.Attribute))
+				field = fmt.Sprintf("%s.%s", DbDevAttributes, name)
+			}
 			sortField[i] = bson.E{Key: field, Value: 1}
 			if sortQ.Order == "desc" {
 				sortField[i].Value = -1
