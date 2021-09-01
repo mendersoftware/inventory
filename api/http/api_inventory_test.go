@@ -502,7 +502,7 @@ func TestApiInventoryAddDevice(t *testing.T) {
 	}{
 		"empty body": {
 			inReq: test.MakeSimpleRequest("POST",
-				"http://1.2.3.4/api/internal/v1/inventory/devices",
+				"http://1.2.3.4/api/internal/v1/inventory/tenants/1/devices",
 				nil),
 			inventoryErr: nil,
 			JSONResponseParams: utils.JSONResponseParams{
@@ -512,7 +512,7 @@ func TestApiInventoryAddDevice(t *testing.T) {
 		},
 		"garbled body": {
 			inReq: test.MakeSimpleRequest("POST",
-				"http://1.2.3.4/api/internal/v1/inventory/devices",
+				"http://1.2.3.4/api/internal/v1/inventory/tenants/1/devices",
 				"foo bar"),
 			inventoryErr: nil,
 			JSONResponseParams: utils.JSONResponseParams{
@@ -522,7 +522,7 @@ func TestApiInventoryAddDevice(t *testing.T) {
 		},
 		"body formatted ok, all fields present": {
 			inReq: test.MakeSimpleRequest("POST",
-				"http://1.2.3.4/api/internal/v1/inventory/devices",
+				"http://1.2.3.4/api/internal/v1/inventory/tenants/1/devices",
 				map[string]interface{}{
 					"id": "id-0001",
 					"attributes": []map[string]interface{}{
@@ -546,7 +546,7 @@ func TestApiInventoryAddDevice(t *testing.T) {
 		},
 		"body formatted ok, all fields present, attributes with scope": {
 			inReq: test.MakeSimpleRequest("POST",
-				"http://1.2.3.4/api/internal/v1/inventory/devices",
+				"http://1.2.3.4/api/internal/v1/inventory/tenants/1/devices",
 				map[string]interface{}{
 					"id": "id-0001",
 					"attributes": []map[string]interface{}{
@@ -570,7 +570,7 @@ func TestApiInventoryAddDevice(t *testing.T) {
 		},
 		"body formatted ok, wrong attributes type": {
 			inReq: test.MakeSimpleRequest("POST",
-				"http://1.2.3.4/api/internal/v1/inventory/devices",
+				"http://1.2.3.4/api/internal/v1/inventory/tenants/1/devices",
 				map[string]interface{}{
 					"id":         "id-0001",
 					"attributes": 123,
@@ -584,7 +584,7 @@ func TestApiInventoryAddDevice(t *testing.T) {
 		},
 		"body formatted ok, 'id' missing": {
 			inReq: test.MakeSimpleRequest("POST",
-				"http://1.2.3.4/api/internal/v1/inventory/devices",
+				"http://1.2.3.4/api/internal/v1/inventory/tenants/1/devices",
 				map[string]interface{}{},
 			),
 			inventoryErr: nil,
@@ -595,7 +595,7 @@ func TestApiInventoryAddDevice(t *testing.T) {
 		},
 		"body formatted ok, incorrect attribute value": {
 			inReq: test.MakeSimpleRequest("POST",
-				"http://1.2.3.4/api/internal/v1/inventory/devices",
+				"http://1.2.3.4/api/internal/v1/inventory/tenants/1/devices",
 				map[string]interface{}{
 					"id": "id-0001",
 					"attributes": []map[string]interface{}{
@@ -612,7 +612,7 @@ func TestApiInventoryAddDevice(t *testing.T) {
 		},
 		"body formatted ok, attribute name missing": {
 			inReq: test.MakeSimpleRequest("POST",
-				"http://1.2.3.4/api/internal/v1/inventory/devices",
+				"http://1.2.3.4/api/internal/v1/inventory/tenants/1/devices",
 				map[string]interface{}{
 					"id": "id-0001",
 					"attributes": []map[string]interface{}{
@@ -628,7 +628,7 @@ func TestApiInventoryAddDevice(t *testing.T) {
 		},
 		"body formatted ok, inv error": {
 			inReq: test.MakeSimpleRequest("POST",
-				"http://1.2.3.4/api/internal/v1/inventory/devices",
+				"http://1.2.3.4/api/internal/v1/inventory/tenants/1/devices",
 				map[string]interface{}{
 					"id": "id-0001",
 					"attributes": []map[string]interface{}{
@@ -2164,7 +2164,7 @@ func TestApiGetDeviceGroupInternal(t *testing.T) {
 	}
 }
 
-func TestApiDeleteDevice(t *testing.T) {
+func TestApiDeleteDeviceInventory(t *testing.T) {
 	t.Parallel()
 	rest.ErrorFieldName = "error"
 
@@ -2193,6 +2193,64 @@ func TestApiDeleteDevice(t *testing.T) {
 		"error": {
 			inDevId: model.DeviceID("3"),
 			inReq:   test.MakeSimpleRequest("DELETE", "http://1.2.3.4/api/0.1.0/devices/3", nil),
+			JSONResponseParams: utils.JSONResponseParams{
+				OutputStatus:     http.StatusInternalServerError,
+				OutputBodyObject: RestError("internal error"),
+			},
+			inventoryErr: errors.New("inventory internal error"),
+		},
+	}
+
+	for name, tc := range tcases {
+		t.Run(fmt.Sprintf("test case: %s", name), func(t *testing.T) {
+
+			inv := minventory.InventoryApp{}
+
+			ctx := contextMatcher()
+
+			inv.On("ReplaceAttributes",
+				ctx,
+				tc.inDevId,
+				model.DeviceAttributes{},
+				model.AttrScopeInventory,
+				"").Return(tc.inventoryErr)
+
+			apih := makeMockApiHandler(t, &inv)
+
+			runTestRequest(t, apih, tc.inReq, tc.JSONResponseParams)
+		})
+	}
+}
+
+func TestApiDeleteDevice(t *testing.T) {
+	t.Parallel()
+	rest.ErrorFieldName = "error"
+
+	tcases := map[string]struct {
+		utils.JSONResponseParams
+
+		inReq        *http.Request
+		inDevId      model.DeviceID
+		inventoryErr error
+	}{
+		"no device": {
+			inDevId:      model.DeviceID("1"),
+			inReq:        test.MakeSimpleRequest("DELETE", "http://1.2.3.4/api/internal/v1/inventory/tenants/1/devices/1", nil),
+			inventoryErr: store.ErrDevNotFound,
+			JSONResponseParams: utils.JSONResponseParams{
+				OutputStatus: http.StatusNoContent,
+			},
+		},
+		"some device": {
+			inDevId: model.DeviceID("2"),
+			inReq:   test.MakeSimpleRequest("DELETE", "http://1.2.3.4/api/internal/v1/inventory/tenants/1/devices/2", nil),
+			JSONResponseParams: utils.JSONResponseParams{
+				OutputStatus: http.StatusNoContent,
+			},
+		},
+		"error": {
+			inDevId: model.DeviceID("3"),
+			inReq:   test.MakeSimpleRequest("DELETE", "http://1.2.3.4/api/internal/v1/inventory/tenants/1/devices/3", nil),
 			JSONResponseParams: utils.JSONResponseParams{
 				OutputStatus:     http.StatusInternalServerError,
 				OutputBodyObject: RestError("internal error"),

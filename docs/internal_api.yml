@@ -83,13 +83,18 @@ paths:
           schema:
             $ref: '#/definitions/Error'
 
-  /devices:
+  /tenants/{tenant_id}/devices:
     post:
       operationId: Initialize Device
       tags:
         - Internal API
       summary: Create a device resource with the supplied set of attributes
       parameters:
+        - name: tenant_id
+          in: path
+          description: ID of given tenant.
+          required: true
+          type: string
         - name: device
           in: body
           required: true
@@ -106,6 +111,35 @@ paths:
           description: Malformed request body. See error for details.
           schema:
             $ref: '#/definitions/Error'
+        500:
+          description: Internal server error.
+          schema:
+            $ref: '#/definitions/Error'
+
+  /tenants/{tenant_id}/devices/{device_id}:
+    delete:
+      operationId: Delete Device
+      tags:
+        - Internal API
+      summary: Remove a device from the inventory service
+      parameters:
+        - name: tenant_id
+          in: path
+          description: ID of given tenant.
+          required: true
+          type: string
+        - name: device_id
+          in: path
+          description: ID of given device.
+          required: true
+          type: string
+      responses:
+        204:
+          description: Device removed
+        404:
+          description: The device was not found.
+          schema:
+            $ref: "#/definitions/Error"
         500:
           description: Internal server error.
           schema:
