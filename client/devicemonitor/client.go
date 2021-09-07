@@ -27,8 +27,7 @@ import (
 )
 
 const (
-	AlertsURI = "/api/v1/devicemonitor/tenants/:tenant_id/devices/:device_id/alerts/latest"
-	HealthURI = "/api/v1/health"
+	AlertsURI = "/api/internal/v1/devicemonitor/tenants/:tenant_id/devices/:device_id/alerts/latest"
 )
 
 const (
