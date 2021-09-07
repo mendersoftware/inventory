@@ -19,7 +19,9 @@ package mocks
 import (
 	context "context"
 
+	devicemonitor "github.com/mendersoftware/inventory/client/devicemonitor"
 	inv "github.com/mendersoftware/inventory/inv"
+
 	mock "github.com/stretchr/testify/mock"
 
 	model "github.com/mendersoftware/inventory/model"
@@ -44,6 +46,27 @@ func (_m *InventoryApp) AddDevice(ctx context.Context, d *model.Device) error {
 	}
 
 	return r0
+}
+
+// CheckAlerts provides a mock function with given fields: ctx, deviceId
+func (_m *InventoryApp) CheckAlerts(ctx context.Context, deviceId string) (int, error) {
+	ret := _m.Called(ctx, deviceId)
+
+	var r0 int
+	if rf, ok := ret.Get(0).(func(context.Context, string) int); ok {
+		r0 = rf(ctx, deviceId)
+	} else {
+		r0 = ret.Get(0).(int)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, deviceId)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // CreateTenant provides a mock function with given fields: ctx, tenant
@@ -428,6 +451,22 @@ func (_m *InventoryApp) UpsertDevicesStatuses(ctx context.Context, devices []mod
 	}
 
 	return r0, r1
+}
+
+// WithDevicemonitor provides a mock function with given fields: client
+func (_m *InventoryApp) WithDevicemonitor(client devicemonitor.Client) inv.InventoryApp {
+	ret := _m.Called(client)
+
+	var r0 inv.InventoryApp
+	if rf, ok := ret.Get(0).(func(devicemonitor.Client) inv.InventoryApp); ok {
+		r0 = rf(client)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(inv.InventoryApp)
+		}
+	}
+
+	return r0
 }
 
 // WithLimits provides a mock function with given fields: attributes, tags

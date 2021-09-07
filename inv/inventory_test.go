@@ -23,6 +23,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
+	mdm "github.com/mendersoftware/inventory/client/devicemonitor/mocks"
 	"github.com/mendersoftware/inventory/model"
 	"github.com/mendersoftware/inventory/store"
 	mstore "github.com/mendersoftware/inventory/store/mocks"
@@ -1623,6 +1624,46 @@ func TestInventoryUnsetDevicesGroup(t *testing.T) {
 			)
 			assert.Equal(t, testCase.UpdateResult, rsp)
 			assert.Equal(t, testCase.Err, err)
+		})
+	}
+}
+
+func TestCheckAlerts(t *testing.T) {
+	t.Parallel()
+
+	testCases := map[string]struct {
+		deviceId string
+		count    int
+		err      error
+		outCount int
+		outErr   error
+	}{
+		"ok": {
+			count:    3,
+			outCount: 3,
+		},
+		"ko": {
+			err:    errors.New("error"),
+			outErr: errors.New("error"),
+		},
+	}
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			ctx := context.Background()
+
+			dm := &mdm.Client{}
+			dm.On("CheckAlerts",
+				ctx, tc.deviceId).Return(tc.count, tc.err)
+
+			i := invForTest(nil)
+			i = i.WithDevicemonitor(dm)
+			count, err := i.CheckAlerts(ctx, tc.deviceId)
+			if tc.err != nil {
+				assert.EqualError(t, tc.outErr, err.Error())
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tc.outCount, count)
+			}
 		})
 	}
 }

@@ -33,12 +33,15 @@ const (
 	AttrScopeIdentity  = "identity"
 	AttrScopeSystem    = "system"
 	AttrScopeTags      = "tags"
+	AttrScopeMonitor   = "monitor"
 
-	AttrNameID       = "id"
-	AttrNameGroup    = "group"
-	AttrNameUpdated  = "updated_ts"
-	AttrNameCreated  = "created_ts"
-	AttrNameTagsEtag = "tags_etag"
+	AttrNameID             = "id"
+	AttrNameGroup          = "group"
+	AttrNameUpdated        = "updated_ts"
+	AttrNameCreated        = "created_ts"
+	AttrNameTagsEtag       = "tags_etag"
+	AttrNameNumberOfAlerts = "alert_count"
+	AttrNameAlerts         = "alerts"
 )
 
 const (

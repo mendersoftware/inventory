@@ -19,6 +19,7 @@ import (
 
 	"github.com/pkg/errors"
 
+	"github.com/mendersoftware/inventory/client/devicemonitor"
 	"github.com/mendersoftware/inventory/model"
 	"github.com/mendersoftware/inventory/store"
 	"github.com/mendersoftware/inventory/store/mongo"
@@ -63,17 +64,25 @@ type InventoryApp interface {
 	) (*model.UpdateResult, error)
 	CreateTenant(ctx context.Context, tenant model.NewTenant) error
 	SearchDevices(ctx context.Context, searchParams model.SearchParams) ([]model.Device, int, error)
+	CheckAlerts(ctx context.Context, deviceId string) (int, error)
 	WithLimits(attributes, tags int) InventoryApp
+	WithDevicemonitor(client devicemonitor.Client) InventoryApp
 }
 
 type inventory struct {
 	db              store.DataStore
 	limitAttributes int
 	limitTags       int
+	dmClient        devicemonitor.Client
 }
 
 func NewInventory(d store.DataStore) InventoryApp {
 	return &inventory{db: d}
+}
+
+func (i *inventory) WithDevicemonitor(client devicemonitor.Client) InventoryApp {
+	i.dmClient = client
+	return i
 }
 
 func (i *inventory) WithLimits(limitAttributes, limitTags int) InventoryApp {
@@ -377,4 +386,8 @@ func (i *inventory) SearchDevices(ctx context.Context, searchParams model.Search
 	}
 
 	return devs, totalCount, nil
+}
+
+func (i *inventory) CheckAlerts(ctx context.Context, deviceId string) (int, error) {
+	return i.dmClient.CheckAlerts(ctx, deviceId)
 }
