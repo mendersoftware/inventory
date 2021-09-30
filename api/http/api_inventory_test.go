@@ -23,6 +23,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/ant0ine/go-json-rest/rest"
 	"github.com/ant0ine/go-json-rest/rest/test"
@@ -126,6 +127,11 @@ func floatPtr(f float64) *float64 {
 	return &ret
 }
 
+func timePtr(f string) *time.Time {
+	ret, _ := time.Parse("2006-01-02T15:04:05Z", f)
+	return &ret
+}
+
 func TestLiveliness(t *testing.T) {
 	api := makeMockApiHandler(t, nil)
 	req, _ := http.NewRequest("GET", "http://localhost"+uriInternalAlive, nil)
@@ -226,6 +232,30 @@ func TestApiParseFilterParams(t *testing.T) {
 					Value:      "3.14",
 					ValueFloat: floatPtr(3.14),
 					Operator:   store.Eq,
+				},
+			},
+		},
+		"eq - short form(implicit), time": {
+			inReq: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&attr_name1=2014-11-12T11:45:26.371Z", nil),
+			filters: []store.Filter{
+				{
+					AttrName:  "attr_name1",
+					AttrScope: model.AttrScopeInventory,
+					Value:     "2014-11-12T11:45:26.371Z",
+					ValueTime: timePtr("2014-11-12T11:45:26.371Z"),
+					Operator:  store.Eq,
+				},
+			},
+		},
+		"eq - short form(implicit), time without milliseconds": {
+			inReq: test.MakeSimpleRequest("GET", "http://1.2.3.4/api/0.1.0/devices?page=1&per_page=5&attr_name1=2014-11-12T11:45:26Z", nil),
+			filters: []store.Filter{
+				{
+					AttrName:  "attr_name1",
+					AttrScope: model.AttrScopeInventory,
+					Value:     "2014-11-12T11:45:26Z",
+					ValueTime: timePtr("2014-11-12T11:45:26Z"),
+					Operator:  store.Eq,
 				},
 			},
 		},

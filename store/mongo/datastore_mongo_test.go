@@ -55,6 +55,8 @@ func TestMongoGetDevices(t *testing.T) {
 		t.Skip("skipping TestMongoGetDevices in short mode.")
 	}
 
+	timeValue, _ := time.Parse("2006-01-02T15:04:05Z", "2014-11-12T11:45:26.371Z")
+
 	inputDevs := []model.Device{
 		{ID: model.DeviceID("0")},
 		{ID: model.DeviceID("1"), Group: model.GroupName("1")},
@@ -78,6 +80,7 @@ func TestMongoGetDevices(t *testing.T) {
 			Attributes: model.DeviceAttributes{
 				{Name: "attrString", Value: "val5", Description: strPtr("desc1"), Scope: model.AttrScopeInventory},
 				{Name: "attrFloat", Value: 5.0, Description: strPtr("desc2"), Scope: model.AttrScopeInventory},
+				{Name: "attrTime", Value: timeValue, Description: strPtr("desc3"), Scope: model.AttrScopeInventory},
 			},
 			Group: model.GroupName("2"),
 		},
@@ -185,6 +188,22 @@ func TestMongoGetDevices(t *testing.T) {
 					Value:      "5.0",
 					ValueFloat: &floatVal5,
 					Operator:   store.Eq,
+				},
+			},
+			sort: nil,
+		},
+		"filter on attribute (equal attribute time)": {
+			expected: []model.Device{inputDevs[5]},
+			devTotal: 1,
+			skip:     0,
+			limit:    20,
+			filters: []store.Filter{
+				{
+					AttrName:  "attrTime",
+					AttrScope: model.AttrScopeInventory,
+					Value:     "2014-11-12T11:45:26.371Z",
+					ValueTime: &timeValue,
+					Operator:  store.Eq,
 				},
 			},
 			sort: nil,
