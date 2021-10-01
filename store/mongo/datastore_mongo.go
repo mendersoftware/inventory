@@ -175,6 +175,11 @@ func (db *DataStoreMongo) GetDevices(ctx context.Context, q store.ListQuery) ([]
 					{field: bson.M{op: filter.Value}},
 					{field: bson.M{op: filter.ValueFloat}},
 				}})
+			} else if filter.ValueTime != nil {
+				queryFilters = append(queryFilters, bson.M{"$or": []bson.M{
+					{field: bson.M{op: filter.Value}},
+					{field: bson.M{op: filter.ValueTime}},
+				}})
 			} else {
 				queryFilters = append(queryFilters, bson.M{field: bson.M{op: filter.Value}})
 			}

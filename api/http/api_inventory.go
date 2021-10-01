@@ -263,6 +263,11 @@ func parseFilterParams(r *rest.Request) ([]store.Filter, error) {
 			filter.ValueFloat = &floatValue
 		}
 
+		timeValue, err := time.Parse("2006-01-02T15:04:05Z", filter.Value)
+		if err == nil {
+			filter.ValueTime = &timeValue
+		}
+
 		filters = append(filters, filter)
 	}
 	return filters, nil
