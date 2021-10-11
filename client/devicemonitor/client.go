@@ -111,14 +111,3 @@ func (c *client) CheckAlerts(ctx context.Context, device string) (int, error) {
 
 	return len(alerts), nil
 }
-
-func joinURL(base, url string) string {
-	if strings.HasPrefix(url, "/") {
-		url = url[1:]
-	}
-	if !strings.HasSuffix(base, "/") {
-		base = base + "/"
-	}
-	return base + url
-
-}

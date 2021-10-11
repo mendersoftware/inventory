@@ -1,4 +1,4 @@
-// Copyright 2017 Northern.tech AS
+// Copyright 2021 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -16,6 +16,9 @@ package main
 import (
 	"testing"
 
+	inventory "github.com/mendersoftware/inventory/inv"
+	mstore "github.com/mendersoftware/inventory/store/mocks"
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -27,5 +30,20 @@ func TestSetupApi(t *testing.T) {
 
 	api, err = SetupAPI(EnvDev)
 	assert.NotNil(t, api)
+	assert.Nil(t, err)
+}
+
+func TestMaybeWithInventory(t *testing.T) {
+	db := &mstore.DataStore{}
+	inv := inventory.NewInventory(db)
+
+	conf := viper.New()
+
+	conf.Set(SettingEnableReporting, true)
+	_, err := maybeWithInventory(inv, conf)
+	assert.EqualError(t, err, "reporting integration needs orchestrator address")
+
+	conf.Set(SettingOrchestratorAddr, "http://mender-workflows:8080")
+	_, err = maybeWithInventory(inv, conf)
 	assert.Nil(t, err)
 }

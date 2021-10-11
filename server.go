@@ -57,21 +57,14 @@ func RunServer(c config.Reader) error {
 
 	inv := inventory.NewInventory(db).WithLimits(limitAttributes, limitTags)
 
-	invapi := api_http.NewInventoryApiHandlers(inv)
 	devicemonitorAddr := c.GetString(SettingDevicemonitorAddr)
 	if devicemonitorAddr != "" {
 		c := devicemonitor.NewClient(devicemonitorAddr)
 		inv = inv.WithDevicemonitor(c)
 	}
 
-	if reporting := c.GetBool(SettingEnableReporting); reporting {
-		orchestrator := c.GetString(SettingOrchestratorAddr)
-		if orchestrator == "" {
-			return errors.New("reporting integration needs orchestrator address")
-		}
-
-		c := workflows.NewClient(orchestrator)
-		inv = inv.WithReporting(c)
+	if inv, err = maybeWithInventory(inv, c); err != nil {
+		return err
 	}
 
 	api, err := SetupAPI(c.GetString(SettingMiddleware))
@@ -79,6 +72,7 @@ func RunServer(c config.Reader) error {
 		return errors.Wrap(err, "API setup failed")
 	}
 
+	invapi := api_http.NewInventoryApiHandlers(inv)
 	apph, err := invapi.GetApp()
 	if err != nil {
 		return errors.Wrap(err, "inventory API handlers setup failed")
@@ -89,4 +83,17 @@ func RunServer(c config.Reader) error {
 	l.Printf("listening on %s", addr)
 
 	return http.ListenAndServe(addr, api.MakeHandler())
+}
+
+func maybeWithInventory(inv inventory.InventoryApp, c config.Reader) (inventory.InventoryApp, error) {
+	if reporting := c.GetBool(SettingEnableReporting); reporting {
+		orchestrator := c.GetString(SettingOrchestratorAddr)
+		if orchestrator == "" {
+			return inv, errors.New("reporting integration needs orchestrator address")
+		}
+
+		c := workflows.NewClient(orchestrator)
+		inv = inv.WithReporting(c)
+	}
+	return inv, nil
 }

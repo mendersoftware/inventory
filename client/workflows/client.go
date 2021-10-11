@@ -25,6 +25,7 @@ import (
 	"github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/requestid"
 	"github.com/mendersoftware/go-lib-micro/rest_utils"
+	"github.com/mendersoftware/inventory/utils"
 	"github.com/pkg/errors"
 )
 
@@ -134,7 +135,7 @@ func (c *client) CheckHealth(ctx context.Context) error {
 	}
 	req, _ := http.NewRequestWithContext(
 		ctx, "GET",
-		joinURL(c.url, HealthURI), nil,
+		utils.JoinURL(c.url, HealthURI), nil,
 	)
 
 	rsp, err := c.client.Do(req)
@@ -150,15 +151,4 @@ func (c *client) CheckHealth(ctx context.Context) error {
 		return errors.Errorf("health check HTTP error: %s", rsp.Status)
 	}
 	return &apiErr
-}
-
-func joinURL(base, url string) string {
-	if strings.HasPrefix(url, "/") {
-		url = url[1:]
-	}
-	if !strings.HasSuffix(base, "/") {
-		base = base + "/"
-	}
-	return base + url
-
 }
