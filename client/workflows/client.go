@@ -68,13 +68,13 @@ func (c *client) StartReindex(ctx context.Context, device string) error {
 		ctx, cancel = context.WithTimeout(ctx, defaultTimeout)
 		defer cancel()
 	}
-	id := identity.FromContext(ctx)
-	if id == nil || id.Tenant == "" {
-		return errors.New("workflows: Context lacking tenant identity")
+	tenantID := ""
+	if id := identity.FromContext(ctx); id != nil {
+		tenantID = id.Tenant
 	}
 	wflow := ReindexWorkflow{
 		RequestID: requestid.FromContext(ctx),
-		TenantID:  id.Tenant,
+		TenantID:  tenantID,
 		DeviceID:  device,
 		Service:   ServiceInventory,
 	}
