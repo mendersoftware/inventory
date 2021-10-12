@@ -1,4 +1,4 @@
-// Copyright 2017 Northern.tech AS
+// Copyright 2021 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -12,13 +12,14 @@
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
 
-package utils
+package http
 
 import (
 	"encoding/json"
 	"testing"
 
 	"github.com/ant0ine/go-json-rest/rest/test"
+	"github.com/mendersoftware/inventory/utils"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -45,7 +46,7 @@ func CheckRecordedResponse(t *testing.T, recorded *test.Recorded, params JSONRes
 
 	for name, valueArr := range params.OutputHeaders {
 		for _, value := range valueArr {
-			assert.True(t, ContainsString(value, recorded.Recorder.HeaderMap[name]), "not found header with value: "+value)
+			assert.True(t, utils.ContainsString(value, recorded.Recorder.HeaderMap[name]), "not found header with value: "+value)
 		}
 	}
 }
