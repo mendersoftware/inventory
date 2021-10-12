@@ -69,6 +69,7 @@ func TestReindex(t *testing.T) {
 		device string
 		reqid  string
 
+		url  string
 		code int
 
 		err error
@@ -82,13 +83,31 @@ func TestReindex(t *testing.T) {
 			code: http.StatusOK,
 		},
 		{
-			name:   "500",
+			name:   "error, connection refused",
+			tenant: "tenant2",
+			device: "device3",
+			reqid:  "reqid2",
+
+			url: "http://127.0.0.1:12345",
+			err: errors.New(`workflows: failed to submit auditlog: Post "http://127.0.0.1:12345/api/v1/workflow/reindex_reporting": dial tcp 127.0.0.1:12345: connect: connection refused`),
+		},
+		{
+			name:   "error, 404",
 			tenant: "tenant2",
 			device: "device3",
 			reqid:  "reqid2",
 
 			code: http.StatusNotFound,
 			err:  errors.New(`workflows: workflow "reindex_reporting" not defined`),
+		},
+		{
+			name:   "error, 500",
+			tenant: "tenant2",
+			device: "device3",
+			reqid:  "reqid2",
+
+			code: http.StatusInternalServerError,
+			err:  errors.New(`workflows: unexpected HTTP status from workflows service: 500 Internal Server Error`),
 		},
 	}
 
@@ -107,7 +126,11 @@ func TestReindex(t *testing.T) {
 					Tenant: tc.tenant,
 				})
 
-			client := NewClient(srv.URL)
+			url := tc.url
+			if url == "" {
+				url = srv.URL
+			}
+			client := NewClient(url)
 
 			err = client.StartReindex(ctx, tc.device)
 			if tc.err != nil {
@@ -178,7 +201,7 @@ func TestCheckHealth(t *testing.T) {
 		}
 	}
 	srv := httptest.NewServer(http.HandlerFunc(serveHTTP))
-	client := NewClient(srv.URL).(*client)
+	client := NewClient(srv.URL, ClientOptions{Client: &http.Client{}}).(*client)
 	defer srv.Close()
 
 	for _, tc := range testCases {
