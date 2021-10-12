@@ -89,7 +89,7 @@ func TestReindex(t *testing.T) {
 			reqid:  "reqid2",
 
 			url: "http://127.0.0.1:12345",
-			err: errors.New(`workflows: failed to submit auditlog: Post "http://127.0.0.1:12345/api/v1/workflow/reindex_reporting": dial tcp 127.0.0.1:12345: connect: connection refused`),
+			err: errors.New(`workflows: failed to submit reindex job: Post "http://127.0.0.1:12345/api/v1/workflow/reindex_reporting": dial tcp 127.0.0.1:12345: connect: connection refused`),
 		},
 		{
 			name:   "error, 404",

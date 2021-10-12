@@ -103,7 +103,7 @@ func (c *client) StartReindex(ctx context.Context, device string) error {
 
 	rsp, err := c.client.Do(req)
 	if err != nil {
-		return errors.Wrap(err, "workflows: failed to submit auditlog")
+		return errors.Wrap(err, "workflows: failed to submit reindex job")
 	}
 	defer rsp.Body.Close()
 
