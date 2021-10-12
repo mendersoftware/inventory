@@ -105,12 +105,11 @@ func (c *client) StartReindex(ctx context.Context, device string) error {
 	if err != nil {
 		return errors.Wrap(err, "workflows: failed to submit auditlog")
 	}
+	defer rsp.Body.Close()
 
 	if rsp.StatusCode < 300 {
 		return nil
-	}
-
-	if rsp.StatusCode == http.StatusNotFound {
+	} else if rsp.StatusCode == http.StatusNotFound {
 		return errors.New(`workflows: workflow "reindex_reporting" not defined`)
 	}
 
@@ -142,6 +141,8 @@ func (c *client) CheckHealth(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	defer rsp.Body.Close()
+
 	if rsp.StatusCode >= http.StatusOK && rsp.StatusCode < 300 {
 		return nil
 	}
