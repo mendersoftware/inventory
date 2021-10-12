@@ -18,8 +18,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/mendersoftware/go-lib-micro/log"
 	"github.com/urfave/cli"
+
+	"github.com/mendersoftware/go-lib-micro/log"
 
 	"github.com/mendersoftware/inventory/config"
 	"github.com/mendersoftware/inventory/store/mongo"

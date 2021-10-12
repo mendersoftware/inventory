@@ -16,10 +16,11 @@ package main
 import (
 	"testing"
 
-	inventory "github.com/mendersoftware/inventory/inv"
-	mstore "github.com/mendersoftware/inventory/store/mocks"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
+
+	inventory "github.com/mendersoftware/inventory/inv"
+	mstore "github.com/mendersoftware/inventory/store/mocks"
 )
 
 func TestSetupApi(t *testing.T) {

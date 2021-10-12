@@ -1,4 +1,4 @@
-// Copyright 2020 Northern.tech AS
+// Copyright 2021 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -21,11 +21,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"go.mongodb.org/mongo-driver/bson"
+
 	"github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
 	mstore "github.com/mendersoftware/go-lib-micro/store"
-	"github.com/stretchr/testify/assert"
-	"go.mongodb.org/mongo-driver/bson"
 
 	"github.com/mendersoftware/inventory/model"
 )

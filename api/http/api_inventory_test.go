@@ -27,14 +27,15 @@ import (
 
 	"github.com/ant0ine/go-json-rest/rest"
 	"github.com/ant0ine/go-json-rest/rest/test"
+	"github.com/pkg/errors"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+
 	"github.com/mendersoftware/go-lib-micro/mongo/oid"
 	"github.com/mendersoftware/go-lib-micro/requestid"
 	"github.com/mendersoftware/go-lib-micro/requestlog"
 	"github.com/mendersoftware/go-lib-micro/rest_utils"
 	mt "github.com/mendersoftware/go-lib-micro/testing"
-	"github.com/pkg/errors"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 
 	inventory "github.com/mendersoftware/inventory/inv"
 	minventory "github.com/mendersoftware/inventory/inv/mocks"

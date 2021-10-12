@@ -17,8 +17,9 @@ import (
 	"net/http"
 
 	"github.com/ant0ine/go-json-rest/rest"
-	"github.com/mendersoftware/go-lib-micro/log"
 	"github.com/pkg/errors"
+
+	"github.com/mendersoftware/go-lib-micro/log"
 
 	api_http "github.com/mendersoftware/inventory/api/http"
 	"github.com/mendersoftware/inventory/client/devicemonitor"

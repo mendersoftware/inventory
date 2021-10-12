@@ -17,8 +17,9 @@ package inv
 import (
 	"context"
 
-	"github.com/mendersoftware/go-lib-micro/log"
 	"github.com/pkg/errors"
+
+	"github.com/mendersoftware/go-lib-micro/log"
 
 	"github.com/mendersoftware/inventory/client/devicemonitor"
 	"github.com/mendersoftware/inventory/client/workflows"

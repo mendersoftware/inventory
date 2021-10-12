@@ -25,11 +25,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pkg/errors"
+	"github.com/stretchr/testify/assert"
+
 	"github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/requestid"
 	"github.com/mendersoftware/go-lib-micro/rest_utils"
-	"github.com/pkg/errors"
-	"github.com/stretchr/testify/assert"
 )
 
 func mockServerReindex(t *testing.T, tenant, device, reqid string, code int) (*httptest.Server, error) {

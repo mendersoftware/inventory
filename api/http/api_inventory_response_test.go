@@ -19,8 +19,9 @@ import (
 	"testing"
 
 	"github.com/ant0ine/go-json-rest/rest/test"
-	"github.com/mendersoftware/inventory/utils"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/mendersoftware/inventory/utils"
 )
 
 type JSONResponseParams struct {

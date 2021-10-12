@@ -29,9 +29,10 @@ import (
 	mopts "go.mongodb.org/mongo-driver/mongo/options"
 
 	"github.com/google/uuid"
+	"github.com/pkg/errors"
+
 	"github.com/mendersoftware/go-lib-micro/log"
 	mstore "github.com/mendersoftware/go-lib-micro/store"
-	"github.com/pkg/errors"
 
 	"github.com/mendersoftware/inventory/model"
 	"github.com/mendersoftware/inventory/store"

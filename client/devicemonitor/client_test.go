@@ -25,9 +25,10 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/mendersoftware/go-lib-micro/identity"
 )
 
 // newTestServer creates a new mock server that responds with the responses

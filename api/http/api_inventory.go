@@ -23,11 +23,12 @@ import (
 
 	"github.com/ant0ine/go-json-rest/rest"
 	validation "github.com/go-ozzo/ozzo-validation/v4"
+	"github.com/pkg/errors"
+
 	midentity "github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/log"
 	"github.com/mendersoftware/go-lib-micro/rest_utils"
 	u "github.com/mendersoftware/go-lib-micro/rest_utils"
-	"github.com/pkg/errors"
 
 	inventory "github.com/mendersoftware/inventory/inv"
 	"github.com/mendersoftware/inventory/model"

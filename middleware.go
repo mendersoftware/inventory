@@ -17,6 +17,7 @@ import (
 	"fmt"
 
 	"github.com/ant0ine/go-json-rest/rest"
+
 	"github.com/mendersoftware/go-lib-micro/accesslog"
 	"github.com/mendersoftware/go-lib-micro/identity"
 	log "github.com/mendersoftware/go-lib-micro/log"
