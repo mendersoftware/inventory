@@ -63,6 +63,6 @@ var (
 		{Key: SettingLimitTags, Value: SettingLimitTagsDefault},
 		{Key: SettingDevicemonitorAddr, Value: SettingDevicemonitorAddrDefault},
 		{Key: SettingEnableReporting, Value: SettingEnableReportingDefault},
-		{Key: SettingOrchestratorAddr, Value: SettingOrchestratorAddr},
+		{Key: SettingOrchestratorAddr, Value: SettingOrchestratorAddrDefault},
 	}
 )

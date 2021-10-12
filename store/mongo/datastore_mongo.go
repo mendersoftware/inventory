@@ -539,21 +539,19 @@ func makeAttrRemove(attrs model.DeviceAttributes) (bson.M, error) {
 	var fieldName string
 	remove := make(bson.M)
 
-	if attrs != nil {
-		for i := range attrs {
-			if attrs[i].Name == "" {
-				return nil, store.ErrNoAttrName
-			}
-			if attrs[i].Scope == "" {
-				// Default to inventory scope
-				attrs[i].Scope = model.AttrScopeInventory
-			}
-			fieldName = makeAttrField(
-				attrs[i].Name,
-				attrs[i].Scope,
-			)
-			remove[fieldName] = true
+	for i := range attrs {
+		if attrs[i].Name == "" {
+			return nil, store.ErrNoAttrName
 		}
+		if attrs[i].Scope == "" {
+			// Default to inventory scope
+			attrs[i].Scope = model.AttrScopeInventory
+		}
+		fieldName = makeAttrField(
+			attrs[i].Name,
+			attrs[i].Scope,
+		)
+		remove[fieldName] = true
 	}
 	return remove, nil
 }

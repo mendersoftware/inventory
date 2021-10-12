@@ -1,4 +1,4 @@
-// Copyright 2020 Northern.tech AS
+// Copyright 2021 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -61,8 +61,6 @@ const (
 		"-" + model.AttrNameUpdated + "." + DbDevAttributesScope
 	groupNameField = DbDevAttributes + "." + model.AttrScopeSystem +
 		"-" + model.AttrNameGroup + "." + DbDevAttributesName
-	groupValueField = DbDevAttributes + "." + model.AttrScopeSystem +
-		"-" + model.AttrNameGroup + "." + DbDevAttributesValue
 	groupScopeField = DbDevAttributes + "." + model.AttrScopeSystem +
 		"-" + model.AttrNameGroup + "." + DbDevAttributesScope
 )
@@ -214,7 +212,7 @@ func (m *migration_1_0_0) Up(from migrate.Version) error {
 		// Perform maintenance cleanup
 		err := m.doCleanup()
 		if err == nil {
-			collMgrInfo.DeleteOne(m.ctx, bson.M{"maintenance.version": m.Version()})
+			_, err = collMgrInfo.DeleteOne(m.ctx, bson.M{"maintenance.version": m.Version()})
 		}
 		return err
 	}

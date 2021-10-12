@@ -135,8 +135,6 @@ func (i *inventoryHandlers) GetApp() (rest.App, error) {
 		rest.Post(urlInternalFiltersSearch, i.InternalFiltersSearchHandler),
 	}
 
-	routes = append(routes)
-
 	app, err := rest.MakeRouter(
 		// augment routes with OPTIONS handler
 		AutogenOptionsRoutes(routes, AllowHeaderOptionsGenerator)...,
@@ -329,7 +327,7 @@ func (i *inventoryHandlers) GetDevicesHandler(w rest.ResponseWriter, r *rest.Req
 	}
 	// the response writer will ensure the header name is in Kebab-Pascal-Case
 	w.Header().Add("X-Total-Count", strconv.Itoa(totalCount))
-	w.WriteJson(devs)
+	_ = w.WriteJson(devs)
 }
 
 func (i *inventoryHandlers) GetDeviceHandler(w rest.ResponseWriter, r *rest.Request) {
@@ -352,7 +350,7 @@ func (i *inventoryHandlers) GetDeviceHandler(w rest.ResponseWriter, r *rest.Requ
 		w.Header().Set("ETag", dev.TagsEtag)
 	}
 
-	w.WriteJson(dev)
+	_ = w.WriteJson(dev)
 }
 
 func (i *inventoryHandlers) DeleteDeviceInventoryHandler(w rest.ResponseWriter, r *rest.Request) {
@@ -647,7 +645,7 @@ func (i *inventoryHandlers) GetDevicesByGroup(w rest.ResponseWriter, r *rest.Req
 	}
 	// the response writer will ensure the header name is in Kebab-Pascal-Case
 	w.Header().Add("X-Total-Count", strconv.Itoa(totalCount))
-	w.WriteJson(ids)
+	_ = w.WriteJson(ids)
 }
 
 func (i *inventoryHandlers) AppendDevicesToGroup(w rest.ResponseWriter, r *rest.Request) {
@@ -680,7 +678,7 @@ func (i *inventoryHandlers) AppendDevicesToGroup(w rest.ResponseWriter, r *rest.
 		u.RestErrWithLogInternal(w, r, l, err)
 		return
 	}
-	w.WriteJson(updated)
+	_ = w.WriteJson(updated)
 }
 
 func (i *inventoryHandlers) ClearDevicesGroup(w rest.ResponseWriter, r *rest.Request) {
@@ -714,7 +712,7 @@ func (i *inventoryHandlers) ClearDevicesGroup(w rest.ResponseWriter, r *rest.Req
 		return
 	}
 	w.WriteHeader(http.StatusOK)
-	w.WriteJson(updated)
+	_ = w.WriteJson(updated)
 }
 
 func parseDevice(r *rest.Request) (*model.Device, error) {
@@ -776,7 +774,7 @@ func (i *inventoryHandlers) GetGroupsHandler(w rest.ResponseWriter, r *rest.Requ
 		groups = []model.GroupName{}
 	}
 
-	w.WriteJson(groups)
+	_ = w.WriteJson(groups)
 }
 
 func (i *inventoryHandlers) GetDeviceGroupHandler(w rest.ResponseWriter, r *rest.Request) {
@@ -802,7 +800,7 @@ func (i *inventoryHandlers) GetDeviceGroupHandler(w rest.ResponseWriter, r *rest
 		ret["group"] = &group
 	}
 
-	w.WriteJson(ret)
+	_ = w.WriteJson(ret)
 }
 
 type newTenantRequest struct {
@@ -855,7 +853,7 @@ func (i *inventoryHandlers) FiltersAttributesHandler(w rest.ResponseWriter, r *r
 		return
 	}
 
-	w.WriteJson(attributes)
+	_ = w.WriteJson(attributes)
 }
 
 func (i *inventoryHandlers) FiltersSearchHandler(w rest.ResponseWriter, r *rest.Request) {
@@ -883,7 +881,7 @@ func (i *inventoryHandlers) FiltersSearchHandler(w rest.ResponseWriter, r *rest.
 
 	// the response writer will ensure the header name is in Kebab-Pascal-Case
 	w.Header().Add(hdrTotalCount, strconv.Itoa(totalCount))
-	w.WriteJson(devs)
+	_ = w.WriteJson(devs)
 }
 
 func (i *inventoryHandlers) InternalFiltersSearchHandler(w rest.ResponseWriter, r *rest.Request) {
@@ -916,7 +914,7 @@ func (i *inventoryHandlers) InternalFiltersSearchHandler(w rest.ResponseWriter, 
 
 	// the response writer will ensure the header name is in Kebab-Pascal-Case
 	w.Header().Add(hdrTotalCount, strconv.Itoa(totalCount))
-	w.WriteJson(devs)
+	_ = w.WriteJson(devs)
 }
 
 func getTenantContext(ctx context.Context, tenantId string) context.Context {
@@ -994,7 +992,7 @@ func (i *inventoryHandlers) InternalDevicesStatusHandler(w rest.ResponseWriter, 
 	}
 
 	w.WriteHeader(http.StatusOK)
-	w.WriteJson(result)
+	_ = w.WriteJson(result)
 }
 
 func (i *inventoryHandlers) GetDeviceGroupsInternalHandler(w rest.ResponseWriter, r *rest.Request) {
@@ -1021,7 +1019,7 @@ func (i *inventoryHandlers) GetDeviceGroupsInternalHandler(w rest.ResponseWriter
 		res.Groups = append(res.Groups, string(group))
 	}
 
-	w.WriteJson(res)
+	_ = w.WriteJson(res)
 }
 
 func (i *inventoryHandlers) ReindexDeviceDataHandler(w rest.ResponseWriter, r *rest.Request) {

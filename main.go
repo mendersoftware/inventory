@@ -126,7 +126,7 @@ func doMain(args []string) {
 		return nil
 	}
 
-	app.Run(args)
+	_ = app.Run(args)
 }
 
 func makeDataStoreConfig() mongo.DataStoreMongoConfig {
