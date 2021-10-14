@@ -18,8 +18,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/mendersoftware/go-lib-micro/log"
 	"github.com/urfave/cli"
+
+	"github.com/mendersoftware/go-lib-micro/log"
 
 	"github.com/mendersoftware/inventory/config"
 	"github.com/mendersoftware/inventory/store/mongo"
@@ -126,7 +127,7 @@ func doMain(args []string) {
 		return nil
 	}
 
-	app.Run(args)
+	_ = app.Run(args)
 }
 
 func makeDataStoreConfig() mongo.DataStoreMongoConfig {

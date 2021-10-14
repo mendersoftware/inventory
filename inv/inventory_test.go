@@ -24,6 +24,7 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	mdm "github.com/mendersoftware/inventory/client/devicemonitor/mocks"
+	mworkflows "github.com/mendersoftware/inventory/client/workflows/mocks"
 	"github.com/mendersoftware/inventory/model"
 	"github.com/mendersoftware/inventory/store"
 	mstore "github.com/mendersoftware/inventory/store/mocks"
@@ -44,23 +45,40 @@ func TestHealthCheck(t *testing.T) {
 	testCases := []struct {
 		Name           string
 		DataStoreError error
+		WorkflowsError error
 	}{{
 		Name: "ok",
 	}, {
 		Name:           "error, error reaching MongoDB",
 		DataStoreError: errors.New("connection refused"),
+	}, {
+		Name:           "error, error reaching workflows",
+		WorkflowsError: errors.New("connection refused"),
 	}}
 	for _, tc := range testCases {
 		t.Run(tc.Name, func(t *testing.T) {
 			ctx := context.TODO()
 			db := &mstore.DataStore{}
+			defer db.AssertExpectations(t)
 			db.On("Ping", ctx).Return(tc.DataStoreError)
-			inv := NewInventory(db)
+
+			workflows := &mworkflows.Client{}
+			defer workflows.AssertExpectations(t)
+			if tc.DataStoreError == nil {
+				workflows.On("CheckHealth", ctx).Return(tc.WorkflowsError)
+			}
+
+			inv := NewInventory(db).WithReporting(workflows)
 			err := inv.HealthCheck(ctx)
 			if tc.DataStoreError != nil {
 				assert.EqualError(t, err,
 					"error reaching MongoDB: "+
 						tc.DataStoreError.Error(),
+				)
+			} else if tc.WorkflowsError != nil {
+				assert.EqualError(t, err,
+					"error reaching workflows: "+
+						tc.WorkflowsError.Error(),
 				)
 			} else {
 				assert.NoError(t, err)
@@ -1424,6 +1442,130 @@ func TestInventoryDeleteDevice(t *testing.T) {
 	}
 }
 
+func TestInventoryDeleteDevices(t *testing.T) {
+	t.Parallel()
+
+	testCases := map[string]struct {
+		datastoreResult *model.UpdateResult
+		datastoreError  error
+		outError        error
+		workflowsError  error
+	}{
+		"ok": {
+			datastoreResult: &model.UpdateResult{
+				DeletedCount: 1,
+			},
+			outError: nil,
+		},
+		"ok, with workflows (swallowed) error": {
+			datastoreResult: &model.UpdateResult{
+				DeletedCount: 1,
+			},
+			workflowsError: errors.New("workflows error"),
+			outError:       nil,
+		},
+		"datastore error": {
+			datastoreError: errors.New("db connection failed"),
+			outError:       errors.New("db connection failed"),
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(fmt.Sprintf("test case: %s", name), func(t *testing.T) {
+			ctx := context.Background()
+
+			db := &mstore.DataStore{}
+			db.On("DeleteDevices",
+				ctx,
+				mock.AnythingOfType("[]model.DeviceID"),
+			).Return(tc.datastoreResult, tc.datastoreError)
+
+			workflows := &mworkflows.Client{}
+			defer workflows.AssertExpectations(t)
+			if tc.outError == nil {
+				workflows.On("StartReindex",
+					ctx,
+					mock.AnythingOfType("string"),
+				).Return(tc.workflowsError)
+			}
+
+			i := invForTest(db).WithReporting(workflows)
+
+			_, err := i.DeleteDevices(ctx, []model.DeviceID{"foo"})
+
+			if tc.outError != nil {
+				if assert.Error(t, err) {
+					assert.EqualError(t, err, tc.outError.Error())
+				}
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestInventoryUpsertDevicesStatuses(t *testing.T) {
+	t.Parallel()
+
+	testCases := map[string]struct {
+		datastoreResult *model.UpdateResult
+		datastoreError  error
+		outError        error
+		workflowsError  error
+	}{
+		"ok": {
+			datastoreResult: &model.UpdateResult{
+				DeletedCount: 1,
+			},
+			outError: nil,
+		},
+		"ok, with workflows (swallowed) error": {
+			datastoreResult: &model.UpdateResult{
+				DeletedCount: 1,
+			},
+			workflowsError: errors.New("workflows error"),
+			outError:       nil,
+		},
+		"datastore error": {
+			datastoreError: errors.New("db connection failed"),
+			outError:       errors.New("db connection failed"),
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(fmt.Sprintf("test case: %s", name), func(t *testing.T) {
+			ctx := context.Background()
+
+			db := &mstore.DataStore{}
+			db.On("UpsertDevicesAttributesWithRevision",
+				ctx,
+				mock.AnythingOfType("[]model.DeviceUpdate"),
+				mock.AnythingOfType("model.DeviceAttributes"),
+			).Return(tc.datastoreResult, tc.datastoreError)
+
+			workflows := &mworkflows.Client{}
+			defer workflows.AssertExpectations(t)
+			if tc.outError == nil {
+				workflows.On("StartReindex",
+					ctx,
+					mock.AnythingOfType("string"),
+				).Return(tc.workflowsError)
+			}
+
+			i := invForTest(db).WithReporting(workflows)
+
+			_, err := i.UpsertDevicesStatuses(ctx, []model.DeviceUpdate{{Id: "foo"}}, model.DeviceAttributes{})
+
+			if tc.outError != nil {
+				if assert.Error(t, err) {
+					assert.EqualError(t, err, tc.outError.Error())
+				}
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
 func TestNewInventory(t *testing.T) {
 	t.Parallel()
 

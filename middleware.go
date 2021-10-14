@@ -17,6 +17,7 @@ import (
 	"fmt"
 
 	"github.com/ant0ine/go-json-rest/rest"
+
 	"github.com/mendersoftware/go-lib-micro/accesslog"
 	"github.com/mendersoftware/go-lib-micro/identity"
 	log "github.com/mendersoftware/go-lib-micro/log"
@@ -81,7 +82,7 @@ func SetupMiddleware(api *rest.Api, mwtype string) error {
 	api.Use(commonLoggingAccessStack...)
 
 	mwstack, ok := middlewareMap[mwtype]
-	if ok != true {
+	if !ok {
 		return fmt.Errorf("incorrect middleware type: %s", mwtype)
 	}
 

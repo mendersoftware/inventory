@@ -27,6 +27,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/mendersoftware/go-lib-micro/identity"
 )
 
 // newTestServer creates a new mock server that responds with the responses
@@ -72,11 +74,10 @@ func newTestServer(
 func TestCheckAlerts(t *testing.T) {
 	t.Parallel()
 
-	expiredCtx, cancel := context.WithDeadline(
-		context.TODO(), time.Now().Add(-1*time.Second))
+	defaultCtx := context.Background()
+	expiredCtx, cancel := context.WithDeadline(defaultCtx, time.Now().Add(-1*time.Second))
 	defer cancel()
-	defaultCtx, cancel := context.WithTimeout(context.TODO(), time.Second*10)
-	defer cancel()
+
 	uuid, err := uuid.Parse("123e4567-e89b-12d3-a456-426652340000")
 	assert.NoError(t, err)
 
@@ -94,7 +95,7 @@ func TestCheckAlerts(t *testing.T) {
 		Error error
 	}{
 		{
-			Name: "ok, no allerts",
+			Name: "ok, no alerts",
 
 			Ctx:          defaultCtx,
 			DeviceId:     "foo",
@@ -102,7 +103,7 @@ func TestCheckAlerts(t *testing.T) {
 			ResponseBody: Alerts{},
 		},
 		{
-			Name: "ok, allerts",
+			Name: "ok, alerts",
 
 			Ctx:          defaultCtx,
 			DeviceId:     "foo",
@@ -112,6 +113,35 @@ func TestCheckAlerts(t *testing.T) {
 				Alert{ID: uuid},
 			},
 			NumberOfAlerts: 2,
+		},
+		{
+			Name: "ok, alerts with tenant ID",
+
+			Ctx:          identity.WithContext(defaultCtx, &identity.Identity{Tenant: "tenant"}),
+			DeviceId:     "foo",
+			ResponseCode: http.StatusOK,
+			ResponseBody: Alerts{
+				Alert{ID: uuid},
+				Alert{ID: uuid},
+			},
+			NumberOfAlerts: 2,
+		},
+		{
+			Name: "error, bad HTTP status",
+
+			Ctx:          defaultCtx,
+			DeviceId:     "foo",
+			ResponseCode: http.StatusNotFound,
+			Error:        errors.New("unexpected HTTP status from devicemonitor service: 404 Not Found"),
+		},
+		{
+			Name: "error, bad response",
+
+			Ctx:          defaultCtx,
+			DeviceId:     "foo",
+			ResponseCode: http.StatusOK,
+			ResponseBody: "dummy",
+			Error:        errors.New("json: cannot unmarshal string into Go value of type devicemonitor.Alerts"),
 		},
 		{
 			Name: "error, expired deadline",
@@ -130,7 +160,7 @@ func TestCheckAlerts(t *testing.T) {
 		}
 	}
 	srv := httptest.NewServer(http.HandlerFunc(serverHTTP))
-	client := NewClient(srv.URL)
+	client := NewClient(srv.URL, ClientOptions{Client: &http.Client{}})
 	defer srv.Close()
 
 	for _, tc := range testCases {

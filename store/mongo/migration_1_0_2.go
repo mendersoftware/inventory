@@ -17,9 +17,10 @@ package mongo
 import (
 	"context"
 
+	"go.mongodb.org/mongo-driver/bson"
+
 	"github.com/mendersoftware/go-lib-micro/log"
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
-	"go.mongodb.org/mongo-driver/bson"
 
 	mstore "github.com/mendersoftware/go-lib-micro/store"
 )

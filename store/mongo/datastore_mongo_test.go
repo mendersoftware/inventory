@@ -32,10 +32,11 @@ import (
 
 	"github.com/mendersoftware/go-lib-micro/identity"
 
+	"github.com/pkg/errors"
+
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
 	"github.com/mendersoftware/go-lib-micro/mongo/oid"
 	mstore "github.com/mendersoftware/go-lib-micro/store"
-	"github.com/pkg/errors"
 )
 
 func TestPing(t *testing.T) {
