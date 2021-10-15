@@ -327,7 +327,7 @@ func (i *inventoryHandlers) GetDevicesHandler(w rest.ResponseWriter, r *rest.Req
 		w.Header().Add("Link", l)
 	}
 	// the response writer will ensure the header name is in Kebab-Pascal-Case
-	w.Header().Add("X-Total-Count", strconv.Itoa(totalCount))
+	w.Header().Add(hdrTotalCount, strconv.Itoa(totalCount))
 	_ = w.WriteJson(devs)
 }
 
@@ -645,7 +645,7 @@ func (i *inventoryHandlers) GetDevicesByGroup(w rest.ResponseWriter, r *rest.Req
 		w.Header().Add("Link", l)
 	}
 	// the response writer will ensure the header name is in Kebab-Pascal-Case
-	w.Header().Add("X-Total-Count", strconv.Itoa(totalCount))
+	w.Header().Add(hdrTotalCount, strconv.Itoa(totalCount))
 	_ = w.WriteJson(ids)
 }
 
