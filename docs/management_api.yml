@@ -586,7 +586,7 @@ paths:
           required: true
           type: string
         - name: DeviceIDs
-          description: JSON list of device IDs to append to the group.
+          description: JSON list of device IDs to remove from the group.
           in: body
           required: true
           schema:
