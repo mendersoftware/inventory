@@ -45,6 +45,7 @@ const (
 	uriDeviceGroup   = "/api/0.1.0/devices/:id/group/:name"
 	uriAttributes    = "/api/0.1.0/attributes"
 	uriGroups        = "/api/0.1.0/groups"
+	uriGroupsName    = "/api/0.1.0/groups/:name"
 	uriGroupsDevices = "/api/0.1.0/groups/:name/devices"
 
 	uriInternalAlive         = "/api/internal/v1/inventory/alive"
@@ -111,7 +112,8 @@ func (i *inventoryHandlers) GetApp() (rest.App, error) {
 		rest.Get(uriDevice, i.GetDeviceHandler),
 		rest.Delete(uriDevice, i.DeleteDeviceInventoryHandler),
 		rest.Delete(uriDeviceGroup, i.DeleteDeviceGroupHandler),
-		rest.Delete(uriGroupsDevices, i.ClearDevicesGroup),
+		rest.Delete(uriGroupsName, i.DeleteGroupHandler),
+		rest.Delete(uriGroupsDevices, i.ClearDevicesGroupHandler),
 		rest.Patch(uriAttributes, i.UpdateDeviceAttributesHandler),
 		rest.Put(uriAttributes, i.UpdateDeviceAttributesHandler),
 		rest.Patch(urlInternalAttributes, i.PatchDeviceAttributesInternalHandler),
@@ -123,7 +125,7 @@ func (i *inventoryHandlers) GetApp() (rest.App, error) {
 
 		rest.Get(uriDeviceGroups, i.GetDeviceGroupHandler),
 		rest.Get(uriGroups, i.GetGroupsHandler),
-		rest.Get(uriGroupsDevices, i.GetDevicesByGroup),
+		rest.Get(uriGroupsDevices, i.GetDevicesByGroupHandler),
 
 		rest.Post(uriInternalTenants, i.CreateTenantHandler),
 		rest.Post(uriInternalDevices, i.AddDeviceHandler),
@@ -614,7 +616,7 @@ func (i *inventoryHandlers) AddDeviceToGroupHandler(w rest.ResponseWriter, r *re
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (i *inventoryHandlers) GetDevicesByGroup(w rest.ResponseWriter, r *rest.Request) {
+func (i *inventoryHandlers) GetDevicesByGroupHandler(w rest.ResponseWriter, r *rest.Request) {
 	ctx := r.Context()
 
 	l := log.FromContext(ctx)
@@ -682,7 +684,26 @@ func (i *inventoryHandlers) AppendDevicesToGroup(w rest.ResponseWriter, r *rest.
 	_ = w.WriteJson(updated)
 }
 
-func (i *inventoryHandlers) ClearDevicesGroup(w rest.ResponseWriter, r *rest.Request) {
+func (i *inventoryHandlers) DeleteGroupHandler(w rest.ResponseWriter, r *rest.Request) {
+	ctx := r.Context()
+	l := log.FromContext(ctx)
+
+	groupName := model.GroupName(r.PathParam("name"))
+	if err := groupName.Validate(); err != nil {
+		u.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
+		return
+	}
+
+	updated, err := i.inventory.DeleteGroup(ctx, groupName)
+	if err != nil {
+		u.RestErrWithLogInternal(w, r, l, err)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	_ = w.WriteJson(updated)
+}
+
+func (i *inventoryHandlers) ClearDevicesGroupHandler(w rest.ResponseWriter, r *rest.Request) {
 	var deviceIDs []model.DeviceID
 	ctx := r.Context()
 	l := log.FromContext(ctx)

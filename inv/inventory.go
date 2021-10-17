@@ -46,6 +46,7 @@ type InventoryApp interface {
 	UpsertDevicesStatuses(ctx context.Context, devices []model.DeviceUpdate, attrs model.DeviceAttributes) (*model.UpdateResult, error)
 	ReplaceAttributes(ctx context.Context, id model.DeviceID, upsertAttrs model.DeviceAttributes, scope string, etag string) error
 	GetFiltersAttributes(ctx context.Context) ([]model.FilterAttribute, error)
+	DeleteGroup(ctx context.Context, groupName model.GroupName) (*model.UpdateResult, error)
 	UnsetDeviceGroup(ctx context.Context, id model.DeviceID, groupName model.GroupName) error
 	UnsetDevicesGroup(
 		ctx context.Context,
@@ -160,8 +161,10 @@ func (i *inventory) DeleteDevices(
 		return nil, err
 	}
 
-	for _, d := range ids {
-		i.maybeTriggerReindex(ctx, string(d))
+	if i.enableReporting {
+		for _, d := range ids {
+			i.triggerReindex(ctx, string(d))
+		}
 	}
 
 	return res, err
@@ -323,6 +326,25 @@ func (i *inventory) GetFiltersAttributes(ctx context.Context) ([]model.FilterAtt
 	return attributes, nil
 }
 
+func (i *inventory) DeleteGroup(
+	ctx context.Context,
+	groupName model.GroupName,
+) (*model.UpdateResult, error) {
+	deviceIDs, err := i.db.DeleteGroup(ctx, groupName)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to delete group")
+	}
+
+	res := &model.UpdateResult{}
+	for deviceID := range deviceIDs {
+		i.maybeTriggerReindex(ctx, string(deviceID))
+		res.MatchedCount += 1
+		res.UpdatedCount += 1
+	}
+
+	return res, err
+}
+
 func (i *inventory) UpsertDevicesStatuses(
 	ctx context.Context,
 	devices []model.DeviceUpdate,
@@ -350,8 +372,10 @@ func (i *inventory) UnsetDevicesGroup(
 		return nil, err
 	}
 
-	for _, d := range deviceIDs {
-		i.maybeTriggerReindex(ctx, string(d))
+	if i.enableReporting {
+		for _, d := range deviceIDs {
+			i.triggerReindex(ctx, string(d))
+		}
 	}
 
 	return res, nil
@@ -381,8 +405,10 @@ func (i *inventory) UpdateDevicesGroup(
 		return nil, err
 	}
 
-	for _, d := range deviceIDs {
-		i.maybeTriggerReindex(ctx, string(d))
+	if i.enableReporting {
+		for _, d := range deviceIDs {
+			i.triggerReindex(ctx, string(d))
+		}
 	}
 
 	return res, err
@@ -472,12 +498,16 @@ func (i *inventory) CheckAlerts(ctx context.Context, deviceId string) (int, erro
 
 // maybeTriggerReindex conditionally triggers the reindex_reporting workflow for a device
 func (i *inventory) maybeTriggerReindex(ctx context.Context, device string) {
-	l := log.FromContext(ctx)
-
 	if i.enableReporting {
-		err := i.wfClient.StartReindex(ctx, device)
-		if err != nil {
-			l.Errorf("failed to start reindex_reporting for device %s, error: %v", device, err)
-		}
+		i.triggerReindex(ctx, device)
+	}
+}
+
+// triggerReindex triggers the reindex_reporting workflow for a device
+func (i *inventory) triggerReindex(ctx context.Context, device string) {
+	err := i.wfClient.StartReindex(ctx, device)
+	if err != nil {
+		l := log.FromContext(ctx)
+		l.Errorf("failed to start reindex_reporting for device %s, error: %v", device, err)
 	}
 }

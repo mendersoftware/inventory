@@ -454,6 +454,53 @@ paths:
           schema:
             $ref: '#/definitions/Error'
 
+  /groups/{name}:
+    delete:
+      operationId: Remove a Group
+      tags:
+        - Management API
+      security:
+        - ManagementJWT: []
+      summary: Remove a device group
+      description: |
+        Removes a device group. This API provides a bulk alternative to
+        DELETE /devices/{id}/group/{name} for managing device groups.
+      parameters:
+        - name: name
+          in: path
+          description: Group name.
+          required: true
+          type: string
+      responses:
+        200:
+          description: Successful response
+          schema:
+            description: |
+              JSON object listing how many devices were updated.
+            type: object
+            required:
+              - updated_count
+            properties:
+              updated_count:
+                type: number
+                description: |
+                  Number of devices for which the group was cleared sucessfully.
+          examples:
+            application/json:
+              updated_count: 2
+        400:
+          description: Invalid request schema.
+          schema:
+            $ref: '#/definitions/Error'
+        404:
+          description: The group was not found.
+          schema:
+            $ref: '#/definitions/Error'
+        500:
+          description: Internal server error.
+          schema:
+            $ref: '#/definitions/Error'
+
   /groups/{name}/devices:
     get:
       operationId: Get Devices in Group
@@ -576,9 +623,7 @@ paths:
         - ManagementJWT: []
       summary: Clear devices' group
       description: |
-        Removes a list of devices from their respective groups. This API provides
-        a bulk alternative to DELETE /devices/{id}/group/{name} for managing
-        device groups.
+        Removes a list of devices from the specified group.
       parameters:
         - name: name
           in: path

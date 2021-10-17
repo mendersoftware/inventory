@@ -19,9 +19,8 @@ package mocks
 import (
 	context "context"
 
-	mock "github.com/stretchr/testify/mock"
-
 	model "github.com/mendersoftware/inventory/model"
+	mock "github.com/stretchr/testify/mock"
 
 	store "github.com/mendersoftware/inventory/store"
 )
@@ -61,6 +60,29 @@ func (_m *DataStore) DeleteDevices(ctx context.Context, ids []model.DeviceID) (*
 	var r1 error
 	if rf, ok := ret.Get(1).(func(context.Context, []model.DeviceID) error); ok {
 		r1 = rf(ctx, ids)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// DeleteGroup provides a mock function with given fields: ctx, group
+func (_m *DataStore) DeleteGroup(ctx context.Context, group model.GroupName) (chan model.DeviceID, error) {
+	ret := _m.Called(ctx, group)
+
+	var r0 chan model.DeviceID
+	if rf, ok := ret.Get(0).(func(context.Context, model.GroupName) chan model.DeviceID); ok {
+		r0 = rf(ctx, group)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(chan model.DeviceID)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, model.GroupName) error); ok {
+		r1 = rf(ctx, group)
 	} else {
 		r1 = ret.Error(1)
 	}
