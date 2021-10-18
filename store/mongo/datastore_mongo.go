@@ -740,6 +740,66 @@ func (db *DataStoreMongo) GetFiltersAttributes(ctx context.Context) ([]model.Fil
 	return attributes, nil
 }
 
+func (db *DataStoreMongo) DeleteGroup(
+	ctx context.Context,
+	group model.GroupName,
+) (chan model.DeviceID, error) {
+	deviceIDs := make(chan model.DeviceID)
+
+	database := db.client.Database(mstore.DbFromContext(ctx, DbName))
+	collDevs := database.Collection(DbDevicesColl)
+
+	filter := bson.M{DbDevAttributesGroupValue: group}
+
+	const batchMaxSize = 100
+	batchSize := int32(batchMaxSize)
+	findOptions := &mopts.FindOptions{
+		Projection: bson.M{DbDevId: 1},
+		BatchSize:  &batchSize,
+	}
+	cursor, err := collDevs.Find(ctx, filter, findOptions)
+	if err != nil {
+		return nil, err
+	}
+
+	go func() {
+		defer cursor.Close(ctx)
+		batch := make([]model.DeviceID, batchMaxSize)
+		batchSize := 0
+
+		update := bson.M{"$unset": bson.M{DbDevAttributesGroup: 1}}
+		device := &model.Device{}
+		defer close(deviceIDs)
+
+	next:
+		for {
+			hasNext := cursor.Next(ctx)
+			if !hasNext {
+				if batchSize > 0 {
+					break
+				}
+				return
+			}
+			if err = cursor.Decode(&device); err == nil {
+				batch[batchSize] = device.ID
+				batchSize++
+				if len(batch) == batchSize {
+					break
+				}
+			}
+		}
+
+		_, _ = collDevs.UpdateMany(ctx, bson.M{DbDevId: bson.M{"$in": batch[:batchSize]}}, update)
+		for _, item := range batch[:batchSize] {
+			deviceIDs <- item
+		}
+		batchSize = 0
+		goto next
+	}()
+
+	return deviceIDs, nil
+}
+
 func (db *DataStoreMongo) UnsetDevicesGroup(
 	ctx context.Context,
 	deviceIDs []model.DeviceID,

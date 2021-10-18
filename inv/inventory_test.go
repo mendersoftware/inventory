@@ -1074,6 +1074,66 @@ func TestGetFiltersAttributes(t *testing.T) {
 	}
 }
 
+func TestDeleteGroup(t *testing.T) {
+	t.Parallel()
+
+	groupName := model.GroupName("group")
+
+	testCases := map[string]struct {
+		err    error
+		outErr error
+	}{
+		"ok": {},
+		"ko": {
+			err:    errors.New("error"),
+			outErr: errors.New("failed to delete group: error"),
+		},
+	}
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			ctx := context.Background()
+			db := &mstore.DataStore{}
+
+			if tc.err != nil {
+				db.On("DeleteGroup",
+					ctx,
+					groupName,
+				).Return(nil, tc.err)
+			} else {
+				devices := make(chan model.DeviceID)
+				go func() {
+					devices <- model.DeviceID("1")
+					devices <- model.DeviceID("2")
+					close(devices)
+				}()
+
+				db.On("DeleteGroup",
+					ctx,
+					groupName,
+				).Return(devices, tc.err)
+			}
+
+			workflows := &mworkflows.Client{}
+			defer workflows.AssertExpectations(t)
+			if tc.err == nil {
+				workflows.On("StartReindex",
+					ctx,
+					mock.AnythingOfType("string"),
+				).Return(nil)
+			}
+
+			i := invForTest(db).WithReporting(workflows)
+			res, err := i.DeleteGroup(ctx, groupName)
+			if tc.err != nil {
+				assert.EqualError(t, tc.outErr, err.Error())
+			} else {
+				assert.Equal(t, int64(2), res.UpdatedCount)
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
 func TestInventoryUnsetDeviceGroup(t *testing.T) {
 	t.Parallel()
 

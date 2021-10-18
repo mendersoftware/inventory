@@ -2308,6 +2308,90 @@ func TestApiDeleteDevice(t *testing.T) {
 	}
 }
 
+func TestAPICDeleteGroup(t *testing.T) {
+	testCases := []struct {
+		Name string
+
+		model.GroupName
+		*http.Request
+		JSONResponseParams
+		InventoryErr error
+	}{{
+		Name: "ok",
+		Request: test.MakeSimpleRequest(
+			"DELETE",
+			"http://localhost/api/0.1.0/groups/foo",
+			nil,
+		),
+		GroupName: "foo",
+		JSONResponseParams: JSONResponseParams{
+			OutputStatus: http.StatusOK,
+			OutputBodyObject: &model.UpdateResult{
+				UpdatedCount: 2,
+			},
+		},
+	}, {
+		Name: "internal error",
+
+		Request: test.MakeSimpleRequest(
+			"DELETE",
+			"http://localhost/api/0.1.0/groups/foo",
+			nil,
+		),
+		GroupName: "foo",
+		JSONResponseParams: JSONResponseParams{
+			OutputStatus: http.StatusInternalServerError,
+			OutputBodyObject: map[string]interface{}{
+				"error":      "internal error",
+				"request_id": "test",
+			},
+		},
+		InventoryErr: errors.New("unknown error"),
+	}, {
+		Name: "error, invalid group name",
+
+		Request: test.MakeSimpleRequest(
+			"DELETE",
+			"http://localhost/api/0.1.0/groups/illegal$group$name",
+			nil,
+		),
+		JSONResponseParams: JSONResponseParams{
+			OutputStatus: http.StatusBadRequest,
+			OutputBodyObject: map[string]interface{}{
+				"error": "Group name can only contain: upper/lowercase " +
+					"alphanum, -(dash), _(underscore)",
+				"request_id": "test",
+			},
+		},
+	}}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.Name, func(t *testing.T) {
+			inv := minventory.InventoryApp{}
+			ctx := contextMatcher()
+			apih := makeMockApiHandler(t, &inv)
+
+			var ret *model.UpdateResult
+			if rsp, ok := testCase.JSONResponseParams.
+				OutputBodyObject.(*model.
+				UpdateResult); ok {
+				ret = rsp
+			}
+			inv.On("DeleteGroup",
+				ctx,
+				testCase.GroupName,
+			).Return(
+				ret,
+				testCase.InventoryErr,
+			)
+			runTestRequest(t, apih,
+				testCase.Request,
+				testCase.JSONResponseParams,
+			)
+		})
+	}
+}
+
 func TestAPIClearDevicesGroup(t *testing.T) {
 	testCases := []struct {
 		Name string

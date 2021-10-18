@@ -2879,6 +2879,63 @@ func compareAttrsWithoutTimestamp(a, b model.DeviceAttributes) bool {
 	return true
 }
 
+func TestMongoDeleteGroup(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping TestMongoUnsetDevicesGroupWithmodel.GroupName in short mode.")
+	}
+
+	groupName := model.GroupName("group")
+	inputDevices := []model.Device{
+		{
+			ID:    model.DeviceID("1"),
+			Group: groupName,
+		},
+		{
+			ID:    model.DeviceID("2"),
+			Group: groupName,
+		},
+		{
+			ID:    model.DeviceID("3"),
+			Group: model.GroupName("other-group"),
+		},
+		{
+			ID: model.DeviceID("4"),
+		},
+	}
+
+	ctx := identity.WithContext(db.CTX(), &identity.Identity{
+		Tenant: "",
+	})
+
+	// Make sure we start test with empty database
+	db.Wipe()
+
+	// insert the devices
+	client := db.Client()
+	devices := make(bson.A, len(inputDevices))
+	for i := range inputDevices {
+		devices[i] = &inputDevices[i]
+	}
+	_, err := client.Database(mstore.DbFromContext(ctx, DbName)).
+		Collection(DbDevicesColl).
+		InsertMany(ctx, devices)
+	if err != nil {
+		panic(err)
+	}
+
+	// test the DeleteGroup method
+	store := NewDataStoreMongoWithSession(client)
+	deviceIDs, err := store.DeleteGroup(ctx, groupName)
+	assert.NoError(t, err)
+
+	updated := 0
+	for deviceID := range deviceIDs {
+		assert.Contains(t, []model.DeviceID{inputDevices[0].ID, inputDevices[1].ID}, deviceID)
+		updated++
+	}
+	assert.Equal(t, 2, updated)
+}
+
 func TestMongoUnsetDevicesGroupWithGroupName(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping TestMongoUnsetDevicesGroupWithmodel.GroupName in short mode.")

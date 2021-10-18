@@ -122,6 +122,29 @@ func (_m *InventoryApp) DeleteDevices(ctx context.Context, ids []model.DeviceID)
 	return r0, r1
 }
 
+// DeleteGroup provides a mock function with given fields: ctx, groupName
+func (_m *InventoryApp) DeleteGroup(ctx context.Context, groupName model.GroupName) (*model.UpdateResult, error) {
+	ret := _m.Called(ctx, groupName)
+
+	var r0 *model.UpdateResult
+	if rf, ok := ret.Get(0).(func(context.Context, model.GroupName) *model.UpdateResult); ok {
+		r0 = rf(ctx, groupName)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*model.UpdateResult)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, model.GroupName) error); ok {
+		r1 = rf(ctx, groupName)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetDevice provides a mock function with given fields: ctx, id
 func (_m *InventoryApp) GetDevice(ctx context.Context, id model.DeviceID) (*model.Device, error) {
 	ret := _m.Called(ctx, id)

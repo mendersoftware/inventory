@@ -102,7 +102,10 @@ type DataStore interface {
 	// in filters
 	GetFiltersAttributes(ctx context.Context) ([]model.FilterAttribute, error)
 
-	// UnsetDevicesGroup removes a list of deices from their respective
+	// DeleteGroup removes a device group
+	DeleteGroup(ctx context.Context, group model.GroupName) (chan model.DeviceID, error)
+
+	// UnsetDevicesGroup removes a list of devices from their respective
 	// groups returning the number of devices that were modified or an
 	// error if any, respectively.
 	UnsetDevicesGroup(ctx context.Context, deviceIDs []model.DeviceID, group model.GroupName) (*model.UpdateResult, error)
