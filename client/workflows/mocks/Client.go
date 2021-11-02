@@ -19,6 +19,7 @@ package mocks
 import (
 	context "context"
 
+	model "github.com/mendersoftware/inventory/model"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -41,13 +42,13 @@ func (_m *Client) CheckHealth(ctx context.Context) error {
 	return r0
 }
 
-// StartReindex provides a mock function with given fields: c, device
-func (_m *Client) StartReindex(c context.Context, device string) error {
-	ret := _m.Called(c, device)
+// StartReindex provides a mock function with given fields: c, deviceIDs
+func (_m *Client) StartReindex(c context.Context, deviceIDs []model.DeviceID) error {
+	ret := _m.Called(c, deviceIDs)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) error); ok {
-		r0 = rf(c, device)
+	if rf, ok := ret.Get(0).(func(context.Context, []model.DeviceID) error); ok {
+		r0 = rf(c, deviceIDs)
 	} else {
 		r0 = ret.Error(0)
 	}

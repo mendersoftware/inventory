@@ -18,6 +18,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -1080,10 +1081,16 @@ func TestDeleteGroup(t *testing.T) {
 	groupName := model.GroupName("group")
 
 	testCases := map[string]struct {
+		count  int
 		err    error
 		outErr error
 	}{
-		"ok": {},
+		"ok": {
+			count: 2,
+		},
+		"ok with pagination": {
+			count: 102,
+		},
 		"ko": {
 			err:    errors.New("error"),
 			outErr: errors.New("failed to delete group: error"),
@@ -1102,8 +1109,9 @@ func TestDeleteGroup(t *testing.T) {
 			} else {
 				devices := make(chan model.DeviceID)
 				go func() {
-					devices <- model.DeviceID("1")
-					devices <- model.DeviceID("2")
+					for i := 0; i < tc.count; i++ {
+						devices <- model.DeviceID(strconv.Itoa(i + 1))
+					}
 					close(devices)
 				}()
 
@@ -1116,10 +1124,31 @@ func TestDeleteGroup(t *testing.T) {
 			workflows := &mworkflows.Client{}
 			defer workflows.AssertExpectations(t)
 			if tc.err == nil {
-				workflows.On("StartReindex",
-					ctx,
-					mock.AnythingOfType("string"),
-				).Return(nil)
+				if tc.count > 100 {
+					workflows.On("StartReindex",
+						ctx,
+						[]model.DeviceID{"1", "2", "3", "4", "5", "6", "7", "8", "9", "10",
+							"11", "12", "13", "14", "15", "16", "17", "18", "19", "20",
+							"21", "22", "23", "24", "25", "26", "27", "28", "29", "30",
+							"31", "32", "33", "34", "35", "36", "37", "38", "39", "40",
+							"41", "42", "43", "44", "45", "46", "47", "48", "49", "50",
+							"51", "52", "53", "54", "55", "56", "57", "58", "59", "60",
+							"61", "62", "63", "64", "65", "66", "67", "68", "69", "70",
+							"71", "72", "73", "74", "75", "76", "77", "78", "79", "80",
+							"81", "82", "83", "84", "85", "86", "87", "88", "89", "90",
+							"91", "92", "93", "94", "95", "96", "97", "98", "99", "100"},
+					).Return(nil).Once()
+
+					workflows.On("StartReindex",
+						ctx,
+						[]model.DeviceID{"101", "102"},
+					).Return(nil).Once()
+				} else {
+					workflows.On("StartReindex",
+						ctx,
+						[]model.DeviceID{"1", "2"},
+					).Return(nil).Once()
+				}
 			}
 
 			i := invForTest(db).WithReporting(workflows)
@@ -1127,7 +1156,7 @@ func TestDeleteGroup(t *testing.T) {
 			if tc.err != nil {
 				assert.EqualError(t, tc.outErr, err.Error())
 			} else {
-				assert.Equal(t, int64(2), res.UpdatedCount)
+				assert.Equal(t, int64(tc.count), res.UpdatedCount)
 				assert.NoError(t, err)
 			}
 		})
@@ -1545,7 +1574,7 @@ func TestInventoryDeleteDevices(t *testing.T) {
 			if tc.outError == nil {
 				workflows.On("StartReindex",
 					ctx,
-					mock.AnythingOfType("string"),
+					mock.AnythingOfType("[]model.DeviceID"),
 				).Return(tc.workflowsError)
 			}
 
@@ -1608,7 +1637,7 @@ func TestInventoryUpsertDevicesStatuses(t *testing.T) {
 			if tc.outError == nil {
 				workflows.On("StartReindex",
 					ctx,
-					mock.AnythingOfType("string"),
+					mock.AnythingOfType("[]model.DeviceID"),
 				).Return(tc.workflowsError)
 			}
 
