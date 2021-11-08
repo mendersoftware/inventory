@@ -27,11 +27,12 @@ import (
 	"github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/requestid"
 	"github.com/mendersoftware/go-lib-micro/rest_utils"
+	"github.com/mendersoftware/inventory/model"
 	"github.com/mendersoftware/inventory/utils"
 )
 
 const (
-	ReindexURI = "/api/v1/workflow/reindex_reporting"
+	ReindexURI = "/api/v1/workflow/reindex_reporting/batch"
 	HealthURI  = "/api/v1/health"
 )
 
@@ -43,7 +44,7 @@ const (
 //go:generate ../../utils/mockgen.sh
 type Client interface {
 	CheckHealth(ctx context.Context) error
-	StartReindex(c context.Context, device string) error
+	StartReindex(c context.Context, deviceIDs []model.DeviceID) error
 }
 
 type ClientOptions struct {
@@ -74,7 +75,7 @@ type client struct {
 	client http.Client
 }
 
-func (c *client) StartReindex(ctx context.Context, device string) error {
+func (c *client) StartReindex(ctx context.Context, deviceIDs []model.DeviceID) error {
 	if _, ok := ctx.Deadline(); !ok {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, defaultTimeout)
@@ -84,11 +85,14 @@ func (c *client) StartReindex(ctx context.Context, device string) error {
 	if id := identity.FromContext(ctx); id != nil {
 		tenantID = id.Tenant
 	}
-	wflow := ReindexWorkflow{
-		RequestID: requestid.FromContext(ctx),
-		TenantID:  tenantID,
-		DeviceID:  device,
-		Service:   ServiceInventory,
+	wflow := make([]ReindexWorkflow, len(deviceIDs))
+	for i, deviceID := range deviceIDs {
+		wflow[i] = ReindexWorkflow{
+			RequestID: requestid.FromContext(ctx),
+			TenantID:  tenantID,
+			DeviceID:  string(deviceID),
+			Service:   ServiceInventory,
+		}
 	}
 	payload, _ := json.Marshal(wflow)
 	req, err := http.NewRequestWithContext(ctx,

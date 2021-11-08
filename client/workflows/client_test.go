@@ -31,6 +31,7 @@ import (
 	"github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/requestid"
 	"github.com/mendersoftware/go-lib-micro/rest_utils"
+	"github.com/mendersoftware/inventory/model"
 )
 
 func mockServerReindex(t *testing.T, tenant, device, reqid string, code int) (*httptest.Server, error) {
@@ -41,16 +42,16 @@ func mockServerReindex(t *testing.T, tenant, device, reqid string, code int) (*h
 		}
 		defer r.Body.Close()
 
-		request := ReindexWorkflow{}
+		request := []ReindexWorkflow{}
 
 		decoder := json.NewDecoder(r.Body)
 		err := decoder.Decode(&request)
 		assert.NoError(t, err)
 
-		assert.Equal(t, reqid, request.RequestID)
-		assert.Equal(t, tenant, request.TenantID)
-		assert.Equal(t, device, request.DeviceID)
-		assert.Equal(t, ServiceInventory, request.Service)
+		assert.Equal(t, reqid, request[0].RequestID)
+		assert.Equal(t, tenant, request[0].TenantID)
+		assert.Equal(t, device, request[0].DeviceID)
+		assert.Equal(t, ServiceInventory, request[0].Service)
 
 		assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
 		w.WriteHeader(http.StatusOK)
@@ -90,7 +91,7 @@ func TestReindex(t *testing.T) {
 			reqid:  "reqid2",
 
 			url: "http://127.0.0.1:12345",
-			err: errors.New(`workflows: failed to submit reindex job: Post "http://127.0.0.1:12345/api/v1/workflow/reindex_reporting": dial tcp 127.0.0.1:12345: connect: connection refused`),
+			err: errors.New(`workflows: failed to submit reindex job: Post "http://127.0.0.1:12345/api/v1/workflow/reindex_reporting/batch": dial tcp 127.0.0.1:12345: connect: connection refused`),
 		},
 		{
 			name:   "error, 404",
@@ -133,7 +134,7 @@ func TestReindex(t *testing.T) {
 			}
 			client := NewClient(url)
 
-			err = client.StartReindex(ctx, tc.device)
+			err = client.StartReindex(ctx, []model.DeviceID{model.DeviceID(tc.device)})
 			if tc.err != nil {
 				assert.EqualError(t, err, tc.err.Error())
 			} else {
