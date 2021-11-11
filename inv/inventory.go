@@ -44,9 +44,25 @@ type InventoryApp interface {
 	GetDevice(ctx context.Context, id model.DeviceID) (*model.Device, error)
 	AddDevice(ctx context.Context, d *model.Device) error
 	UpsertAttributes(ctx context.Context, id model.DeviceID, attrs model.DeviceAttributes) error
-	UpsertAttributesWithUpdated(ctx context.Context, id model.DeviceID, attrs model.DeviceAttributes, scope string, etag string) error
-	UpsertDevicesStatuses(ctx context.Context, devices []model.DeviceUpdate, attrs model.DeviceAttributes) (*model.UpdateResult, error)
-	ReplaceAttributes(ctx context.Context, id model.DeviceID, upsertAttrs model.DeviceAttributes, scope string, etag string) error
+	UpsertAttributesWithUpdated(
+		ctx context.Context,
+		id model.DeviceID,
+		attrs model.DeviceAttributes,
+		scope string,
+		etag string,
+	) error
+	UpsertDevicesStatuses(
+		ctx context.Context,
+		devices []model.DeviceUpdate,
+		attrs model.DeviceAttributes,
+	) (*model.UpdateResult, error)
+	ReplaceAttributes(
+		ctx context.Context,
+		id model.DeviceID,
+		upsertAttrs model.DeviceAttributes,
+		scope string,
+		etag string,
+	) error
 	GetFiltersAttributes(ctx context.Context) ([]model.FilterAttribute, error)
 	DeleteGroup(ctx context.Context, groupName model.GroupName) (*model.UpdateResult, error)
 	UnsetDeviceGroup(ctx context.Context, id model.DeviceID, groupName model.GroupName) error
@@ -62,7 +78,12 @@ type InventoryApp interface {
 		group model.GroupName,
 	) (*model.UpdateResult, error)
 	ListGroups(ctx context.Context, filters []model.FilterPredicate) ([]model.GroupName, error)
-	ListDevicesByGroup(ctx context.Context, group model.GroupName, skip int, limit int) ([]model.DeviceID, int, error)
+	ListDevicesByGroup(
+		ctx context.Context,
+		group model.GroupName,
+		skip int,
+		limit int,
+	) ([]model.DeviceID, int, error)
 	GetDeviceGroup(ctx context.Context, id model.DeviceID) (model.GroupName, error)
 	DeleteDevice(ctx context.Context, id model.DeviceID) error
 	DeleteDevices(
@@ -122,7 +143,10 @@ func (i *inventory) HealthCheck(ctx context.Context) error {
 	return nil
 }
 
-func (i *inventory) ListDevices(ctx context.Context, q store.ListQuery) ([]model.Device, int, error) {
+func (i *inventory) ListDevices(
+	ctx context.Context,
+	q store.ListQuery,
+) ([]model.Device, int, error) {
 	devs, totalCount, err := i.db.GetDevices(ctx, q)
 
 	if err != nil {
@@ -185,7 +209,11 @@ func (i *inventory) DeleteDevice(ctx context.Context, id model.DeviceID) error {
 	return nil
 }
 
-func (i *inventory) UpsertAttributes(ctx context.Context, id model.DeviceID, attrs model.DeviceAttributes) error {
+func (i *inventory) UpsertAttributes(
+	ctx context.Context,
+	id model.DeviceID,
+	attrs model.DeviceAttributes,
+) error {
 	if _, err := i.db.UpsertDevicesAttributes(
 		ctx, []model.DeviceID{id}, attrs,
 	); err != nil {
@@ -197,7 +225,12 @@ func (i *inventory) UpsertAttributes(ctx context.Context, id model.DeviceID, att
 	return nil
 }
 
-func (i *inventory) checkAttributesLimits(ctx context.Context, id model.DeviceID, attrs model.DeviceAttributes, scope string) error {
+func (i *inventory) checkAttributesLimits(
+	ctx context.Context,
+	id model.DeviceID,
+	attrs model.DeviceAttributes,
+	scope string,
+) error {
 	limit := 0
 	switch scope {
 	case model.AttrScopeInventory:
@@ -270,7 +303,13 @@ func (i *inventory) UpsertAttributesWithUpdated(
 	return nil
 }
 
-func (i *inventory) ReplaceAttributes(ctx context.Context, id model.DeviceID, upsertAttrs model.DeviceAttributes, scope string, etag string) error {
+func (i *inventory) ReplaceAttributes(
+	ctx context.Context,
+	id model.DeviceID,
+	upsertAttrs model.DeviceAttributes,
+	scope string,
+	etag string,
+) error {
 	limit := 0
 	switch scope {
 	case model.AttrScopeInventory:
@@ -400,7 +439,11 @@ func (i *inventory) UnsetDevicesGroup(
 	return res, nil
 }
 
-func (i *inventory) UnsetDeviceGroup(ctx context.Context, id model.DeviceID, group model.GroupName) error {
+func (i *inventory) UnsetDeviceGroup(
+	ctx context.Context,
+	id model.DeviceID,
+	group model.GroupName,
+) error {
 	result, err := i.db.UnsetDevicesGroup(ctx, []model.DeviceID{id}, group)
 	if err != nil {
 		return errors.Wrap(err, "failed to unassign group from device")
@@ -465,7 +508,12 @@ func (i *inventory) ListGroups(
 	return groups, nil
 }
 
-func (i *inventory) ListDevicesByGroup(ctx context.Context, group model.GroupName, skip, limit int) ([]model.DeviceID, int, error) {
+func (i *inventory) ListDevicesByGroup(
+	ctx context.Context,
+	group model.GroupName,
+	skip,
+	limit int,
+) ([]model.DeviceID, int, error) {
 	ids, totalCount, err := i.db.GetDevicesByGroup(ctx, group, skip, limit)
 	if err != nil {
 		if err == store.ErrGroupNotFound {
@@ -478,7 +526,10 @@ func (i *inventory) ListDevicesByGroup(ctx context.Context, group model.GroupNam
 	return ids, totalCount, nil
 }
 
-func (i *inventory) GetDeviceGroup(ctx context.Context, id model.DeviceID) (model.GroupName, error) {
+func (i *inventory) GetDeviceGroup(
+	ctx context.Context,
+	id model.DeviceID,
+) (model.GroupName, error) {
 	group, err := i.db.GetDeviceGroup(ctx, id)
 	if err != nil {
 		if err == store.ErrDevNotFound {
@@ -499,7 +550,10 @@ func (i *inventory) CreateTenant(ctx context.Context, tenant model.NewTenant) er
 	return nil
 }
 
-func (i *inventory) SearchDevices(ctx context.Context, searchParams model.SearchParams) ([]model.Device, int, error) {
+func (i *inventory) SearchDevices(
+	ctx context.Context,
+	searchParams model.SearchParams,
+) ([]model.Device, int, error) {
 	devs, totalCount, err := i.db.SearchDevices(ctx, searchParams)
 
 	if err != nil {

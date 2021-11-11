@@ -25,6 +25,7 @@ import (
 	"github.com/mendersoftware/go-lib-micro/log"
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
 	mstore "github.com/mendersoftware/go-lib-micro/store"
+
 	"github.com/mendersoftware/inventory/model"
 )
 

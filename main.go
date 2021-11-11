@@ -47,8 +47,9 @@ func doMain(args []string) {
 
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
-			Name:        "config",
-			Usage:       "Configuration `FILE`. Supports JSON, TOML, YAML and HCL formatted configs.",
+			Name: "config",
+			Usage: "Configuration `FILE`." +
+				" Supports JSON, TOML, YAML and HCL formatted configs.",
 			Destination: &configPath,
 		},
 		cli.BoolFlag{

@@ -27,6 +27,7 @@ import (
 	"github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/requestid"
 	"github.com/mendersoftware/go-lib-micro/rest_utils"
+
 	"github.com/mendersoftware/inventory/model"
 	"github.com/mendersoftware/inventory/utils"
 )

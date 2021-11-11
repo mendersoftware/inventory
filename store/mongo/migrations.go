@@ -23,6 +23,7 @@ import (
 	"github.com/mendersoftware/go-lib-micro/log"
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
 	mstore "github.com/mendersoftware/go-lib-micro/store"
+
 	"github.com/mendersoftware/inventory/store"
 )
 
@@ -35,7 +36,11 @@ func (db *DataStoreMongo) WithAutomigrate() store.DataStore {
 	}
 }
 
-func (db *DataStoreMongo) MigrateTenant(ctx context.Context, version string, tenantId string) error {
+func (db *DataStoreMongo) MigrateTenant(
+	ctx context.Context,
+	version string,
+	tenantId string,
+) error {
 	l := log.FromContext(ctx)
 
 	database := mstore.DbNameForTenant(tenantId, DbName)
