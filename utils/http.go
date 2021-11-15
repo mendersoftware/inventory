@@ -1,4 +1,4 @@
-// Copyright 2017 Northern.tech AS
+// Copyright 2021 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -60,7 +60,14 @@ func MsgQueryParmOneOf(name string, allowed []string) string {
 }
 
 //query param parsing/validation
-func ParseQueryParmUInt(r *rest.Request, name string, required bool, min, max, def uint64) (uint64, error) {
+func ParseQueryParmUInt(
+	r *rest.Request,
+	name string,
+	required bool,
+	min,
+	max,
+	def uint64,
+) (uint64, error) {
 	strVal := r.URL.Query().Get(name)
 
 	if strVal == "" {
@@ -102,7 +109,12 @@ func ParseQueryParmBool(r *rest.Request, name string, required bool, def *bool) 
 	return &boolVal, nil
 }
 
-func ParseQueryParmStr(r *rest.Request, name string, required bool, allowed []string) (string, error) {
+func ParseQueryParmStr(
+	r *rest.Request,
+	name string,
+	required bool,
+	allowed []string,
+) (string, error) {
 	val := r.URL.Query().Get(name)
 
 	if val == "" {
@@ -130,7 +142,14 @@ func ParsePagination(r *rest.Request) (uint64, uint64, error) {
 		return 0, 0, err
 	}
 
-	per_page, err := ParseQueryParmUInt(r, PerPageName, false, PerPageMin, PerPageMax, PerPageDefault)
+	per_page, err := ParseQueryParmUInt(
+		r,
+		PerPageName,
+		false,
+		PerPageMin,
+		PerPageMax,
+		PerPageDefault,
+	)
 	if err != nil {
 		return 0, 0, err
 	}

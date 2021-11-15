@@ -75,7 +75,11 @@ type DataStore interface {
 	// in a differential manner. Nonexistent attributes are created,
 	// existing are overwritten; the device resource is also created if
 	// necessary.
-	UpsertDevicesAttributes(ctx context.Context, ids []model.DeviceID, attrs model.DeviceAttributes) (*model.UpdateResult, error)
+	UpsertDevicesAttributes(
+		ctx context.Context,
+		ids []model.DeviceID,
+		attrs model.DeviceAttributes,
+	) (*model.UpdateResult, error)
 
 	// UpsertRemoveDeviceAttributes provides an interface to replace the
 	// attributes for a device. It accepts two lists: a list of attributes
@@ -96,7 +100,10 @@ type DataStore interface {
 	// method is that this method takes into accout device object revision
 	// and upserts attributes only if the recorded object has revision lower than
 	// the revision provided with the update.
-	UpsertDevicesAttributesWithRevision(ctx context.Context, ids []model.DeviceUpdate, attrs model.DeviceAttributes) (*model.UpdateResult, error)
+	UpsertDevicesAttributesWithRevision(ctx context.Context,
+		ids []model.DeviceUpdate,
+		attrs model.DeviceAttributes,
+	) (*model.UpdateResult, error)
 
 	// GetFiltersAttributes returns the attributes which can be used
 	// in filters
@@ -108,19 +115,29 @@ type DataStore interface {
 	// UnsetDevicesGroup removes a list of devices from their respective
 	// groups returning the number of devices that were modified or an
 	// error if any, respectively.
-	UnsetDevicesGroup(ctx context.Context, deviceIDs []model.DeviceID, group model.GroupName) (*model.UpdateResult, error)
+	UnsetDevicesGroup(ctx context.Context,
+		deviceIDs []model.DeviceID,
+		group model.GroupName,
+	) (*model.UpdateResult, error)
 
 	// UpdateDevicesGroup updates multiple devices' group, returning number
 	// of matching devices, the number devices that changed group and error,
 	// if any.
-	UpdateDevicesGroup(ctx context.Context, devIDs []model.DeviceID, group model.GroupName) (*model.UpdateResult, error)
+	UpdateDevicesGroup(ctx context.Context,
+		devIDs []model.DeviceID,
+		group model.GroupName,
+	) (*model.UpdateResult, error)
 
 	// ListGroups returns a list of all existing groups. Devices included
 	// in the evaluation can be filtered by the filters argument.
 	ListGroups(ctx context.Context, filters []model.FilterPredicate) ([]model.GroupName, error)
 
 	// Lists devices belonging to a group
-	GetDevicesByGroup(ctx context.Context, group model.GroupName, skip, limit int) ([]model.DeviceID, int, error)
+	GetDevicesByGroup(ctx context.Context,
+		group model.GroupName,
+		skip,
+		limit int,
+	) ([]model.DeviceID, int, error)
 
 	// Get device's group
 	GetDeviceGroup(ctx context.Context, id model.DeviceID) (model.GroupName, error)
@@ -128,7 +145,9 @@ type DataStore interface {
 	// Scan all devices in collection, grab all (unique) attribute names
 	GetAllAttributeNames(ctx context.Context) ([]string, error)
 
-	SearchDevices(ctx context.Context, searchParams model.SearchParams) ([]model.Device, int, error)
+	SearchDevices(ctx context.Context,
+		searchParams model.SearchParams,
+	) ([]model.Device, int, error)
 
 	MigrateTenant(ctx context.Context, version string, tenantId string) error
 

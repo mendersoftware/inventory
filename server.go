@@ -86,7 +86,10 @@ func RunServer(c config.Reader) error {
 	return http.ListenAndServe(addr, api.MakeHandler())
 }
 
-func maybeWithInventory(inv inventory.InventoryApp, c config.Reader) (inventory.InventoryApp, error) {
+func maybeWithInventory(
+	inv inventory.InventoryApp,
+	c config.Reader,
+) (inventory.InventoryApp, error) {
 	if reporting := c.GetBool(SettingEnableReporting); reporting {
 		orchestrator := c.GetString(SettingOrchestratorAddr)
 		if orchestrator == "" {

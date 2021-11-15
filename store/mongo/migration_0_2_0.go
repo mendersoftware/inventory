@@ -52,7 +52,11 @@ func (m *migration_0_2_0) Up(from migrate.Version) error {
 
 		// get all docs containing a given attribute
 		scope := fmt.Sprintf("%s.%s", nnew, DbDevAttributesScope)
-		_, err = coll.UpdateMany(m.ctx, bson.M{nnew: bson.M{"$exists": true}}, bson.M{"$set": bson.M{scope: DbScopeInventory}})
+		_, err = coll.UpdateMany(
+			m.ctx,
+			bson.M{nnew: bson.M{"$exists": true}},
+			bson.M{"$set": bson.M{scope: DbScopeInventory}},
+		)
 		if err != nil {
 			return errors.Wrapf(err, "failed to update scope for attribute name %s", nold)
 		}

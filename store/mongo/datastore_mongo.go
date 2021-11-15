@@ -134,7 +134,10 @@ func NewDataStoreMongo(config DataStoreMongoConfig) (store.DataStore, error) {
 		}
 		// from: https://www.mongodb.com/blog/post/mongodb-go-driver-tutorial
 		/*
-			It is best practice to keep a client that is connected to MongoDB around so that the application can make use of connection pooling - you don't want to open and close a connection for each query. However, if your application no longer requires a connection, the connection can be closed with client.Disconnect() like so:
+			It is best practice to keep a client that is connected to MongoDB around so that the
+			application can make use of connection pooling - you don't want to open and close a
+			connection for each query. However, if your application no longer requires a connection,
+			the connection can be closed with client.Disconnect() like so:
 		*/
 		err = clientGlobal.Ping(ctx, nil)
 		if err != nil {
@@ -161,13 +164,20 @@ func (db *DataStoreMongo) Ping(ctx context.Context) error {
 	return res.Err()
 }
 
-func (db *DataStoreMongo) GetDevices(ctx context.Context, q store.ListQuery) ([]model.Device, int, error) {
+func (db *DataStoreMongo) GetDevices(
+	ctx context.Context,
+	q store.ListQuery,
+) ([]model.Device, int, error) {
 	c := db.client.Database(mstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
 
 	queryFilters := make([]bson.M, 0)
 	for _, filter := range q.Filters {
 		op := mongoOperator(filter.Operator)
-		name := fmt.Sprintf("%s-%s", filter.AttrScope, model.GetDeviceAttributeNameReplacer().Replace(filter.AttrName))
+		name := fmt.Sprintf(
+			"%s-%s",
+			filter.AttrScope,
+			model.GetDeviceAttributeNameReplacer().Replace(filter.AttrName),
+		)
 		field := fmt.Sprintf("%s.%s.%s", DbDevAttributes, name, DbDevAttributesValue)
 		switch filter.Operator {
 		default:
@@ -216,7 +226,11 @@ func (db *DataStoreMongo) GetDevices(ctx context.Context, q store.ListQuery) ([]
 		findOptions.SetLimit(int64(q.Limit))
 	}
 	if q.Sort != nil {
-		name := fmt.Sprintf("%s-%s", q.Sort.AttrScope, model.GetDeviceAttributeNameReplacer().Replace(q.Sort.AttrName))
+		name := fmt.Sprintf(
+			"%s-%s",
+			q.Sort.AttrScope,
+			model.GetDeviceAttributeNameReplacer().Replace(q.Sort.AttrName),
+		)
 		sortField := fmt.Sprintf("%s.%s.%s", DbDevAttributes, name, DbDevAttributesValue)
 		sortFieldQuery := bson.D{{Key: sortField, Value: 1}}
 		if !q.Sort.Ascending {
@@ -468,7 +482,12 @@ func (db *DataStoreMongo) upsertAttributes(
 
 // makeAttrField is a convenience function for composing attribute field names.
 func makeAttrField(attrName, attrScope string, subFields ...string) string {
-	field := fmt.Sprintf("%s.%s-%s", DbDevAttributes, attrScope, model.GetDeviceAttributeNameReplacer().Replace(attrName))
+	field := fmt.Sprintf(
+		"%s.%s-%s",
+		DbDevAttributes,
+		attrScope,
+		model.GetDeviceAttributeNameReplacer().Replace(attrName),
+	)
 	if len(subFields) > 0 {
 		field = strings.Join(
 			append([]string{field}, subFields...), ".",
@@ -673,7 +692,9 @@ func (db *DataStoreMongo) UpdateDevicesGroup(
 	}, nil
 }
 
-func (db *DataStoreMongo) GetFiltersAttributes(ctx context.Context) ([]model.FilterAttribute, error) {
+func (db *DataStoreMongo) GetFiltersAttributes(
+	ctx context.Context,
+) ([]model.FilterAttribute, error) {
 	database := db.client.Database(mstore.DbFromContext(ctx, DbName))
 	collDevs := database.Collection(DbDevicesColl)
 
@@ -844,7 +865,10 @@ func predicateToQuery(pred model.FilterPredicate) (bson.D, error) {
 		return nil, err
 	}
 	name := fmt.Sprintf(
-		"%s.%s-%s.value", DbDevAttributes, pred.Scope, model.GetDeviceAttributeNameReplacer().Replace(pred.Attribute),
+		"%s.%s-%s.value",
+		DbDevAttributes,
+		pred.Scope,
+		model.GetDeviceAttributeNameReplacer().Replace(pred.Attribute),
 	)
 	return bson.D{{
 		Key: name, Value: bson.D{{Key: pred.Type, Value: pred.Value}},
@@ -887,7 +911,12 @@ func (db *DataStoreMongo) ListGroups(
 	return groups, nil
 }
 
-func (db *DataStoreMongo) GetDevicesByGroup(ctx context.Context, group model.GroupName, skip, limit int) ([]model.DeviceID, int, error) {
+func (db *DataStoreMongo) GetDevicesByGroup(
+	ctx context.Context,
+	group model.GroupName,
+	skip,
+	limit int,
+) ([]model.DeviceID, int, error) {
 	c := db.client.
 		Database(mstore.DbFromContext(ctx, DbName)).
 		Collection(DbDevicesColl)
@@ -924,7 +953,10 @@ func (db *DataStoreMongo) GetDevicesByGroup(ctx context.Context, group model.Gro
 	return resIds, totalDevices, nil
 }
 
-func (db *DataStoreMongo) GetDeviceGroup(ctx context.Context, id model.DeviceID) (model.GroupName, error) {
+func (db *DataStoreMongo) GetDeviceGroup(
+	ctx context.Context,
+	id model.DeviceID,
+) (model.GroupName, error) {
 	dev, err := db.GetDevice(ctx, id)
 	if err != nil || dev == nil {
 		return "", store.ErrDevNotFound
@@ -1014,7 +1046,10 @@ func (db *DataStoreMongo) GetAllAttributeNames(ctx context.Context) ([]string, e
 	return attributeNames, nil
 }
 
-func (db *DataStoreMongo) SearchDevices(ctx context.Context, searchParams model.SearchParams) ([]model.Device, int, error) {
+func (db *DataStoreMongo) SearchDevices(
+	ctx context.Context,
+	searchParams model.SearchParams,
+) ([]model.Device, int, error) {
 	c := db.client.Database(mstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl)
 
 	queryFilters := make([]bson.M, 0)
@@ -1024,7 +1059,11 @@ func (db *DataStoreMongo) SearchDevices(ctx context.Context, searchParams model.
 		if filter.Scope == model.AttrScopeIdentity && filter.Attribute == model.AttrNameID {
 			field = DbDevId
 		} else {
-			name := fmt.Sprintf("%s-%s", filter.Scope, model.GetDeviceAttributeNameReplacer().Replace(filter.Attribute))
+			name := fmt.Sprintf(
+				"%s-%s",
+				filter.Scope,
+				model.GetDeviceAttributeNameReplacer().Replace(filter.Attribute),
+			)
 			field = fmt.Sprintf("%s.%s.%s", DbDevAttributes, name, DbDevAttributesValue)
 		}
 		queryFilters = append(queryFilters, bson.M{field: bson.M{op: filter.Value}})
@@ -1047,7 +1086,11 @@ func (db *DataStoreMongo) SearchDevices(ctx context.Context, searchParams model.
 	if len(searchParams.Attributes) > 0 {
 		projection := bson.M{DbDevUpdatedTs: 1}
 		for _, attribute := range searchParams.Attributes {
-			name := fmt.Sprintf("%s-%s", attribute.Scope, model.GetDeviceAttributeNameReplacer().Replace(attribute.Attribute))
+			name := fmt.Sprintf(
+				"%s-%s",
+				attribute.Scope,
+				model.GetDeviceAttributeNameReplacer().Replace(attribute.Attribute),
+			)
 			field := fmt.Sprintf("%s.%s", DbDevAttributes, name)
 			projection[field] = 1
 		}
@@ -1061,7 +1104,11 @@ func (db *DataStoreMongo) SearchDevices(ctx context.Context, searchParams model.
 			if sortQ.Scope == model.AttrScopeIdentity && sortQ.Attribute == model.AttrNameID {
 				field = DbDevId
 			} else {
-				name := fmt.Sprintf("%s-%s", sortQ.Scope, model.GetDeviceAttributeNameReplacer().Replace(sortQ.Attribute))
+				name := fmt.Sprintf(
+					"%s-%s",
+					sortQ.Scope,
+					model.GetDeviceAttributeNameReplacer().Replace(sortQ.Attribute),
+				)
 				field = fmt.Sprintf("%s.%s", DbDevAttributes, name)
 			}
 			sortField[i] = bson.E{Key: field, Value: 1}
@@ -1107,9 +1154,18 @@ func indexAttr(s *mongo.Client, ctx context.Context, attr string) error {
 
 	if err != nil {
 		if isTooManyIndexes(err) {
-			l.Warnf("failed to index attr %s in db %s: too many indexes", attr, mstore.DbFromContext(ctx, DbName))
+			l.Warnf(
+				"failed to index attr %s in db %s: too many indexes",
+				attr,
+				mstore.DbFromContext(ctx, DbName),
+			)
 		} else {
-			return errors.Wrapf(err, "failed to index attr %s in db %s", attr, mstore.DbFromContext(ctx, DbName))
+			return errors.Wrapf(
+				err,
+				"failed to index attr %s in db %s",
+				attr,
+				mstore.DbFromContext(ctx, DbName),
+			)
 		}
 	}
 

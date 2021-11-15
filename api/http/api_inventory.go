@@ -48,18 +48,20 @@ const (
 	uriGroupsName    = "/api/0.1.0/groups/:name"
 	uriGroupsDevices = "/api/0.1.0/groups/:name/devices"
 
-	uriInternalAlive         = "/api/internal/v1/inventory/alive"
-	uriInternalHealth        = "/api/internal/v1/inventory/health"
-	uriInternalTenants       = "/api/internal/v1/inventory/tenants"
-	uriInternalDevices       = "/api/internal/v1/inventory/tenants/:tenant_id/devices"
-	urlInternalDevicesStatus = "/api/internal/v1/inventory/tenants/:tenant_id/devices/status/:status"
-	uriInternalDeviceDetails = "/api/internal/v1/inventory/tenants/:tenant_id/devices/:device_id"
-	uriInternalDeviceGroups  = "/api/internal/v1/inventory/tenants/:tenant_id/devices/:device_id/groups"
-	urlInternalAttributes    = "/api/internal/v1/inventory/tenants/:tenant_id/device/:device_id/attribute/scope/:scope"
-	urlInternalReindex       = "/api/internal/v1/inventory/tenants/:tenant_id/devices/:device_id/reindex"
-	apiUrlManagementV2       = "/api/management/v2/inventory"
-	urlFiltersAttributes     = apiUrlManagementV2 + "/filters/attributes"
-	urlFiltersSearch         = apiUrlManagementV2 + "/filters/search"
+	apiUrlInternalV1         = "/api/internal/v1/inventory"
+	uriInternalAlive         = apiUrlInternalV1 + "/alive"
+	uriInternalHealth        = apiUrlInternalV1 + "/health"
+	uriInternalTenants       = apiUrlInternalV1 + "/tenants"
+	uriInternalDevices       = apiUrlInternalV1 + "/tenants/:tenant_id/devices"
+	urlInternalDevicesStatus = apiUrlInternalV1 + "/tenants/:tenant_id/devices/status/:status"
+	uriInternalDeviceDetails = apiUrlInternalV1 + "/tenants/:tenant_id/devices/:device_id"
+	uriInternalDeviceGroups  = apiUrlInternalV1 + "/tenants/:tenant_id/devices/:device_id/groups"
+	urlInternalAttributes    = apiUrlInternalV1 +
+		"/tenants/:tenant_id/device/:device_id/attribute/scope/:scope"
+	urlInternalReindex   = apiUrlInternalV1 + "/tenants/:tenant_id/devices/:device_id/reindex"
+	apiUrlManagementV2   = "/api/management/v2/inventory"
+	urlFiltersAttributes = apiUrlManagementV2 + "/filters/attributes"
+	urlFiltersSearch     = apiUrlManagementV2 + "/filters/search"
 
 	apiUrlInternalV2         = "/api/internal/v2/inventory"
 	urlInternalFiltersSearch = apiUrlInternalV2 + "/tenants/:tenant_id/filters/search"
@@ -183,7 +185,11 @@ func parseSortParam(r *rest.Request) (*store.Sort, error) {
 		return nil, nil
 	}
 	sortValArray := strings.Split(sortStr, queryParamValueSeparator)
-	attrNameWithScope := strings.SplitN(sortValArray[sortAttributeNameIdx], queryParamScopeSeparator, 2)
+	attrNameWithScope := strings.SplitN(
+		sortValArray[sortAttributeNameIdx],
+		queryParamScopeSeparator,
+		2,
+	)
 	var scope, attrName string
 	if len(attrNameWithScope) == 1 {
 		scope = model.AttrScopeInventory
@@ -209,7 +215,13 @@ func parseSortParam(r *rest.Request) (*store.Sort, error) {
 //
 // eg. `attr_name1=value1` or `attr_name1=eq:value1`
 func parseFilterParams(r *rest.Request) ([]store.Filter, error) {
-	knownParams := []string{utils.PageName, utils.PerPageName, queryParamSort, queryParamHasGroup, queryParamGroup}
+	knownParams := []string{
+		utils.PageName,
+		utils.PerPageName,
+		queryParamSort,
+		queryParamHasGroup,
+		queryParamGroup,
+	}
 	filters := make([]store.Filter, 0)
 	var filter store.Filter
 	for name := range r.URL.Query() {
@@ -521,7 +533,10 @@ func (i *inventoryHandlers) updateDeviceAttributes(
 	w.WriteHeader(http.StatusOK)
 }
 
-func (i *inventoryHandlers) PatchDeviceAttributesInternalHandler(w rest.ResponseWriter, r *rest.Request) {
+func (i *inventoryHandlers) PatchDeviceAttributesInternalHandler(
+	w rest.ResponseWriter,
+	r *rest.Request,
+) {
 	ctx := r.Context()
 	tenantId := r.PathParam("tenant_id")
 	ctx = getTenantContext(ctx, tenantId)
@@ -630,7 +645,12 @@ func (i *inventoryHandlers) GetDevicesByGroupHandler(w rest.ResponseWriter, r *r
 	}
 
 	//get one extra device to see if there's a 'next' page
-	ids, totalCount, err := i.inventory.ListDevicesByGroup(ctx, model.GroupName(group), int((page-1)*perPage), int(perPage))
+	ids, totalCount, err := i.inventory.ListDevicesByGroup(
+		ctx,
+		model.GroupName(group),
+		int((page-1)*perPage),
+		int(perPage),
+	)
 	if err != nil {
 		if err == store.ErrGroupNotFound {
 			u.RestErrWithLog(w, r, l, err, http.StatusNotFound)
