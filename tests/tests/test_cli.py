@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# Copyright 2021 Northern.tech AS
+# Copyright 2022 Northern.tech AS
 #
 #    Licensed under the Apache License, Version 2.0 (the "License");
 #    you may not use this file except in compliance with the License.
@@ -45,7 +45,8 @@ class TestMigration:
 
 class TestCliMigration(TestMigration):
     def test_migrate(self, cli, clean_db, mongo):
-        cli.migrate()
+        code, _, stderr = cli.migrate()
+        assert code == 0, f"Unexpected exit code, stderr: {stderr}"
 
         TestMigration.verify_db_and_collections(mongo, DB_NAME)
         TestMigration.verify_migration(mongo[DB_NAME], DB_VERSION)
@@ -53,7 +54,8 @@ class TestCliMigration(TestMigration):
 
 class TestCliMigrationMultitenant(TestMigration):
     def test_migrate(self, cli, clean_db, mongo):
-        cli.migrate(tenant_id="foobar")
+        code, _, stderr = cli.migrate(tenant_id="foobar")
+        assert code == 0, f"Unexpected exit code, stderr: {stderr}"
 
         tenant_db = DB_NAME + "-foobar"
         TestMigration.verify_db_and_collections(mongo, tenant_db)

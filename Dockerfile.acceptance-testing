@@ -2,15 +2,17 @@ FROM golang:1.17.6-alpine3.15 as builder
 RUN mkdir -p /go/src/github.com/mendersoftware/inventory
 COPY . /go/src/github.com/mendersoftware/inventory
 RUN cd /go/src/github.com/mendersoftware/inventory && \
-    env CGO_ENABLED=0 go test -c -o inventory-test -coverpkg $(go list ./... | grep -v vendor | grep -v mocks | grep -v test | tr  '\n' ,)
+    env CGO_ENABLED=0 go test -c -o inventory -tags main \
+    -cover -covermode atomic \
+    -coverpkg $(go list ./... | grep -v vendor | grep -v mocks | grep -v test | tr  '\n' ,)
 
 FROM alpine:3.15.0
 
 EXPOSE 8080
 RUN mkdir /tests
 
-COPY  --from=builder /go/src/github.com/mendersoftware/inventory/inventory-test /usr/bin/
-COPY ./config.yaml /usr/bin/
+COPY  --from=builder /go/src/github.com/mendersoftware/inventory/inventory /usr/bin/inventory
+COPY ./config.yaml /etc/inventory/
 STOPSIGNAL SIGINT
 
-ENTRYPOINT ["/usr/bin/inventory-test", "-test.coverprofile=/testing/coverage-acceptance.txt", "-acceptance-tests", "-test.run=TestMain", "-cli-args=server --automigrate"]
+ENTRYPOINT ["/usr/bin/inventory", "server", "--automigrate"]
