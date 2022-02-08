@@ -1,4 +1,4 @@
-# Copyright 2021 Northern.tech AS
+# Copyright 2022 Northern.tech AS
 #
 #    Licensed under the Apache License, Version 2.0 (the "License");
 #    you may not use this file except in compliance with the License.
@@ -11,18 +11,22 @@
 #    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #    See the License for the specific language governing permissions and
 #    limitations under the License.
-from bravado.swagger_model import load_file
-from bravado.client import SwaggerClient, RequestsClient
+
+import logging
+import os
+import socket
+
 from urllib import parse as urlparse
+
+import docker
+import pytest  # noqa
+import requests
+
+from bravado.client import SwaggerClient, RequestsClient
+from bravado.swagger_model import load_file
+from requests.packages.urllib3.exceptions import InsecureRequestWarning
 from requests.utils import parse_header_links
 
-import os
-import requests
-import pytest
-import logging
-import subprocess
-
-from requests.packages.urllib3.exceptions import InsecureRequestWarning
 
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
@@ -43,9 +47,7 @@ class ManagementClient:
         http_client.session.verify = False
 
         self.client = SwaggerClient.from_spec(
-            load_file(spec),
-            config=config,
-            http_client=http_client,
+            load_file(spec), config=config, http_client=http_client,
         )
         self.client.swagger_spec.api_url = "http://%s/api/%s" % (host, api)
 
@@ -86,19 +88,13 @@ class ManagementClient:
 
     def updateTagAttributes(self, device_id, tags, eTag=None, JWT="foo.bar.baz"):
         r, _ = self.client.Management_API.Add_Tags(
-            id=device_id,
-            If_Match=eTag,
-            tags=tags,
-            Authorization=JWT,
+            id=device_id, If_Match=eTag, tags=tags, Authorization=JWT,
         ).result()
         return r
 
     def setTagAttributes(self, device_id, tags, eTag=None, JWT="foo.bar.baz"):
         r, _ = self.client.Management_API.Assign_Tags(
-            id=device_id,
-            If_Match=eTag,
-            tags=tags,
-            Authorization=JWT,
+            id=device_id, If_Match=eTag, tags=tags, Authorization=JWT,
         ).result()
         return r
 
@@ -152,15 +148,33 @@ class ManagementClient:
 
 
 class CliClient:
-    cmd = "/testing/inventory"
+    exec_path = "/usr/bin/inventory"
 
-    def migrate(self, tenant_id=None):
-        args = [self.cmd, "migrate"]
+    def __init__(self):
+        self.docker = docker.from_env()
+        # HACK: Find docker-compose project by identifying the container
+        # we're running inside. The hostname equals the container id.
+        _self = self.docker.containers.list(filters={"id": socket.gethostname()})[0]
 
-        if tenant_id:
-            args += ["--tenant", tenant_id]
+        project = _self.labels.get("com.docker.compose.project")
+        self.container = self.docker.containers.list(
+            filters={
+                "label": [
+                    f"com.docker.compose.project={project}",
+                    "com.docker.compose.service=mender-inventory",
+                ]
+            },
+            limit=1,
+        )[0]
 
-        subprocess.run(args, check=True)
+    def migrate(self, tenant_id=None, **kwargs):
+        cmd = [self.exec_path, "migrate"]
+
+        if tenant_id is not None:
+            cmd.extend(["--tenant", tenant_id])
+
+        code, (stdout, stderr) = self.container.exec_run(cmd, demux=True, **kwargs)
+        return code, stdout, stderr
 
 
 class ApiClient:
@@ -219,9 +233,7 @@ class InternalApiClient(ApiClient):
 
     def create_tenant(self, tenant_id):
         return self.client.Internal_API.Create_Tenant(
-            tenant={
-                "tenant_id": tenant_id,
-            }
+            tenant={"tenant_id": tenant_id,}
         ).result()
 
     def create_device(self, device_id, attributes, description="test device"):
