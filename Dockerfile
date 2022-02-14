@@ -1,4 +1,4 @@
-FROM golang:1.17.6-alpine3.15 as builder
+FROM golang:1.17.7-alpine3.15 as builder
 RUN mkdir -p /go/src/github.com/mendersoftware/inventory
 WORKDIR /go/src/github.com/mendersoftware/inventory
 ADD ./ .
