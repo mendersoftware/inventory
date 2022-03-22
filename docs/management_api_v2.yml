@@ -91,6 +91,9 @@ paths:
                 format: integer
                 default: 10
                 description: Maximum number of results per page.
+              text:
+                type: string
+                description: Free-text search query
               filters:
                 type: array
                 description: List of filter predicates.

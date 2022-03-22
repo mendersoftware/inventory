@@ -55,6 +55,9 @@ paths:
                 items:
                     description: Attribute filter predicate
                     type: string
+              text:
+                type: string
+                description: Free-text search query
               filters:
                 type: array
                 description: List of filter predicates, chained with boolean AND operators to build the search condition definition.
@@ -65,6 +68,11 @@ paths:
                 description: List of ordered sort criterias
                 items:
                   $ref: '#/definitions/SortCriteria'
+              attributes:
+                type: array
+                description: List of attributes to select and return
+                items:
+                  $ref: '#/definitions/SelectAttribute'
 
       responses:
         200:
@@ -232,6 +240,23 @@ definitions:
       attribute: "serial_no"
       scope: "inventory"
       value: "123456789"
+
+  SelectAttribute:
+    description: Inventory attribute
+    type: object
+    required:
+      - attribute
+      - scope
+    properties:
+      attribute:
+        type: string
+        description: Attribute name.
+      scope:
+        type: string
+        description: Attribute scope.
+    example:
+      attribute: "serial_no"
+      scope: "inventory"
 
   SortCriteria:
     description: Sort criteria definition
