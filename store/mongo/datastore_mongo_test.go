@@ -1,4 +1,4 @@
-// Copyright 2021 Northern.tech AS
+// Copyright 2022 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -29,6 +29,7 @@ import (
 
 	"github.com/mendersoftware/inventory/model"
 	"github.com/mendersoftware/inventory/store"
+	"github.com/mendersoftware/inventory/utils"
 
 	"github.com/mendersoftware/go-lib-micro/identity"
 
@@ -2839,6 +2840,54 @@ func TestMongoUpdateDeviceGroup(t *testing.T) {
 	}
 }
 
+func TestMongoUpdateDeviceText(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping UpdateDeviceText in short mode.")
+	}
+
+	testCases := map[string]struct {
+		InputDeviceID model.DeviceID
+		Text          string
+		Tenant        string
+	}{
+		"ok, single tenant": {
+			InputDeviceID: model.DeviceID("1"),
+			Text:          "text",
+			Tenant:        "",
+		},
+		"ok, multi tenant": {
+			InputDeviceID: model.DeviceID("1"),
+			Text:          "text",
+			Tenant:        "tenant1",
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			// Make sure we start test with empty database
+			db.Wipe()
+			client := db.Client()
+			store := NewDataStoreMongoWithSession(client)
+
+			var ctx context.Context
+			if tc.Tenant != "" {
+				ctx = identity.WithContext(db.CTX(), &identity.Identity{
+					Tenant: tc.Tenant,
+				})
+			} else {
+				ctx = identity.WithContext(db.CTX(), &identity.Identity{
+					Tenant: "",
+				})
+			}
+			err := store.AddDevice(ctx, &model.Device{ID: tc.InputDeviceID})
+			assert.NoError(t, err)
+
+			err = store.UpdateDeviceText(ctx, tc.InputDeviceID, tc.Text)
+			assert.NoError(t, err)
+		})
+	}
+}
+
 func strPtr(s string) *string {
 	return &s
 }
@@ -3782,6 +3831,7 @@ func TestMigrate(t *testing.T) {
 				"0.2.0",
 				"1.0.0",
 				"1.0.1",
+				"1.0.2",
 				DbVersion,
 			},
 		},
@@ -3794,6 +3844,7 @@ func TestMigrate(t *testing.T) {
 				"0.2.0",
 				"1.0.0",
 				"1.0.1",
+				"1.0.2",
 				DbVersion,
 			},
 		},
@@ -3812,6 +3863,7 @@ func TestMigrate(t *testing.T) {
 				"0.2.0",
 				"1.0.0",
 				"1.0.1",
+				"1.0.2",
 				DbVersion,
 			},
 		},
@@ -3825,6 +3877,7 @@ func TestMigrate(t *testing.T) {
 				"0.2.0",
 				"1.0.0",
 				"1.0.1",
+				"1.0.2",
 				DbVersion,
 			},
 		},
@@ -3839,6 +3892,7 @@ func TestMigrate(t *testing.T) {
 				"0.2.0",
 				"1.0.0",
 				"1.0.1",
+				"1.0.2",
 				DbVersion,
 			},
 		},
@@ -4012,6 +4066,7 @@ func TestMongoSearchDevices(t *testing.T) {
 		t.Skip("skipping TestMongoSearchDevices in short mode.")
 	}
 
+	now := time.Now()
 	inputDevs := []model.Device{
 		{
 			ID: model.DeviceID("0"),
@@ -4021,7 +4076,9 @@ func TestMongoSearchDevices(t *testing.T) {
 				{Name: "group", Value: "foo", Description: strPtr("group"), Scope: model.AttrScopeInventory},
 				{Name: "ip.address", Value: "1.2.3.4", Scope: model.AttrScopeInventory},
 			},
-			Group: "foo",
+			Group:     "foo",
+			CreatedTs: now,
+			UpdatedTs: now,
 		},
 		{
 			ID: model.DeviceID("1"),
@@ -4030,7 +4087,9 @@ func TestMongoSearchDevices(t *testing.T) {
 				{Name: "SN", Value: float64(111), Description: strPtr("SN"), Scope: model.AttrScopeInventory},
 				{Name: "group", Value: "foo", Description: strPtr("group"), Scope: model.AttrScopeInventory},
 			},
-			Group: "foo",
+			Group:     "foo",
+			CreatedTs: now,
+			UpdatedTs: now,
 		},
 		{
 			ID: model.DeviceID("2"),
@@ -4039,7 +4098,9 @@ func TestMongoSearchDevices(t *testing.T) {
 				{Name: "SN", Value: float64(122), Description: strPtr("SN"), Scope: model.AttrScopeInventory},
 				{Name: "group", Value: "foo", Description: strPtr("group"), Scope: model.AttrScopeInventory},
 			},
-			Group: "foo",
+			Group:     "foo",
+			CreatedTs: now,
+			UpdatedTs: now,
 		},
 		{
 			ID: model.DeviceID("3"),
@@ -4048,7 +4109,9 @@ func TestMongoSearchDevices(t *testing.T) {
 				{Name: "SN", Value: float64(133), Description: strPtr("SN"), Scope: model.AttrScopeInventory},
 				{Name: "group", Value: "bar", Description: strPtr("group"), Scope: model.AttrScopeInventory},
 			},
-			Group: "bar",
+			Group:     "bar",
+			CreatedTs: now,
+			UpdatedTs: now,
 		},
 		{
 			ID: model.DeviceID("4"),
@@ -4057,7 +4120,10 @@ func TestMongoSearchDevices(t *testing.T) {
 				{Name: "SN", Value: float64(144), Description: strPtr("SN"), Scope: model.AttrScopeInventory},
 				{Name: "group", Value: "bar", Description: strPtr("group"), Scope: model.AttrScopeInventory},
 			},
-			Group: "bar",
+			Group:     "bar",
+			Text:      utils.TextToKeywords("this is a free-text searchable attribute"),
+			CreatedTs: now,
+			UpdatedTs: now,
 		},
 	}
 
@@ -4358,6 +4424,16 @@ func TestMongoSearchDevices(t *testing.T) {
 				},
 			},
 		},
+		"free text search": {
+			expected: []model.Device{inputDevs[4]},
+			devTotal: 1,
+			searchParams: model.SearchParams{
+				Page:    1,
+				PerPage: 5,
+				Text:    utils.TextToKeywords("free-text attribute"),
+				Sort:    []model.SortCriteria{},
+			},
+		},
 	}
 
 	for name, tc := range testCases {
@@ -4385,6 +4461,13 @@ func TestMongoSearchDevices(t *testing.T) {
 		}
 
 		mongoStore := NewDataStoreMongoWithSession(client)
+
+		//we need the $text index when testing the full-text search; apply migrations
+		if tc.searchParams.Text != "" {
+			mongoStore = mongoStore.WithAutomigrate()
+			err := mongoStore.Migrate(ctx, DbVersion)
+			assert.NoError(t, err)
+		}
 
 		//test
 		devs, totalCount, err := mongoStore.SearchDevices(ctx, tc.searchParams)

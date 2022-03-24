@@ -1,4 +1,4 @@
-// Copyright 2021 Northern.tech AS
+// Copyright 2022 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -11,6 +11,7 @@
 //    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
+
 package inv
 
 import (
@@ -30,6 +31,7 @@ import (
 	"github.com/mendersoftware/inventory/store"
 	mstore "github.com/mendersoftware/inventory/store/mocks"
 	"github.com/mendersoftware/inventory/store/mongo"
+	"github.com/mendersoftware/inventory/utils"
 )
 
 func invForTest(d store.DataStore) InventoryApp {
@@ -244,12 +246,12 @@ func TestInventoryAddDevice(t *testing.T) {
 			outError:       errors.New("no device given"),
 		},
 		"datastore success": {
-			inDevice:       &model.Device{},
+			inDevice:       &model.Device{ID: "1"},
 			datastoreError: nil,
 			outError:       nil,
 		},
 		"datastore error": {
-			inDevice:       &model.Device{},
+			inDevice:       &model.Device{ID: "1"},
 			datastoreError: errors.New("db connection failed"),
 			outError:       errors.New("failed to add device: db connection failed"),
 		},
@@ -263,7 +265,12 @@ func TestInventoryAddDevice(t *testing.T) {
 		db := &mstore.DataStore{}
 		db.On("AddDevice",
 			ctx,
-			mock.AnythingOfType("*model.Device")).
+			mock.MatchedBy(func(device *model.Device) bool {
+				text := utils.GetTextField(device)
+				assert.Equal(t, device.Text, text)
+
+				return true
+			})).
 			Return(tc.datastoreError)
 		i := invForTest(db)
 
@@ -283,10 +290,18 @@ func TestInventoryUpsertAttributes(t *testing.T) {
 	t.Parallel()
 
 	testCases := map[string]struct {
+		datastoreRes   *model.UpdateResult
 		datastoreError error
 		outError       error
 	}{
 		"datastore success": {
+			datastoreRes: &model.UpdateResult{
+				Devices: []*model.Device{
+					{
+						ID: "1",
+					},
+				},
+			},
 			datastoreError: nil,
 			outError:       nil,
 		},
@@ -307,9 +322,16 @@ func TestInventoryUpsertAttributes(t *testing.T) {
 				ctx,
 				mock.AnythingOfType("[]model.DeviceID"),
 				mock.AnythingOfType("model.DeviceAttributes")).
-				Return(nil, tc.datastoreError)
-			i := invForTest(db)
+				Return(tc.datastoreRes, tc.datastoreError)
+			if tc.datastoreError == nil {
+				db.On("UpdateDeviceText",
+					ctx,
+					tc.datastoreRes.Devices[0].ID,
+					utils.GetTextField(tc.datastoreRes.Devices[0]),
+				).Return(nil)
+			}
 
+			i := invForTest(db)
 			err := i.UpsertAttributes(ctx, "devid", model.DeviceAttributes{})
 
 			if tc.outError != nil {
@@ -327,7 +349,14 @@ func TestInventoryUpsertAttributesWithUpdated(t *testing.T) {
 	t.Parallel()
 
 	dsResultFailed := model.UpdateResult{MatchedCount: 0}
-	dsResultsuccess := model.UpdateResult{MatchedCount: 1}
+	dsResultsuccess := model.UpdateResult{
+		Devices: []*model.Device{
+			{
+				ID: "1",
+			},
+		},
+		MatchedCount: 1,
+	}
 
 	const devID = model.DeviceID("devid")
 
@@ -354,7 +383,7 @@ func TestInventoryUpsertAttributesWithUpdated(t *testing.T) {
 					Scope: model.AttrScopeInventory,
 				},
 			},
-			datastoreResult: nil,
+			datastoreResult: &dsResultsuccess,
 			datastoreError:  nil,
 			outError:        nil,
 			scope:           model.AttrScopeInventory,
@@ -423,7 +452,7 @@ func TestInventoryUpsertAttributesWithUpdated(t *testing.T) {
 				},
 			},
 			limitAttributes: 1,
-			datastoreResult: nil,
+			datastoreResult: &dsResultsuccess,
 			datastoreError:  nil,
 			outError:        nil,
 			scope:           model.AttrScopeInventory,
@@ -440,7 +469,7 @@ func TestInventoryUpsertAttributesWithUpdated(t *testing.T) {
 				},
 			},
 			limitTags:       1,
-			datastoreResult: nil,
+			datastoreResult: &dsResultsuccess,
 			datastoreError:  nil,
 			outError:        nil,
 			scope:           model.AttrScopeTags,
@@ -571,6 +600,14 @@ func TestInventoryUpsertAttributesWithUpdated(t *testing.T) {
 				tc.etag,
 			).Return(tc.datastoreResult, tc.datastoreError)
 
+			if tc.datastoreError == nil && tc.datastoreResult != nil {
+				db.On("UpdateDeviceText",
+					ctx,
+					tc.datastoreResult.Devices[0].ID,
+					utils.GetTextField(tc.datastoreResult.Devices[0]),
+				).Return(nil)
+			}
+
 			i := invForTest(db).WithLimits(tc.limitAttributes, tc.limitTags)
 
 			err := i.UpsertAttributesWithUpdated(ctx, devID, tc.attributes, tc.scope, tc.etag)
@@ -594,10 +631,20 @@ func TestInventoryUpsertAttributesWithUpdated(t *testing.T) {
 func TestReplaceAttributes(t *testing.T) {
 	t.Parallel()
 
+	updateResult := &model.UpdateResult{
+		Devices: []*model.Device{
+			{
+				ID: "1",
+			},
+		},
+		MatchedCount: 1,
+	}
+
 	testCases := map[string]struct {
 		deviceID        model.DeviceID
 		getDevice       *model.Device
 		getDeviceErr    error
+		dataStoreResult *model.UpdateResult
 		datastoreError  error
 		limitAttributes int
 		limitTags       int
@@ -606,9 +653,8 @@ func TestReplaceAttributes(t *testing.T) {
 		removeAttrs model.DeviceAttributes
 		outError    error
 
-		scope    string
-		etag     string
-		dbResult *model.UpdateResult
+		scope string
+		etag  string
 	}{
 		"ok, device not found": {
 			deviceID:     "1",
@@ -629,8 +675,9 @@ func TestReplaceAttributes(t *testing.T) {
 			},
 			removeAttrs: model.DeviceAttributes{},
 
-			datastoreError: nil,
-			outError:       nil,
+			dataStoreResult: nil,
+			datastoreError:  nil,
+			outError:        nil,
 
 			scope: model.AttrScopeInventory,
 		},
@@ -655,8 +702,9 @@ func TestReplaceAttributes(t *testing.T) {
 			},
 			removeAttrs: model.DeviceAttributes{},
 
-			datastoreError: nil,
-			outError:       nil,
+			dataStoreResult: updateResult,
+			datastoreError:  nil,
+			outError:        nil,
 
 			scope: model.AttrScopeInventory,
 		},
@@ -698,8 +746,9 @@ func TestReplaceAttributes(t *testing.T) {
 				},
 			},
 
-			datastoreError: nil,
-			outError:       nil,
+			dataStoreResult: updateResult,
+			datastoreError:  nil,
+			outError:        nil,
 
 			scope: model.AttrScopeInventory,
 		},
@@ -756,6 +805,8 @@ func TestReplaceAttributes(t *testing.T) {
 			},
 			removeAttrs: model.DeviceAttributes{},
 			scope:       model.AttrScopeTags,
+
+			dataStoreResult: updateResult,
 		},
 		"ok, replace tags, with etag": {
 			deviceID: "1",
@@ -785,6 +836,8 @@ func TestReplaceAttributes(t *testing.T) {
 			},
 			scope: model.AttrScopeTags,
 			etag:  "f7238315-062d-4440-875a-676006f84c34",
+
+			dataStoreResult: updateResult,
 		},
 		"ok, delete tags, no etag": {
 			deviceID: "1",
@@ -816,6 +869,8 @@ func TestReplaceAttributes(t *testing.T) {
 				},
 			},
 			scope: model.AttrScopeTags,
+
+			dataStoreResult: updateResult,
 		},
 		"ok, delete tags, with etag": {
 			deviceID: "1",
@@ -849,6 +904,8 @@ func TestReplaceAttributes(t *testing.T) {
 			},
 			scope: model.AttrScopeTags,
 			etag:  "f7238315-062d-4440-875a-676006f84c34",
+
+			dataStoreResult: updateResult,
 		},
 		"fail, modify tags, etag doesn't match": {
 			deviceID: "1",
@@ -906,8 +963,9 @@ func TestReplaceAttributes(t *testing.T) {
 			},
 			removeAttrs: model.DeviceAttributes{},
 
-			datastoreError: nil,
-			outError:       nil,
+			dataStoreResult: updateResult,
+			datastoreError:  nil,
+			outError:        nil,
 
 			scope: model.AttrScopeInventory,
 		},
@@ -956,8 +1014,9 @@ func TestReplaceAttributes(t *testing.T) {
 			},
 			removeAttrs: model.DeviceAttributes{},
 
-			datastoreError: nil,
-			outError:       nil,
+			dataStoreResult: updateResult,
+			datastoreError:  nil,
+			outError:        nil,
 
 			scope: model.AttrScopeTags,
 		},
@@ -981,8 +1040,9 @@ func TestReplaceAttributes(t *testing.T) {
 			},
 			removeAttrs: model.DeviceAttributes{},
 
-			datastoreError: nil,
-			outError:       ErrTooManyAttributes,
+			dataStoreResult: updateResult,
+			datastoreError:  nil,
+			outError:        ErrTooManyAttributes,
 
 			scope: model.AttrScopeTags,
 		},
@@ -1010,7 +1070,16 @@ func TestReplaceAttributes(t *testing.T) {
 					tc.removeAttrs,
 					tc.scope,
 					tc.etag,
-				).Return(tc.dbResult, tc.datastoreError)
+				).Return(tc.dataStoreResult, tc.datastoreError)
+
+				if (tc.getDeviceErr == nil || tc.getDeviceErr == store.ErrDevNotFound) &&
+					tc.datastoreError == nil && tc.dataStoreResult != nil {
+					db.On("UpdateDeviceText",
+						ctx,
+						tc.dataStoreResult.Devices[0].ID,
+						utils.GetTextField(tc.dataStoreResult.Devices[0]),
+					).Return(nil)
+				}
 			}
 
 			i := invForTest(db).WithLimits(tc.limitAttributes, tc.limitTags)

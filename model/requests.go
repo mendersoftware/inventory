@@ -1,4 +1,4 @@
-// Copyright 2020 Northern.tech AS
+// Copyright 2022 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -15,8 +15,9 @@
 package model
 
 type UpdateResult struct {
-	MatchedCount int64 `json:"matched_count,omitempty"`
-	UpdatedCount int64 `json:"updated_count,omitempty"`
-	CreatedCount int64 `json:"created_count,omitempty"`
-	DeletedCount int64 `json:"deleted_count,omitempty"`
+	MatchedCount int64     `json:"matched_count,omitempty"`
+	UpdatedCount int64     `json:"updated_count,omitempty"`
+	CreatedCount int64     `json:"created_count,omitempty"`
+	DeletedCount int64     `json:"deleted_count,omitempty"`
+	Devices      []*Device `json:"-"`
 }
