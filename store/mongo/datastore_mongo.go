@@ -606,8 +606,7 @@ func (db *DataStoreMongo) UpsertRemoveDeviceAttributes(
 	const createdField = systemScope + "-" + model.AttrNameCreated
 	const etagField = model.AttrNameTagsEtag
 	var (
-		result *model.UpdateResult
-		err    error
+		err error
 	)
 
 	c := db.client.
@@ -622,15 +621,17 @@ func (db *DataStoreMongo) UpsertRemoveDeviceAttributes(
 	if err != nil {
 		return nil, err
 	}
-	updateOpts := mopts.Update().SetUpsert(true)
 	filter := bson.M{"_id": id}
 	if etag != "" {
 		filter[etagField] = bson.M{"$eq": etag}
 	}
 
+	updateOpts := mopts.FindOneAndUpdate().
+		SetUpsert(true).
+		SetReturnDocument(mopts.After)
 	if scope == model.AttrScopeTags {
 		update[etagField] = uuid.New().String()
-		updateOpts = mopts.Update().SetUpsert(false)
+		updateOpts = updateOpts.SetUpsert(false)
 	}
 	now := time.Now()
 	if scope != model.AttrScopeTags {
@@ -654,15 +655,23 @@ func (db *DataStoreMongo) UpsertRemoveDeviceAttributes(
 		update["$unset"] = remove
 	}
 
-	var res *mongo.UpdateResult
-	res, err = c.UpdateOne(ctx, filter, update, updateOpts)
-	if err == nil {
-		result = &model.UpdateResult{
-			MatchedCount: res.MatchedCount,
-			CreatedCount: res.UpsertedCount,
-		}
+	device := &model.Device{}
+	res := c.FindOneAndUpdate(ctx, filter, update, updateOpts)
+	err = res.Decode(device)
+	if err == mongo.ErrNoDocuments {
+		return &model.UpdateResult{
+			MatchedCount: 0,
+			CreatedCount: 0,
+			Devices:      []*model.Device{},
+		}, nil
+	} else if err == nil {
+		return &model.UpdateResult{
+			MatchedCount: 1,
+			CreatedCount: 0,
+			Devices:      []*model.Device{device},
+		}, nil
 	}
-	return result, err
+	return nil, err
 }
 
 func (db *DataStoreMongo) UpdateDevicesGroup(
