@@ -4,7 +4,7 @@ WORKDIR /go/src/github.com/mendersoftware/inventory
 ADD ./ .
 RUN CGO_ENABLED=0 GOARCH=amd64 go build -o inventory .
 
-FROM alpine:3.15.0
+FROM alpine:3.15.3
 EXPOSE 8080
 RUN mkdir /etc/inventory
 ENTRYPOINT ["/usr/bin/inventory", "--config", "/etc/inventory/config.yaml"]
