@@ -12,15 +12,13 @@ require (
 	github.com/klauspost/compress v1.14.4 // indirect
 	github.com/mendersoftware/go-lib-micro v0.0.0-20220302075303-47da52c85fb8
 	github.com/pkg/errors v0.9.1
-	github.com/spf13/viper v1.10.1
+	github.com/spf13/viper v1.11.0
 	github.com/stretchr/objx v0.3.0 // indirect
-	github.com/stretchr/testify v1.7.0
+	github.com/stretchr/testify v1.7.1
 	github.com/ugorji/go v1.2.7 // indirect
 	github.com/urfave/cli v1.22.5
 	github.com/xdg-go/scram v1.1.0 // indirect
 	github.com/xdg-go/stringprep v1.0.3 // indirect
 	github.com/youmark/pkcs8 v0.0.0-20201027041543-1326539a0a0a // indirect
 	go.mongodb.org/mongo-driver v1.8.3
-	golang.org/x/crypto v0.0.0-20220214200702-86341886e292 // indirect
-	golang.org/x/net v0.0.0-20220225172249-27dd8689420f // indirect
 )
