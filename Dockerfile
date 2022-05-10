@@ -2,7 +2,7 @@ FROM golang:1.17.6-alpine3.15 as builder
 WORKDIR /go/src/github.com/mendersoftware/inventory
 RUN apk add --no-cache ca-certificates
 COPY ./ .
-RUN CGO_ENABLED=0 GOARCH=amd64 go build -o inventory .
+RUN CGO_ENABLED=0 go build -o inventory .
 
 FROM scratch
 WORKDIR /etc/inventory
