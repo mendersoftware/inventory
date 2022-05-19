@@ -1,18 +1,18 @@
 FROM golang:1.17.6-alpine3.15 as builder
-RUN mkdir -p /go/src/github.com/mendersoftware/inventory
-COPY . /go/src/github.com/mendersoftware/inventory
-RUN cd /go/src/github.com/mendersoftware/inventory && \
-    env CGO_ENABLED=0 go test -c -o inventory -tags main \
+WORKDIR /go/src/github.com/mendersoftware/inventory
+RUN apk add --no-cache ca-certificates
+COPY ./ .
+RUN env CGO_ENABLED=0 go test -c -o inventory -tags main \
     -cover -covermode atomic \
     -coverpkg $(go list ./... | grep -v vendor | grep -v mocks | grep -v test | tr  '\n' ,)
 
-FROM alpine:3.15.0
-
+FROM scratch
+WORKDIR /etc/inventory
 EXPOSE 8080
-RUN mkdir /tests
+COPY ./config.yaml .
+COPY --from=builder /go/src/github.com/mendersoftware/inventory/inventory /usr/bin/
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
-COPY  --from=builder /go/src/github.com/mendersoftware/inventory/inventory /usr/bin/inventory
-COPY ./config.yaml /etc/inventory/
 STOPSIGNAL SIGINT
 
 ENTRYPOINT ["/usr/bin/inventory", "server", "--automigrate"]
