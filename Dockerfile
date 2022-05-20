@@ -1,4 +1,4 @@
-FROM golang:1.17.6-alpine3.15 as builder
+FROM golang:1.18.2-alpine3.15 as builder
 WORKDIR /go/src/github.com/mendersoftware/inventory
 RUN apk add --no-cache ca-certificates
 COPY ./ .
