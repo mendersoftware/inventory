@@ -18,11 +18,13 @@ import (
 	"context"
 
 	"github.com/mendersoftware/go-lib-micro/mongo/migrate"
+	mstore "github.com/mendersoftware/go-lib-micro/store"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	mopts "go.mongodb.org/mongo-driver/mongo/options"
 
-	mstore "github.com/mendersoftware/go-lib-micro/store"
+	"github.com/mendersoftware/inventory/model"
+	"github.com/mendersoftware/inventory/utils"
 )
 
 type migration_1_1_0 struct {
@@ -41,6 +43,35 @@ func (m *migration_1_1_0) Up(from migrate.Version) error {
 	_, err := indexView.CreateOne(m.ctx, mongo.IndexModel{Keys: keys, Options: &mopts.IndexOptions{
 		Name: &name,
 	}})
+	if err != nil {
+		return err
+	}
+	//
+	opts := &mopts.FindOptions{}
+	opts.SetSort(bson.M{DbDevId: 1})
+	c, err := coll.Find(m.ctx, bson.M{}, opts)
+	if err != nil {
+		return err
+	}
+	store := NewDataStoreMongoWithSession(m.ms.client)
+	device := &model.Device{}
+	for {
+		hasNext := c.Next(m.ctx)
+		if !hasNext {
+			break
+		}
+		err = c.Decode(device)
+		if err != nil {
+			return err
+		}
+		text := utils.GetTextField(device)
+		if device.Text != text {
+			err = store.UpdateDeviceText(m.ctx, device.ID, text)
+			if err != nil {
+				return err
+			}
+		}
+	}
 	return err
 }
 
