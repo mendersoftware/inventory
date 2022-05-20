@@ -1146,7 +1146,9 @@ func (db *DataStoreMongo) SearchDevices(
 		findOptions.SetProjection(projection)
 	}
 
-	if len(searchParams.Sort) > 0 {
+	if searchParams.Text != "" {
+		findOptions.SetSort(bson.M{"score": bson.M{"$meta": "textScore"}})
+	} else if len(searchParams.Sort) > 0 {
 		sortField := make(bson.D, len(searchParams.Sort))
 		for i, sortQ := range searchParams.Sort {
 			var field string
