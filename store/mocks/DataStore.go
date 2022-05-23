@@ -1,4 +1,4 @@
-// Copyright 2021 Northern.tech AS
+// Copyright 2022 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -377,6 +377,20 @@ func (_m *DataStore) UnsetDevicesGroup(ctx context.Context, deviceIDs []model.De
 	}
 
 	return r0, r1
+}
+
+// UpdateDeviceText provides a mock function with given fields: ctx, id, text
+func (_m *DataStore) UpdateDeviceText(ctx context.Context, id model.DeviceID, text string) error {
+	ret := _m.Called(ctx, id, text)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, model.DeviceID, string) error); ok {
+		r0 = rf(ctx, id, text)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
 }
 
 // UpdateDevicesGroup provides a mock function with given fields: ctx, devIDs, group

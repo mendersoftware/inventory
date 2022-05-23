@@ -1,4 +1,4 @@
-// Copyright 2021 Northern.tech AS
+// Copyright 2022 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -36,10 +36,11 @@ import (
 
 	"github.com/mendersoftware/inventory/model"
 	"github.com/mendersoftware/inventory/store"
+	"github.com/mendersoftware/inventory/utils"
 )
 
 const (
-	DbVersion = "1.0.2"
+	DbVersion = "1.1.0"
 
 	DbName        = "inventory"
 	DbDevicesColl = "devices"
@@ -49,6 +50,7 @@ const (
 	DbDevGroup           = "group"
 	DbDevRevision        = "revision"
 	DbDevUpdatedTs       = "updated_ts"
+	DbDevAttributesText  = "text"
 	DbDevAttributesTs    = "timestamp"
 	DbDevAttributesDesc  = "description"
 	DbDevAttributesValue = "value"
@@ -393,12 +395,12 @@ func (db *DataStoreMongo) upsertAttributes(
 	case 0:
 		return &model.UpdateResult{}, nil
 	case 1:
-		var res *mongo.UpdateResult
-
 		filter := bson.M{
 			"_id": devices[0].Id,
 		}
-		updateOpts := mopts.Update().SetUpsert(true)
+		updateOpts := mopts.FindOneAndUpdate().
+			SetUpsert(true).
+			SetReturnDocument(mopts.After)
 
 		if withRevision {
 			filter[DbDevRevision] = bson.M{"$lt": devices[0].Revision}
@@ -406,7 +408,9 @@ func (db *DataStoreMongo) upsertAttributes(
 		}
 		if scope == model.AttrScopeTags {
 			update[etagField] = uuid.New().String()
-			updateOpts = mopts.Update().SetUpsert(false)
+			updateOpts = mopts.FindOneAndUpdate().
+				SetUpsert(false).
+				SetReturnDocument(mopts.After)
 		}
 		if etag != "" {
 			filter[etagField] = bson.M{"$eq": etag}
@@ -417,17 +421,22 @@ func (db *DataStoreMongo) upsertAttributes(
 			"$setOnInsert": oninsert,
 		}
 
-		res, err = c.UpdateOne(ctx, filter, update, updateOpts)
+		device := &model.Device{}
+		res := c.FindOneAndUpdate(ctx, filter, update, updateOpts)
+		err = res.Decode(device)
 		if err != nil {
-			if strings.Contains(err.Error(), "duplicate key error") {
+			if mongo.IsDuplicateKeyError(err) {
 				return nil, store.ErrWriteConflict
+			} else if err == mongo.ErrNoDocuments {
+				return &model.UpdateResult{}, nil
 			} else {
 				return nil, err
 			}
 		}
 		result = &model.UpdateResult{
-			MatchedCount: res.MatchedCount,
-			CreatedCount: res.UpsertedCount,
+			MatchedCount: 1,
+			CreatedCount: 0,
+			Devices:      []*model.Device{device},
 		}
 	default:
 		var bres *mongo.BulkWriteResult
@@ -463,7 +472,7 @@ func (db *DataStoreMongo) upsertAttributes(
 			ctx, models, mopts.BulkWrite().SetOrdered(false),
 		)
 		if err != nil {
-			if strings.Contains(err.Error(), "duplicate key error") {
+			if mongo.IsDuplicateKeyError(err) {
 				// bulk mode, swallow the error as we already updated the other devices
 				// and the Matchedcount and CreatedCount values will tell the caller if
 				// all the operations succeeded or not
@@ -554,7 +563,7 @@ func makeAttrUpsert(attrs model.DeviceAttributes) (bson.M, error) {
 	return upsert, nil
 }
 
-// makeAttrUpsert creates a new upsert document for the given attributes.
+// makeAttrRemove creates a new unset document to remove attributes
 func makeAttrRemove(attrs model.DeviceAttributes) (bson.M, error) {
 	var fieldName string
 	remove := make(bson.M)
@@ -597,8 +606,7 @@ func (db *DataStoreMongo) UpsertRemoveDeviceAttributes(
 	const createdField = systemScope + "-" + model.AttrNameCreated
 	const etagField = model.AttrNameTagsEtag
 	var (
-		result *model.UpdateResult
-		err    error
+		err error
 	)
 
 	c := db.client.
@@ -613,15 +621,17 @@ func (db *DataStoreMongo) UpsertRemoveDeviceAttributes(
 	if err != nil {
 		return nil, err
 	}
-	updateOpts := mopts.Update().SetUpsert(true)
 	filter := bson.M{"_id": id}
 	if etag != "" {
 		filter[etagField] = bson.M{"$eq": etag}
 	}
 
+	updateOpts := mopts.FindOneAndUpdate().
+		SetUpsert(true).
+		SetReturnDocument(mopts.After)
 	if scope == model.AttrScopeTags {
 		update[etagField] = uuid.New().String()
-		updateOpts = mopts.Update().SetUpsert(false)
+		updateOpts = updateOpts.SetUpsert(false)
 	}
 	now := time.Now()
 	if scope != model.AttrScopeTags {
@@ -645,15 +655,23 @@ func (db *DataStoreMongo) UpsertRemoveDeviceAttributes(
 		update["$unset"] = remove
 	}
 
-	var res *mongo.UpdateResult
-	res, err = c.UpdateOne(ctx, filter, update, updateOpts)
-	if err == nil {
-		result = &model.UpdateResult{
-			MatchedCount: res.MatchedCount,
-			CreatedCount: res.UpsertedCount,
-		}
+	device := &model.Device{}
+	res := c.FindOneAndUpdate(ctx, filter, update, updateOpts)
+	err = res.Decode(device)
+	if err == mongo.ErrNoDocuments {
+		return &model.UpdateResult{
+			MatchedCount: 0,
+			CreatedCount: 0,
+			Devices:      []*model.Device{},
+		}, nil
+	} else if err == nil {
+		return &model.UpdateResult{
+			MatchedCount: 1,
+			CreatedCount: 0,
+			Devices:      []*model.Device{device},
+		}, nil
 	}
-	return result, err
+	return nil, err
 }
 
 func (db *DataStoreMongo) UpdateDevicesGroup(
@@ -690,6 +708,29 @@ func (db *DataStoreMongo) UpdateDevicesGroup(
 		MatchedCount: res.MatchedCount,
 		UpdatedCount: res.ModifiedCount,
 	}, nil
+}
+
+// UpdateDeviceText updates the device text field
+func (db *DataStoreMongo) UpdateDeviceText(
+	ctx context.Context,
+	deviceID model.DeviceID,
+	text string,
+) error {
+	filter := bson.M{
+		DbDevId: deviceID.String(),
+	}
+
+	update := bson.M{
+		"$set": bson.M{
+			DbDevAttributesText: text,
+		},
+	}
+
+	database := db.client.Database(mstore.DbFromContext(ctx, DbName))
+	collDevs := database.Collection(DbDevicesColl)
+
+	_, err := collDevs.UpdateOne(ctx, filter, update)
+	return err
 }
 
 func (db *DataStoreMongo) GetFiltersAttributes(
@@ -1074,6 +1115,14 @@ func (db *DataStoreMongo) SearchDevices(
 		queryFilters = append(queryFilters, bson.M{"_id": bson.M{"$in": searchParams.DeviceIDs}})
 	}
 
+	if searchParams.Text != "" {
+		queryFilters = append(queryFilters, bson.M{
+			"$text": bson.M{
+				"$search": utils.TextToKeywords(searchParams.Text),
+			},
+		})
+	}
+
 	findQuery := bson.M{}
 	if len(queryFilters) > 0 {
 		findQuery["$and"] = queryFilters
@@ -1097,7 +1146,9 @@ func (db *DataStoreMongo) SearchDevices(
 		findOptions.SetProjection(projection)
 	}
 
-	if len(searchParams.Sort) > 0 {
+	if searchParams.Text != "" {
+		findOptions.SetSort(bson.M{"score": bson.M{"$meta": "textScore"}})
+	} else if len(searchParams.Sort) > 0 {
 		sortField := make(bson.D, len(searchParams.Sort))
 		for i, sortQ := range searchParams.Sort {
 			var field string

@@ -1,4 +1,4 @@
-// Copyright 2021 Northern.tech AS
+// Copyright 2022 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -26,6 +26,7 @@ import (
 	"github.com/mendersoftware/inventory/model"
 	"github.com/mendersoftware/inventory/store"
 	"github.com/mendersoftware/inventory/store/mongo"
+	"github.com/mendersoftware/inventory/utils"
 )
 
 const reindexBatchSize = 100
@@ -168,6 +169,7 @@ func (i *inventory) AddDevice(ctx context.Context, dev *model.Device) error {
 	if dev == nil {
 		return errors.New("no device given")
 	}
+	dev.Text = utils.GetTextField(dev)
 	err := i.db.AddDevice(ctx, dev)
 	if err != nil {
 		return errors.Wrap(err, "failed to add device")
@@ -203,7 +205,6 @@ func (i *inventory) DeleteDevice(ctx context.Context, id model.DeviceID) error {
 	} else if res.DeletedCount < 1 {
 		return store.ErrDevNotFound
 	}
-
 	i.maybeTriggerReindex(ctx, []model.DeviceID{id})
 
 	return nil
@@ -214,14 +215,16 @@ func (i *inventory) UpsertAttributes(
 	id model.DeviceID,
 	attrs model.DeviceAttributes,
 ) error {
-	if _, err := i.db.UpsertDevicesAttributes(
+	res, err := i.db.UpsertDevicesAttributes(
 		ctx, []model.DeviceID{id}, attrs,
-	); err != nil {
+	)
+	if err != nil {
 		return errors.Wrap(err, "failed to upsert attributes in db")
 	}
-
-	i.maybeTriggerReindex(ctx, []model.DeviceID{id})
-
+	if res != nil && res.MatchedCount > 0 {
+		i.reindexTextField(ctx, res.Devices)
+		i.maybeTriggerReindex(ctx, []model.DeviceID{id})
+	}
 	return nil
 }
 
@@ -298,8 +301,10 @@ func (i *inventory) UpsertAttributesWithUpdated(
 		}
 	}
 
-	i.maybeTriggerReindex(ctx, []model.DeviceID{id})
-
+	if res != nil && res.MatchedCount > 0 {
+		i.reindexTextField(ctx, res.Devices)
+		i.maybeTriggerReindex(ctx, []model.DeviceID{id})
+	}
 	return nil
 }
 
@@ -353,9 +358,10 @@ func (i *inventory) ReplaceAttributes(
 			return ErrETagDoesntMatch
 		}
 	}
-
-	i.maybeTriggerReindex(ctx, []model.DeviceID{id})
-
+	if res != nil && res.MatchedCount > 0 {
+		i.reindexTextField(ctx, res.Devices)
+		i.maybeTriggerReindex(ctx, []model.DeviceID{id})
+	}
 	return nil
 }
 
@@ -580,5 +586,20 @@ func (i *inventory) triggerReindex(ctx context.Context, deviceIDs []model.Device
 	if err != nil {
 		l := log.FromContext(ctx)
 		l.Errorf("failed to start reindex_reporting for devices %v, error: %v", deviceIDs, err)
+	}
+}
+
+// reindexTextField reindex the device's text field
+func (i *inventory) reindexTextField(ctx context.Context, devices []*model.Device) {
+	l := log.FromContext(ctx)
+	for _, device := range devices {
+		text := utils.GetTextField(device)
+		if device.Text != text {
+			err := i.db.UpdateDeviceText(ctx, device.ID, text)
+			if err != nil {
+				l.Errorf("failed to reindex the text field for device %v, error: %v",
+					device.ID, err)
+			}
+		}
 	}
 }
