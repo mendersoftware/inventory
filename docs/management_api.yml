@@ -674,12 +674,19 @@ definitions:
     type: object
     required:
       - name
+      - scope
       - value
     properties:
       name:
         type: string
         description: |
             A human readable, unique attribute ID, e.g. 'device_type', 'ip_addr', 'cpu_load', etc.
+      scope:
+        type: string
+        description: |
+            The scope of the attribute.
+
+            Scope is a string and acts as namespace for the attribute name.
       description:
         type: string
         description: Attribute description.
