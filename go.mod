@@ -16,7 +16,7 @@ require (
 	github.com/stretchr/objx v0.3.0 // indirect
 	github.com/stretchr/testify v1.7.1
 	github.com/ugorji/go v1.2.7 // indirect
-	github.com/urfave/cli v1.22.5
+	github.com/urfave/cli v1.22.9
 	github.com/xdg-go/scram v1.1.0 // indirect
 	github.com/xdg-go/stringprep v1.0.3 // indirect
 	github.com/youmark/pkcs8 v0.0.0-20201027041543-1326539a0a0a // indirect
