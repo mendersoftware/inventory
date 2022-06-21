@@ -60,6 +60,7 @@ a1a5ca382f9e8c646fa05240a74a6554bbc3084b5675f84c9eaafd3d95686612  vendor/github.
 9e321f6a1db81616a6c344d3aefddf9834fef23bdd913eae0db283dfa6753dff  vendor/github.com/go-playground/validator/v10/LICENSE
 a55d0c6e1a35ee6cf13afb4bbc3c8801cc570d7ac8edcd5e4503892f1c7ff4f7  vendor/github.com/go-playground/universal-translator/LICENSE
 08eab1118c80885fa1fa6a6dd7303f65a379fcb3733e063d20d1bbc2c76e6fa1  vendor/github.com/mattn/go-isatty/LICENSE
+e35cc791b3c8e48b4a42a0d2719f9cdd51677fcffab0bb5dae1e63f0a53c9ee0  vendor/github.com/pelletier/go-toml/v2/LICENSE
 # 
 #
 # LGPL3 with static linking exception.
