@@ -13,8 +13,7 @@ require (
 	github.com/mendersoftware/go-lib-micro v0.0.0-20220620185918-c0dd57dbb00b
 	github.com/pkg/errors v0.9.1
 	github.com/spf13/viper v1.12.0
-	github.com/stretchr/objx v0.3.0 // indirect
-	github.com/stretchr/testify v1.7.2
+	github.com/stretchr/testify v1.7.5
 	github.com/ugorji/go v1.2.7 // indirect
 	github.com/urfave/cli v1.22.9
 	github.com/xdg-go/scram v1.1.0 // indirect
