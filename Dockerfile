@@ -1,4 +1,4 @@
-FROM golang:1.18.2-alpine3.15 as builder
+FROM golang:1.18.4-alpine3.15 as builder
 WORKDIR /go/src/github.com/mendersoftware/inventory
 RUN mkdir -p /etc_extra
 RUN echo "nobody:x:65534:" > /etc_extra/group
