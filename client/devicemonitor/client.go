@@ -1,4 +1,4 @@
-// Copyright 2021 Northern.tech AS
+// Copyright 2022 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -27,7 +27,7 @@ import (
 )
 
 const (
-	AlertsURI = "/api/internal/v1/devicemonitor/tenants/:tenant_id/devices/:device_id/alerts/latest"
+	AlertsURI = "/api/internal/v1/devicemonitor/tenants/#tenant_id/devices/#device_id/alerts/latest"
 )
 
 const (
@@ -79,8 +79,8 @@ func (c *client) CheckAlerts(ctx context.Context, device string) (int, error) {
 	if id != nil {
 		tenant = id.Tenant
 	}
-	repl := strings.NewReplacer(":device_id", device,
-		":tenant_id", tenant)
+	repl := strings.NewReplacer("#device_id", device,
+		"#tenant_id", tenant)
 	req, err := http.NewRequestWithContext(ctx,
 		"GET",
 		c.url+repl.Replace(AlertsURI),

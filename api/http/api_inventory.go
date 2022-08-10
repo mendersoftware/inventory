@@ -1,4 +1,4 @@
-// Copyright 2021 Northern.tech AS
+// Copyright 2022 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -39,32 +39,32 @@ import (
 
 const (
 	uriDevices       = "/api/0.1.0/devices"
-	uriDevice        = "/api/0.1.0/devices/:id"
-	uriDeviceTags    = "/api/0.1.0/devices/:id/tags"
-	uriDeviceGroups  = "/api/0.1.0/devices/:id/group"
-	uriDeviceGroup   = "/api/0.1.0/devices/:id/group/:name"
+	uriDevice        = "/api/0.1.0/devices/#id"
+	uriDeviceTags    = "/api/0.1.0/devices/#id/tags"
+	uriDeviceGroups  = "/api/0.1.0/devices/#id/group"
+	uriDeviceGroup   = "/api/0.1.0/devices/#id/group/#name"
 	uriAttributes    = "/api/0.1.0/attributes"
 	uriGroups        = "/api/0.1.0/groups"
-	uriGroupsName    = "/api/0.1.0/groups/:name"
-	uriGroupsDevices = "/api/0.1.0/groups/:name/devices"
+	uriGroupsName    = "/api/0.1.0/groups/#name"
+	uriGroupsDevices = "/api/0.1.0/groups/#name/devices"
 
 	apiUrlInternalV1         = "/api/internal/v1/inventory"
 	uriInternalAlive         = apiUrlInternalV1 + "/alive"
 	uriInternalHealth        = apiUrlInternalV1 + "/health"
 	uriInternalTenants       = apiUrlInternalV1 + "/tenants"
-	uriInternalDevices       = apiUrlInternalV1 + "/tenants/:tenant_id/devices"
-	urlInternalDevicesStatus = apiUrlInternalV1 + "/tenants/:tenant_id/devices/status/:status"
-	uriInternalDeviceDetails = apiUrlInternalV1 + "/tenants/:tenant_id/devices/:device_id"
-	uriInternalDeviceGroups  = apiUrlInternalV1 + "/tenants/:tenant_id/devices/:device_id/groups"
+	uriInternalDevices       = apiUrlInternalV1 + "/tenants/#tenant_id/devices"
+	urlInternalDevicesStatus = apiUrlInternalV1 + "/tenants/#tenant_id/devices/status/#status"
+	uriInternalDeviceDetails = apiUrlInternalV1 + "/tenants/#tenant_id/devices/#device_id"
+	uriInternalDeviceGroups  = apiUrlInternalV1 + "/tenants/#tenant_id/devices/#device_id/groups"
 	urlInternalAttributes    = apiUrlInternalV1 +
-		"/tenants/:tenant_id/device/:device_id/attribute/scope/:scope"
-	urlInternalReindex   = apiUrlInternalV1 + "/tenants/:tenant_id/devices/:device_id/reindex"
+		"/tenants/#tenant_id/device/#device_id/attribute/scope/#scope"
+	urlInternalReindex   = apiUrlInternalV1 + "/tenants/#tenant_id/devices/#device_id/reindex"
 	apiUrlManagementV2   = "/api/management/v2/inventory"
 	urlFiltersAttributes = apiUrlManagementV2 + "/filters/attributes"
 	urlFiltersSearch     = apiUrlManagementV2 + "/filters/search"
 
 	apiUrlInternalV2         = "/api/internal/v2/inventory"
-	urlInternalFiltersSearch = apiUrlInternalV2 + "/tenants/:tenant_id/filters/search"
+	urlInternalFiltersSearch = apiUrlInternalV2 + "/tenants/#tenant_id/filters/search"
 
 	hdrTotalCount = "X-Total-Count"
 )
