@@ -139,7 +139,7 @@ definitions:
         type: string
         description: Attribute description.
       value:
-        type: string
+        type: object
         description: |
             The current value of the attribute.
 
