@@ -9,21 +9,15 @@ stages:
 
 include:
   - project: 'Northern.tech/Mender/mendertesting'
-    file: '.gitlab-ci-check-golang-lint.yml'
-  - project: 'Northern.tech/Mender/mendertesting'
-    file: '.gitlab-ci-check-golang-unittests.yml'
-  - project: 'Northern.tech/Mender/mendertesting'
-    file: '.gitlab-ci-check-commits.yml'
-  - project: 'Northern.tech/Mender/mendertesting'
-    file: '.gitlab-ci-check-license.yml'
-  - project: 'Northern.tech/Mender/mendertesting'
-    file: '.gitlab-ci-check-docker-acceptance.yml'
-  - project: 'Northern.tech/Mender/mendertesting'
-    file: '.gitlab-ci-check-apidocs.yml'
-  - project: 'Northern.tech/Mender/mendertesting'
-    file: '.gitlab-ci-check-docker-build.yml'
-  - project: 'Northern.tech/Mender/mendertesting'
-    file: '.gitlab-ci-github-status-updates.yml'
+    file:
+      - '.gitlab-ci-check-golang-lint.yml'
+      - '.gitlab-ci-check-golang-unittests.yml'
+      - '.gitlab-ci-check-commits.yml'
+      - '.gitlab-ci-check-license.yml'
+      - '.gitlab-ci-check-docker-acceptance.yml'
+      - '.gitlab-ci-check-apidocs.yml'
+      - '.gitlab-ci-check-docker-build.yml'
+      - '.gitlab-ci-github-status-updates.yml'
 
 test:acceptance_tests:
   script:
