@@ -1,4 +1,4 @@
-// Copyright 2022 Northern.tech AS
+// Copyright 2023 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -100,7 +100,7 @@ func NewDataStoreMongoWithSession(client *mongo.Client) store.DataStore {
 	return &DataStoreMongo{client: client}
 }
 
-//config.ConnectionString must contain a valid
+// config.ConnectionString must contain a valid
 func NewDataStoreMongo(config DataStoreMongoConfig) (store.DataStore, error) {
 	//init master session
 	var err error
@@ -1133,7 +1133,13 @@ func (db *DataStoreMongo) SearchDevices(
 	findOptions.SetLimit(int64(searchParams.PerPage))
 
 	if len(searchParams.Attributes) > 0 {
-		projection := bson.M{DbDevUpdatedTs: 1}
+		name := fmt.Sprintf(
+			"%s-%s",
+			model.AttrScopeSystem,
+			model.GetDeviceAttributeNameReplacer().Replace(DbDevUpdatedTs),
+		)
+		field := fmt.Sprintf("%s.%s", DbDevAttributes, name)
+		projection := bson.M{field: 1}
 		for _, attribute := range searchParams.Attributes {
 			name := fmt.Sprintf(
 				"%s-%s",
