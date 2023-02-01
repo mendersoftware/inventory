@@ -8,7 +8,7 @@ require (
 	github.com/google/uuid v1.3.0
 	github.com/mendersoftware/go-lib-micro v0.0.0-20220620185918-c0dd57dbb00b
 	github.com/pkg/errors v0.9.1
-	github.com/spf13/viper v1.14.0
+	github.com/spf13/viper v1.15.0
 	github.com/stretchr/testify v1.8.1
 	github.com/urfave/cli v1.22.10
 	go.mongodb.org/mongo-driver v1.11.1
