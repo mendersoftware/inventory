@@ -2950,6 +2950,10 @@ func TestApiInventoryFiltersAttributes(t *testing.T) {
 			},
 			httpCode: http.StatusOK,
 		},
+		"ok, no attributes": {
+			attributes: nil,
+			httpCode:   http.StatusOK,
+		},
 		"ko": {
 			err:      errors.New("error"),
 			httpCode: http.StatusInternalServerError,
@@ -2969,6 +2973,9 @@ func TestApiInventoryFiltersAttributes(t *testing.T) {
 
 			recorded.CodeIs(tc.httpCode)
 			if tc.httpCode == http.StatusOK {
+				if tc.attributes == nil {
+					tc.attributes = []model.FilterAttribute{}
+				}
 				body, _ := json.Marshal(tc.attributes)
 				recorded.BodyIs(string(body))
 			}
