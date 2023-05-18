@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# Copyright 2021 Northern.tech AS
+# Copyright 2023 Northern.tech AS
 #
 #    Licensed under the Apache License, Version 2.0 (the "License");
 #    you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ import pytest
 
 from pymongo import MongoClient
 
-from client import CliClient, ManagementClient, InternalApiClient
+from client import CliClient, ManagementClient, InternalApiClient, ManagementClientV2
 
 
 @pytest.fixture(scope="session")
@@ -55,10 +55,18 @@ def management_client(request):
 
 
 @pytest.fixture(scope="session")
+def management_client_v2(request):
+    return ManagementClientV2(
+        request.config.getoption("host"),
+        request.config.getoption("management_v2_spec"),
+        request.config.getoption("api"),
+    )
+
+
+@pytest.fixture(scope="session")
 def internal_client(request):
     return InternalApiClient(
-        request.config.getoption("host"),
-        request.config.getoption("internal_spec"),
+        request.config.getoption("host"), request.config.getoption("internal_spec"),
     )
 
 
