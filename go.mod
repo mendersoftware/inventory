@@ -9,7 +9,7 @@ require (
 	github.com/mendersoftware/go-lib-micro v0.0.0-20221025103319-e1f941fb3145
 	github.com/pkg/errors v0.9.1
 	github.com/spf13/viper v1.15.0
-	github.com/stretchr/testify v1.8.2
+	github.com/stretchr/testify v1.8.4
 	github.com/urfave/cli v1.22.12
 	go.mongodb.org/mongo-driver v1.11.2
 )
