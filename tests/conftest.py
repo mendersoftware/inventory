@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# Copyright 2021 Northern.tech AS
+# Copyright 2023 Northern.tech AS
 #
 #    Licensed under the Apache License, Version 2.0 (the "License");
 #    you may not use this file except in compliance with the License.
@@ -16,14 +16,37 @@ import logging
 
 
 def pytest_addoption(parser):
-    parser.addoption("--api", action="store", default="0.1.0", help="API version used in HTTP requests")
-    parser.addoption("--host", action="store", default="localhost", help="host running API")
-    parser.addoption("--devices", action="store", default="1001", help="# of devices to test with")
-    parser.addoption("--management-spec", action="store",
-                     default="management_api.yml.", help="management API spec")
+    parser.addoption(
+        "--api",
+        action="store",
+        default="0.1.0",
+        help="API version used in HTTP requests",
+    )
+    parser.addoption(
+        "--host", action="store", default="localhost", help="host running API"
+    )
+    parser.addoption(
+        "--devices", action="store", default="1001", help="# of devices to test with"
+    )
+    parser.addoption(
+        "--management-spec",
+        action="store",
+        default="management_api.yml.",
+        help="management API spec",
+    )
+    parser.addoption(
+        "--management-v2-spec",
+        action="store",
+        default="management_api_v2.yml.",
+        help="management API v2 spec",
+    )
     parser.addoption("--internal-spec", default="../docs/internal_api.yml")
-    parser.addoption("--inventory-items", action="store",
-                     default="inventory_items", help="file with inventory items")
+    parser.addoption(
+        "--inventory-items",
+        action="store",
+        default="inventory_items",
+        help="file with inventory items",
+    )
 
 
 def pytest_configure(config):
@@ -35,5 +58,5 @@ def pytest_configure(config):
         lvl = logging.DEBUG
     logging.basicConfig(level=lvl)
     # configure bravado related loggers to be less verbose
-    logging.getLogger('swagger_spec_validator').setLevel(logging.INFO)
-    logging.getLogger('bravado_core').setLevel(logging.INFO)
+    logging.getLogger("swagger_spec_validator").setLevel(logging.INFO)
+    logging.getLogger("bravado_core").setLevel(logging.INFO)

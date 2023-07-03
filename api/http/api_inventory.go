@@ -1,4 +1,4 @@
-// Copyright 2022 Northern.tech AS
+// Copyright 2023 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -893,6 +893,11 @@ func (i *inventoryHandlers) FiltersAttributesHandler(w rest.ResponseWriter, r *r
 	if err != nil {
 		u.RestErrWithLogInternal(w, r, l, err)
 		return
+	}
+
+	// in case of nil make sure we return empty list
+	if attributes == nil {
+		attributes = []model.FilterAttribute{}
 	}
 
 	_ = w.WriteJson(attributes)

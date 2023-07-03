@@ -1,4 +1,4 @@
-# Copyright 2022 Northern.tech AS
+# Copyright 2023 Northern.tech AS
 #
 #    Licensed under the Apache License, Version 2.0 (the "License");
 #    you may not use this file except in compliance with the License.
@@ -145,6 +145,33 @@ class ManagementClient:
 
         else:
             return r
+
+
+class ManagementClientV2:
+    log = logging.getLogger("Client")
+
+    def __init__(self, host, spec, api):
+        config = {
+            "also_return_response": True,
+            "validate_responses": True,
+            "validate_requests": True,
+            "validate_swagger_spec": True,
+            "use_models": True,
+        }
+
+        http_client = RequestsClient()
+        http_client.session.verify = False
+
+        self.client = SwaggerClient.from_spec(
+            load_file(spec), config=config, http_client=http_client,
+        )
+        self.client.swagger_spec.api_url = (
+            "http://%s/api/management/v2/inventory/" % host
+        )
+
+    def getFiltersAttributes(self):
+        r, _ = self.client.Management_API.Get_filterable_attributes().result()
+        return r
 
 
 class CliClient:
