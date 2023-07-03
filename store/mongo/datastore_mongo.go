@@ -74,8 +74,6 @@ var (
 
 	// once ensures client is created only once
 	once sync.Once
-
-	ErrNotFound = errors.New("mongo: no documents in result")
 )
 
 type DataStoreMongoConfig struct {
@@ -311,6 +309,38 @@ func (db *DataStoreMongo) UpsertDevicesAttributesWithRevision(
 	return db.upsertAttributes(ctx, devices, attrs, false, true, "", "")
 }
 
+func (db *DataStoreMongo) inventoryNeedsUpdate(
+	ctx context.Context,
+	id model.DeviceID,
+	newAttributes model.DeviceAttributes,
+) (rc bool) {
+	rc = false
+	device, err := db.GetDevice(ctx, id)
+	if device == nil || err != nil {
+		return true
+	}
+
+	a := device.Attributes.GetByName(model.AttrNameUpdated)
+	if a == nil {
+		return true
+	}
+
+	if v, ok := a.Value.(primitive.DateTime); ok {
+		v := v.Time()
+		lastUpdatedDate := utils.TruncateToDay(v)
+		now := utils.TruncateToDay(time.Now())
+		if now.Day() != lastUpdatedDate.Day() {
+			if now.Month() != lastUpdatedDate.Month() {
+				if now.Year() != lastUpdatedDate.Year() {
+					return true
+				}
+			}
+		}
+	}
+
+	return !device.Attributes.Equal(newAttributes)
+}
+
 func (db *DataStoreMongo) UpsertDevicesAttributesWithUpdated(
 	ctx context.Context,
 	ids []model.DeviceID,
@@ -318,7 +348,16 @@ func (db *DataStoreMongo) UpsertDevicesAttributesWithUpdated(
 	scope string,
 	etag string,
 ) (*model.UpdateResult, error) {
-	return db.upsertAttributes(ctx, makeDevsWithIds(ids), attrs, true, false, scope, etag)
+	var idsToUpdate = []model.DeviceID{}
+	for _, id := range ids {
+		if db.inventoryNeedsUpdate(ctx, id, attrs) {
+			idsToUpdate = append(idsToUpdate, id)
+		}
+	}
+	if len(idsToUpdate) < 1 {
+		return nil, nil
+	}
+	return db.upsertAttributes(ctx, makeDevsWithIds(idsToUpdate), attrs, true, false, scope, etag)
 }
 
 func (db *DataStoreMongo) UpsertDevicesAttributes(
