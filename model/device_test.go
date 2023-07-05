@@ -16,6 +16,7 @@ package model
 import (
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"go.mongodb.org/mongo-driver/bson"
@@ -43,6 +44,23 @@ func TestDeviceAttributesUnmarshal(t *testing.T) {
 	}
 
 	assert.ObjectsAreEqualValues(exp, da)
+	assert.True(t, exp[0].Equal(exp[0]))
+	assert.True(t, exp[1].Equal(exp[1]))
+	assert.True(t, !exp[0].Equal(exp[1]))
+	assert.True(t, !exp[1].Equal(exp[0]))
+	withUpdatedCreated := DeviceAttributes{
+		exp[0],
+		exp[1],
+		{
+			Name:  "created_ts",
+			Value: time.Now(),
+		},
+		{
+			Name:  "updated_ts",
+			Value: time.Now(),
+		},
+	}
+	assert.True(t, withUpdatedCreated.Equal(exp))
 }
 
 func TestDeviceAttributesMarshal(t *testing.T) {
@@ -75,6 +93,38 @@ func TestDeviceAttributesMarshal(t *testing.T) {
 	data, err = json.Marshal(&daEmpty)
 	assert.NoError(t, err)
 	assert.Equal(t, "[]", string(data))
+
+	assert.True(t, da[0].Equal(da[0]))
+	assert.True(t, da[1].Equal(da[1]))
+	assert.True(t, !da[1].Equal(da[0]))
+	assert.True(t, !da[0].Equal(da[1]))
+
+	withUpdatedCreated := DeviceAttributes{
+		da[0],
+		da[1],
+		{
+			Name:  "created_ts",
+			Value: time.Now(),
+		},
+		{
+			Name:  "updated_ts",
+			Value: time.Now(),
+		},
+	}
+	emptyWithUpdatedCreated := DeviceAttributes{
+		{
+			Name:  "created_ts",
+			Value: time.Now(),
+		},
+		{
+			Name:  "updated_ts",
+			Value: time.Now(),
+		},
+	}
+	assert.True(t, withUpdatedCreated.Equal(da))
+	assert.True(t, emptyWithUpdatedCreated.Equal(daEmpty))
+	assert.True(t, !withUpdatedCreated.Equal(daEmpty))
+	assert.True(t, !daEmpty.Equal(withUpdatedCreated))
 }
 
 func TestMarshalMarshalBSON(t *testing.T) {
@@ -259,6 +309,38 @@ func TestValidateDeviceAttributes(t *testing.T) {
 				}
 			} else {
 				assert.NoError(t, err)
+				withUpdatedCreated := DeviceAttributes{
+					{
+						Name:  "created_ts",
+						Value: time.Now(),
+					},
+					{
+						Name:  "updated_ts",
+						Value: time.Now(),
+					},
+				}
+				for i, _ := range tc.Attributes {
+					withUpdatedCreated = append(withUpdatedCreated, tc.Attributes[i])
+				}
+				assert.True(t, withUpdatedCreated.Equal(tc.Attributes))
+
+				withUpdatedCreated = DeviceAttributes{
+					{
+						Name:  "created_ts",
+						Value: time.Now(),
+					},
+					{
+						Name:  "updated_ts",
+						Value: time.Now(),
+					},
+				}
+				for i, _ := range tc.Attributes {
+					withUpdatedCreated = append(withUpdatedCreated, tc.Attributes[i])
+					break
+				}
+				if len(tc.Attributes) > 1 {
+					assert.True(t, !withUpdatedCreated.Equal(tc.Attributes))
+				}
 			}
 		})
 	}
