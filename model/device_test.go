@@ -94,6 +94,18 @@ func TestDeviceAttributesMarshal(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "[]", string(data))
 
+	da = DeviceAttributes{
+		{
+			Name:  "foo",
+			Scope: "inventory",
+			Value: "bar",
+		},
+		{
+			Name:  "bar",
+			Scope: "inventory",
+			Value: []int{1, 2, 3},
+		},
+	}
 	assert.True(t, da[0].Equal(da[0]))
 	assert.True(t, da[1].Equal(da[1]))
 	assert.True(t, !da[1].Equal(da[0]))
@@ -322,6 +334,11 @@ func TestValidateDeviceAttributes(t *testing.T) {
 				for i, _ := range tc.Attributes {
 					withUpdatedCreated = append(withUpdatedCreated, tc.Attributes[i])
 				}
+				if !withUpdatedCreated.Equal(tc.Attributes) {
+					i := 1
+					if i > 1 {
+					}
+				}
 				assert.True(t, withUpdatedCreated.Equal(tc.Attributes))
 
 				withUpdatedCreated = DeviceAttributes{
@@ -339,6 +356,11 @@ func TestValidateDeviceAttributes(t *testing.T) {
 					break
 				}
 				if len(tc.Attributes) > 1 {
+					if withUpdatedCreated.Equal(tc.Attributes) {
+						i := 1
+						if i > 1 {
+						}
+					}
 					assert.True(t, !withUpdatedCreated.Equal(tc.Attributes))
 				}
 			}
@@ -359,4 +381,112 @@ func TestValidateGroupName(t *testing.T) {
 	assert.EqualError(t, group3.Validate(), "Group name cannot be blank")
 	group4 := GroupName("test")
 	assert.NoError(t, group4.Validate())
+}
+
+func TestDeviceAttributesEqual(t *testing.T) {
+	createdUpdated := DeviceAttributes{
+		{
+			Name:  "created_ts",
+			Value: time.Now(),
+		},
+		{
+			Name:  "updated_ts",
+			Value: time.Now(),
+		},
+	}
+	attributes := DeviceAttributes{
+		{
+			Name:  "bar",
+			Scope: "inventory",
+			Value: []int{1, 2, 3},
+		},
+		{
+			Name:  "bar",
+			Scope: "inventory",
+			Value: []int{1, 2, 3},
+		},
+	}
+	databaseAttributes := DeviceAttributes{
+		attributes[0],
+		attributes[1],
+		createdUpdated[0],
+		createdUpdated[1],
+	}
+	rc := databaseAttributes.Equal(attributes)
+	assert.True(t, rc, "these attributes are equal, and so should Equal note it")
+
+	attributes = DeviceAttributes{
+		{
+			Name:  "bar",
+			Scope: "inventory",
+			Value: []int{1, 2, 3},
+		},
+		{
+			Name:  "bar",
+			Scope: "inventory",
+			Value: []int{1, 2, 3},
+		},
+	}
+	databaseAttributes = DeviceAttributes{
+		attributes[0],
+		{
+			Name:  "bar",
+			Scope: "inventory",
+			Value: []int{1, 2, 4},
+		},
+		createdUpdated[0],
+		createdUpdated[1],
+	}
+	rc = databaseAttributes.Equal(attributes)
+	assert.False(t, rc, "these attributes are not equal, and so should Equal note it")
+
+	attributes = DeviceAttributes{
+		{
+			Name:  "bar",
+			Scope: "inventory",
+			Value: []int{1, 2, 3},
+		},
+		{
+			Name:  "bar",
+			Scope: "inventory",
+			Value: []int{1, 2, 3},
+		},
+	}
+	databaseAttributes = DeviceAttributes{
+		attributes[0],
+		{
+			Name:  "baar",
+			Scope: "inventory",
+			Value: []int{1, 2, 3},
+		},
+		createdUpdated[0],
+		createdUpdated[1],
+	}
+	rc = databaseAttributes.Equal(attributes)
+	assert.False(t, rc, "these attributes are not equal, and so should Equal note it")
+
+	attributes = DeviceAttributes{
+		{
+			Name:  "bar",
+			Scope: "inventory",
+			Value: []int{1, 2, 3},
+		},
+		{
+			Name:  "bar",
+			Scope: "inventory",
+			Value: [3]int{1, 2, 3},
+		},
+	}
+	databaseAttributes = DeviceAttributes{
+		attributes[0],
+		{
+			Name:  "bar",
+			Scope: "inventory",
+			Value: []int{1, 2, 3},
+		},
+		createdUpdated[0],
+		createdUpdated[1],
+	}
+	rc = databaseAttributes.Equal(attributes)
+	assert.True(t, rc, "these attributes are equal, and so should Equal note it")
 }

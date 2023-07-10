@@ -16,6 +16,7 @@ package model
 
 import (
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"regexp"
 	"strings"
@@ -132,6 +133,19 @@ func (da DeviceAttribute) Validate() error {
 	)
 }
 
+func allowedType(v reflect.Value) bool {
+	if v.Type().Kind() == reflect.Int {
+		return true
+	}
+	if v.Type().Kind() == reflect.String {
+		return true
+	}
+	if v.Type().Kind() == reflect.Float64 {
+		return true
+	}
+	return false
+}
+
 func (da DeviceAttribute) Equal(e DeviceAttribute) bool {
 	if (da.Value == nil || e.Value == nil) && !(da.Value == nil && e.Value == nil) {
 		return false
@@ -139,15 +153,54 @@ func (da DeviceAttribute) Equal(e DeviceAttribute) bool {
 	rVal1 := reflect.ValueOf(da.Value)
 	rVal2 := reflect.ValueOf(e.Value)
 	if rVal1.Kind() != rVal2.Kind() {
-		return false
+		if rVal1.Kind() == reflect.Slice && rVal2.Kind() == reflect.Array ||
+			rVal1.Kind() == reflect.Array && rVal2.Kind() == reflect.Slice {
+		} else {
+			return false
+		}
 	}
-	if rVal1.Kind() == reflect.Slice {
+	if rVal1.Kind() == reflect.Slice || rVal1.Kind() == reflect.Array {
 		if rVal1.Len() != rVal2.Len() {
 			return false
 		}
 		for i := 0; i < rVal1.Len(); i++ {
-			if rVal1.Index(i) != rVal2.Index(i) {
+			//if !rVal1.Comparable() || !rVal1.Index(i).Equal(rVal2.Index(i)) { //does not work:
+			//nolint:lll
+			//model/device.go:149:14: rVal1.Comparable undefined (type reflect.Value has no field or method Comparable)
+			//nolint:lll
+			//model/device.go:149:46: rVal1.Index(i).Equal undefined (type reflect.Value has no field or method Equal)
+			if rVal1.Index(i).Kind() != rVal2.Index(i).Kind() {
 				return false
+			}
+			if !allowedType(rVal1.Index(i)) || !allowedType(rVal2.Index(i)) {
+				if rVal1.Index(i) != rVal2.Index(i) {
+					return false
+				}
+			} else {
+				if rVal2.Index(i).Kind() == reflect.Int {
+					value1 := rVal1.Index(i).Interface().(int)
+					value2 := rVal2.Index(i).Interface().(int)
+					if value1 != value2 {
+						return false
+					}
+				}
+				if rVal2.Index(i).Kind() == reflect.String {
+					value1 := rVal1.Index(i).Interface().(string)
+					value2 := rVal2.Index(i).Interface().(string)
+					if value1 != value2 {
+						return false
+					}
+				}
+				if rVal2.Index(i).Kind() == reflect.Float64 {
+					floatComparePrecision := "%.8f"
+					floatValue1 := rVal1.Index(i).Interface().(float64)
+					floatValue2 := rVal2.Index(i).Interface().(float64)
+					value1 := fmt.Sprintf(floatComparePrecision, floatValue1)
+					value2 := fmt.Sprintf(floatComparePrecision, floatValue2)
+					if value1 != value2 {
+						return false
+					}
+				}
 			}
 		}
 	} else {
