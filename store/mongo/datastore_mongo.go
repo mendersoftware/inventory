@@ -283,6 +283,37 @@ func (db *DataStoreMongo) GetDevice(
 	return &res, nil
 }
 
+func (db *DataStoreMongo) GetDevicesById(
+	ctx context.Context,
+	id []model.DeviceID,
+) ([]model.Device, error) {
+	var res []model.Device
+	c := db.client.
+		Database(mstore.DbFromContext(ctx, DbName)).
+		Collection(DbDevicesColl)
+	l := log.FromContext(ctx)
+
+	if len(id) < 1 {
+		return nil, nil
+	}
+	r, err := c.Find(ctx, bson.M{DbDevId: bson.M{"$in": id}})
+	if err != nil {
+		switch err {
+		case mongo.ErrNoDocuments:
+			return nil, nil
+		default:
+			l.Errorf("GetDevicesById Find: %v", err)
+			return nil, errors.Wrap(err, "failed to fetch devices")
+		}
+	}
+	err = r.All(ctx, &res)
+	if err != nil {
+		l.Errorf("GetDevicesById deocde: %v", err)
+		return nil, errors.Wrap(err, "failed to decode devices")
+	}
+	return res, nil
+}
+
 // AddDevice inserts a new device, initializing the inventory data.
 func (db *DataStoreMongo) AddDevice(ctx context.Context, dev *model.Device) error {
 	if dev.Group != "" {
@@ -311,34 +342,55 @@ func (db *DataStoreMongo) UpsertDevicesAttributesWithRevision(
 
 func (db *DataStoreMongo) inventoryNeedsUpdate(
 	ctx context.Context,
-	id model.DeviceID,
+	ids []model.DeviceID,
 	newAttributes model.DeviceAttributes,
-) (rc bool) {
-	rc = false
-	device, err := db.GetDevice(ctx, id)
-	if device == nil || err != nil {
-		return true
+) []model.DeviceID {
+	devicesArray, err := db.GetDevicesById(ctx, ids)
+	if devicesArray == nil || err != nil {
+		return ids
+	}
+	devices := make(map[model.DeviceID]model.Device, len(devicesArray))
+	for _, d := range devicesArray {
+		devices[d.ID] = d
 	}
 
-	a := device.Attributes.GetByName(model.AttrNameUpdated)
-	if a == nil {
-		return true
+	var devicesInNeedOfUpdate []model.DeviceID
+	// all the devices that do not exist in the db (not returned
+	// by GetDevicesById and not present in devices map)
+	// need to be upserted, i.e.: need to be returned
+	// from this call, and we add them to the slice here
+	for _, id := range ids {
+		if _, ok := devices[id]; !ok {
+			devicesInNeedOfUpdate = append(devicesInNeedOfUpdate, id)
+		}
 	}
+	for _, device := range devices {
+		a := device.Attributes.GetByName(model.AttrNameUpdated)
+		if a == nil {
+			devicesInNeedOfUpdate = append(devicesInNeedOfUpdate, device.ID)
+			continue
+		}
 
-	if v, ok := a.Value.(primitive.DateTime); ok {
-		v := v.Time()
-		lastUpdatedDate := utils.TruncateToDay(v)
-		now := utils.TruncateToDay(time.Now())
-		if now.Day() != lastUpdatedDate.Day() {
-			if now.Month() != lastUpdatedDate.Month() {
-				if now.Year() != lastUpdatedDate.Year() {
-					return true
+		if v, ok := a.Value.(primitive.DateTime); ok {
+			v := v.Time()
+			lastUpdatedDate := utils.TruncateToDay(v)
+			now := utils.TruncateToDay(time.Now())
+			if now.Day() != lastUpdatedDate.Day() {
+				if now.Month() != lastUpdatedDate.Month() {
+					if now.Year() != lastUpdatedDate.Year() {
+						devicesInNeedOfUpdate = append(devicesInNeedOfUpdate, device.ID)
+						continue
+					}
 				}
 			}
 		}
-	}
 
-	return !device.Attributes.Equal(newAttributes)
+		if !device.Attributes.Equal(newAttributes) {
+			devicesInNeedOfUpdate = append(devicesInNeedOfUpdate, device.ID)
+			continue
+		}
+	}
+	return devicesInNeedOfUpdate
 }
 
 func (db *DataStoreMongo) UpsertDevicesAttributesWithUpdated(
@@ -348,12 +400,7 @@ func (db *DataStoreMongo) UpsertDevicesAttributesWithUpdated(
 	scope string,
 	etag string,
 ) (*model.UpdateResult, error) {
-	var idsToUpdate = []model.DeviceID{}
-	for _, id := range ids {
-		if db.inventoryNeedsUpdate(ctx, id, attrs) {
-			idsToUpdate = append(idsToUpdate, id)
-		}
-	}
+	idsToUpdate := db.inventoryNeedsUpdate(ctx, ids, attrs)
 	if len(idsToUpdate) < 1 {
 		return nil, nil
 	}
