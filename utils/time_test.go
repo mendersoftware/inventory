@@ -11,33 +11,24 @@
 //	WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //	See the License for the specific language governing permissions and
 //	limitations under the License.
-package main
+package utils
 
 import (
 	"testing"
+	"time"
 
-	"github.com/ant0ine/go-json-rest/rest"
+	"github.com/stretchr/testify/assert"
 )
 
-func TestSetupMiddleware(t *testing.T) {
+func TestTruncateToDay(t *testing.T) {
+	now := time.Now()
+	nowTruncated := TruncateToDay(now)
 
-	var tdata = []struct {
-		mwtype string
-		experr bool
-	}{
-		{"foo", true},
-		{EnvProd, false},
-		{EnvDev, false},
-	}
+	assert.Equal(t, nowTruncated.Hour(), 0)
+	assert.Equal(t, nowTruncated.Minute(), 0)
+	assert.Equal(t, nowTruncated.Second(), 0)
 
-	for _, td := range tdata {
-		api := rest.NewApi()
-
-		err := SetupMiddleware(api, td.mwtype)
-		if err != nil && td.experr == false {
-			t.Errorf("dod not expect error: %s", err)
-		} else if err == nil && td.experr == true {
-			t.Errorf("expected error, got none")
-		}
-	}
+	assert.Equal(t, now.Year(), nowTruncated.Year())
+	assert.Equal(t, now.Month(), nowTruncated.Month())
+	assert.Equal(t, now.Day(), nowTruncated.Day())
 }
