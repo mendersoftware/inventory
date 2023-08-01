@@ -17,6 +17,7 @@ package store
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/mendersoftware/inventory/model"
 )
@@ -73,6 +74,7 @@ type DataStore interface {
 		attrs model.DeviceAttributes,
 		scope string,
 		etag string,
+		lastUpdateDurationThreshold time.Duration,
 	) (*model.UpdateResult, error)
 
 	// UpsertDevicesAttributes provides an interface to apply the same
