@@ -324,7 +324,7 @@ func (db *DataStoreMongo) AddDevice(ctx context.Context, dev *model.Device) erro
 		})
 	}
 	_, err := db.UpsertDevicesAttributesWithUpdated(
-		ctx, []model.DeviceID{dev.ID}, dev.Attributes, "", "",
+		ctx, []model.DeviceID{dev.ID}, dev.Attributes, "", "", 0,
 	)
 	if err != nil {
 		return errors.Wrap(err, "failed to store device")
@@ -344,6 +344,7 @@ func (db *DataStoreMongo) inventoryNeedsUpdate(
 	ctx context.Context,
 	ids []model.DeviceID,
 	newAttributes model.DeviceAttributes,
+	lastUpdateDurationThreshold time.Duration,
 ) []model.DeviceID {
 	devicesArray, err := db.GetDevicesById(ctx, ids)
 	if devicesArray == nil || err != nil {
@@ -372,16 +373,11 @@ func (db *DataStoreMongo) inventoryNeedsUpdate(
 		}
 
 		if v, ok := a.Value.(primitive.DateTime); ok {
-			v := v.Time()
-			lastUpdatedDate := utils.TruncateToDay(v)
-			now := utils.TruncateToDay(time.Now())
-			if now.Day() != lastUpdatedDate.Day() {
-				if now.Month() != lastUpdatedDate.Month() {
-					if now.Year() != lastUpdatedDate.Year() {
-						devicesInNeedOfUpdate = append(devicesInNeedOfUpdate, device.ID)
-						continue
-					}
-				}
+			lastUpdateTime := v.Time().UTC()
+			now := time.Now().UTC()
+			if now.Sub(lastUpdateTime) > lastUpdateDurationThreshold {
+				devicesInNeedOfUpdate = append(devicesInNeedOfUpdate, device.ID)
+				continue
 			}
 		}
 
@@ -399,8 +395,9 @@ func (db *DataStoreMongo) UpsertDevicesAttributesWithUpdated(
 	attrs model.DeviceAttributes,
 	scope string,
 	etag string,
+	lastUpdateDurationThreshold time.Duration,
 ) (*model.UpdateResult, error) {
-	idsToUpdate := db.inventoryNeedsUpdate(ctx, ids, attrs)
+	idsToUpdate := db.inventoryNeedsUpdate(ctx, ids, attrs, lastUpdateDurationThreshold)
 	if len(idsToUpdate) < 1 {
 		return nil, nil
 	}
