@@ -99,6 +99,12 @@ type InventoryApp interface {
 	WithLimits(attributes, tags int) InventoryApp
 	WithDevicemonitor(client devicemonitor.Client) InventoryApp
 	WithLastUpdateDurationThreshold(threshold time.Duration) InventoryApp
+	InventoryNeedsUpdate(
+		ctx context.Context,
+		newAttributes model.DeviceAttributes,
+		deviceID model.DeviceID,
+		scope string,
+	) bool
 }
 
 type inventory struct {
@@ -611,4 +617,46 @@ func (i *inventory) reindexTextField(ctx context.Context, devices []*model.Devic
 			}
 		}
 	}
+}
+
+// InventoryNeedsUpdate returns true if given attributes need an update
+// The need is determined as follows:
+//  1. if scope is not inventory we assume we need to update
+//  2. if the new attributes differ from currently existing in the db we need to update
+//     a. we make both existing and new attributes into a map with keys of scope_name
+//     b. if all the new attributes exits in the db we consider the update as not needed
+//     c. if any of the new attributes does not exist or has different value in the db
+//     we assume we have to update
+func (i *inventory) InventoryNeedsUpdate(
+	ctx context.Context,
+	newAttributes model.DeviceAttributes,
+	deviceID model.DeviceID,
+	scope string,
+) bool {
+	if scope != model.AttrScopeInventory {
+		// we always update non-inventory scope
+		return true
+	}
+
+	newAttributesMap := newAttributes.ToMap(model.AttrNameUpdated, model.AttrNameCreated)
+	existingDevice, err := i.db.GetDevice(ctx, deviceID)
+	if err != nil || existingDevice == nil {
+		return true
+	}
+	existingAttributes := existingDevice.Attributes.ToMap(
+		model.AttrNameUpdated,
+		model.AttrNameCreated,
+	)
+	for k, v := range newAttributesMap {
+		if e, ok := existingAttributes[k]; ok {
+			if !v.Equal(e) {
+				return true
+			}
+		} else {
+			// cannot be equal if keys differ (the last possibility)
+			return true
+		}
+	}
+
+	return false
 }

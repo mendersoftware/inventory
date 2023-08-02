@@ -340,55 +340,6 @@ func (db *DataStoreMongo) UpsertDevicesAttributesWithRevision(
 	return db.upsertAttributes(ctx, devices, attrs, false, true, "", "")
 }
 
-func (db *DataStoreMongo) inventoryNeedsUpdate(
-	ctx context.Context,
-	ids []model.DeviceID,
-	newAttributes model.DeviceAttributes,
-	lastUpdateDurationThreshold time.Duration,
-) []model.DeviceID {
-	devicesArray, err := db.GetDevicesById(ctx, ids)
-	if devicesArray == nil || err != nil {
-		return ids
-	}
-	devices := make(map[model.DeviceID]model.Device, len(devicesArray))
-	for _, d := range devicesArray {
-		devices[d.ID] = d
-	}
-
-	var devicesInNeedOfUpdate []model.DeviceID
-	// all the devices that do not exist in the db (not returned
-	// by GetDevicesById and not present in devices map)
-	// need to be upserted, i.e.: need to be returned
-	// from this call, and we add them to the slice here
-	for _, id := range ids {
-		if _, ok := devices[id]; !ok {
-			devicesInNeedOfUpdate = append(devicesInNeedOfUpdate, id)
-		}
-	}
-	for _, device := range devices {
-		a := device.Attributes.GetByName(model.AttrNameUpdated)
-		if a == nil {
-			devicesInNeedOfUpdate = append(devicesInNeedOfUpdate, device.ID)
-			continue
-		}
-
-		if v, ok := a.Value.(primitive.DateTime); ok {
-			lastUpdateTime := v.Time().UTC()
-			now := time.Now().UTC()
-			if now.Sub(lastUpdateTime) > lastUpdateDurationThreshold {
-				devicesInNeedOfUpdate = append(devicesInNeedOfUpdate, device.ID)
-				continue
-			}
-		}
-
-		if !device.Attributes.Equal(newAttributes) {
-			devicesInNeedOfUpdate = append(devicesInNeedOfUpdate, device.ID)
-			continue
-		}
-	}
-	return devicesInNeedOfUpdate
-}
-
 func (db *DataStoreMongo) UpsertDevicesAttributesWithUpdated(
 	ctx context.Context,
 	ids []model.DeviceID,
@@ -397,11 +348,10 @@ func (db *DataStoreMongo) UpsertDevicesAttributesWithUpdated(
 	etag string,
 	lastUpdateDurationThreshold time.Duration,
 ) (*model.UpdateResult, error) {
-	idsToUpdate := db.inventoryNeedsUpdate(ctx, ids, attrs, lastUpdateDurationThreshold)
-	if len(idsToUpdate) < 1 {
+	if len(ids) < 1 {
 		return nil, nil
 	}
-	return db.upsertAttributes(ctx, makeDevsWithIds(idsToUpdate), attrs, true, false, scope, etag)
+	return db.upsertAttributes(ctx, makeDevsWithIds(ids), attrs, true, false, scope, etag)
 }
 
 func (db *DataStoreMongo) UpsertDevicesAttributes(

@@ -507,11 +507,22 @@ func (i *inventoryHandlers) updateDeviceAttributes(
 
 	// upsert or replace the attributes
 	if r.Method == http.MethodPatch {
+		// we only check if the inventory needs update with PATCH, we assume that calling PUT
+		// is a conscious choice of the caller, to write to the db unconditionally.
+		if !i.inventory.InventoryNeedsUpdate(
+			ctx,
+			attrs,
+			deviceID,
+			scope,
+		) {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
 		err = i.inventory.UpsertAttributesWithUpdated(ctx, deviceID, attrs, scope, etag)
 	} else if r.Method == http.MethodPut {
 		err = i.inventory.ReplaceAttributes(ctx, deviceID, attrs, scope, etag)
 	} else {
-		u.RestErrWithLog(w, r, l, errors.New("method not alllowed"), http.StatusMethodNotAllowed)
+		u.RestErrWithLog(w, r, l, errors.New("method not allowed"), http.StatusMethodNotAllowed)
 		return
 	}
 

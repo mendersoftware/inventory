@@ -228,6 +228,20 @@ func (_m *InventoryApp) HealthCheck(ctx context.Context) error {
 	return r0
 }
 
+// InventoryNeedsUpdate provides a mock function with given fields: ctx, newAttributes, deviceID, scope
+func (_m *InventoryApp) InventoryNeedsUpdate(ctx context.Context, newAttributes model.DeviceAttributes, deviceID model.DeviceID, scope string) bool {
+	ret := _m.Called(ctx, newAttributes, deviceID, scope)
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func(context.Context, model.DeviceAttributes, model.DeviceID, string) bool); ok {
+		r0 = rf(ctx, newAttributes, deviceID, scope)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	return r0
+}
+
 // ListDevices provides a mock function with given fields: ctx, q
 func (_m *InventoryApp) ListDevices(ctx context.Context, q store.ListQuery) ([]model.Device, int, error) {
 	ret := _m.Called(ctx, q)

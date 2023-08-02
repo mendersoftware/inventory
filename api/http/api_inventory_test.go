@@ -894,6 +894,12 @@ func TestApiInventoryUpdateDeviceTags(t *testing.T) {
 		ctx := contextMatcher()
 
 		if tc.inReq.Method == http.MethodPatch {
+			inv.On("InventoryNeedsUpdate",
+				ctx,
+				mock.AnythingOfType("model.DeviceAttributes"),
+				tc.deviceID,
+				tc.scope,
+			).Return(true)
 			inv.On("UpsertAttributesWithUpdated",
 				ctx,
 				tc.deviceID,
@@ -1272,6 +1278,12 @@ func TestApiInventoryUpsertAttributes(t *testing.T) {
 		ctx := contextMatcher()
 
 		if tc.inReq.Method == http.MethodPatch {
+			inv.On("InventoryNeedsUpdate",
+				ctx,
+				mock.AnythingOfType("model.DeviceAttributes"),
+				mock.AnythingOfType("model.DeviceID"),
+				tc.scope,
+			).Return(true)
 			inv.On("UpsertAttributesWithUpdated",
 				ctx,
 				mock.AnythingOfType("model.DeviceID"),
