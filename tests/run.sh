@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2022 Northern.tech AS
+# Copyright 2023 Northern.tech AS
 #
 #    Licensed under the Apache License, Version 2.0 (the "License");
 #    you may not use this file except in compliance with the License.
@@ -31,6 +31,7 @@ HOST=${HOST="mender-inventory:8080"}
 py.test -s --tb=short --host $HOST \
           --internal-spec $DIR/internal_api.yml \
           --management-spec $DIR/management_api.yml \
+          --management-v2-spec $DIR/management_api_v2.yml \
           --verbose --junitxml=$DIR/results.xml \
           --inventory-items $DIR/inventory_items \
           $DIR/tests/test_*.py "$@"

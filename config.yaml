@@ -44,6 +44,13 @@ mongo: mongo-inventory:27017
 # Overwrite with environment variable: INVENTORY_LIMIT_ATTRIBUTES
 # limit_attributes: 100
 
+# Maximum duration between the inventory updates, if
+# you updated the inventory more than this duration ago
+# get updated unconditionally upon next request from a device
+# Defaults to: "24h"
+# Overwrite with environment variable: INVENTORY_LAST_UPDATE_DURATION_THRESHOLD
+# last_update_duration_threshold: "24h"
+
 # Maximum number of tags per device
 # Defaults to: 20
 # Overwrite with environment variable: INVENTORY_LIMIT_TAGS

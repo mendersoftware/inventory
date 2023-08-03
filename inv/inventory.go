@@ -1,4 +1,4 @@
-// Copyright 2022 Northern.tech AS
+// Copyright 2023 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@ package inv
 
 import (
 	"context"
+	"time"
 
 	"github.com/pkg/errors"
 
@@ -37,6 +38,7 @@ var (
 )
 
 // this inventory service interface
+//
 //go:generate ../utils/mockgen.sh
 type InventoryApp interface {
 	WithReporting(c workflows.Client) InventoryApp
@@ -96,15 +98,17 @@ type InventoryApp interface {
 	CheckAlerts(ctx context.Context, deviceId string) (int, error)
 	WithLimits(attributes, tags int) InventoryApp
 	WithDevicemonitor(client devicemonitor.Client) InventoryApp
+	WithLastUpdateDurationThreshold(threshold time.Duration) InventoryApp
 }
 
 type inventory struct {
-	db              store.DataStore
-	limitAttributes int
-	limitTags       int
-	dmClient        devicemonitor.Client
-	enableReporting bool
-	wfClient        workflows.Client
+	db                          store.DataStore
+	limitAttributes             int
+	limitTags                   int
+	dmClient                    devicemonitor.Client
+	enableReporting             bool
+	wfClient                    workflows.Client
+	lastUpdateDurationThreshold time.Duration
 }
 
 func NewInventory(d store.DataStore) InventoryApp {
@@ -119,6 +123,11 @@ func (i *inventory) WithDevicemonitor(client devicemonitor.Client) InventoryApp 
 func (i *inventory) WithLimits(limitAttributes, limitTags int) InventoryApp {
 	i.limitAttributes = limitAttributes
 	i.limitTags = limitTags
+	return i
+}
+
+func (i *inventory) WithLastUpdateDurationThreshold(threshold time.Duration) InventoryApp {
+	i.lastUpdateDurationThreshold = threshold
 	return i
 }
 
@@ -290,7 +299,7 @@ func (i *inventory) UpsertAttributesWithUpdated(
 		return err
 	}
 	res, err := i.db.UpsertDevicesAttributesWithUpdated(
-		ctx, []model.DeviceID{id}, attrs, scope, etag,
+		ctx, []model.DeviceID{id}, attrs, scope, etag, i.lastUpdateDurationThreshold,
 	)
 	if err != nil {
 		return errors.Wrap(err, "failed to upsert attributes in db")
