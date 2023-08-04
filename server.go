@@ -57,7 +57,6 @@ func RunServer(c config.Reader) error {
 	limitTags := c.GetInt(SettingLimitTags)
 
 	inv := inventory.NewInventory(db).WithLimits(limitAttributes, limitTags)
-	inv = inv.WithLastUpdateDurationThreshold(c.GetDuration(SettingLastUpdateDurationThreshold))
 
 	devicemonitorAddr := c.GetString(SettingDevicemonitorAddr)
 	if devicemonitorAddr != "" {

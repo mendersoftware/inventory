@@ -16,7 +16,6 @@ package inv
 
 import (
 	"context"
-	"time"
 
 	"github.com/pkg/errors"
 
@@ -98,17 +97,15 @@ type InventoryApp interface {
 	CheckAlerts(ctx context.Context, deviceId string) (int, error)
 	WithLimits(attributes, tags int) InventoryApp
 	WithDevicemonitor(client devicemonitor.Client) InventoryApp
-	WithLastUpdateDurationThreshold(threshold time.Duration) InventoryApp
 }
 
 type inventory struct {
-	db                          store.DataStore
-	limitAttributes             int
-	limitTags                   int
-	dmClient                    devicemonitor.Client
-	enableReporting             bool
-	wfClient                    workflows.Client
-	lastUpdateDurationThreshold time.Duration
+	db              store.DataStore
+	limitAttributes int
+	limitTags       int
+	dmClient        devicemonitor.Client
+	enableReporting bool
+	wfClient        workflows.Client
 }
 
 func NewInventory(d store.DataStore) InventoryApp {
@@ -123,11 +120,6 @@ func (i *inventory) WithDevicemonitor(client devicemonitor.Client) InventoryApp 
 func (i *inventory) WithLimits(limitAttributes, limitTags int) InventoryApp {
 	i.limitAttributes = limitAttributes
 	i.limitTags = limitTags
-	return i
-}
-
-func (i *inventory) WithLastUpdateDurationThreshold(threshold time.Duration) InventoryApp {
-	i.lastUpdateDurationThreshold = threshold
 	return i
 }
 
@@ -299,7 +291,7 @@ func (i *inventory) UpsertAttributesWithUpdated(
 		return err
 	}
 	res, err := i.db.UpsertDevicesAttributesWithUpdated(
-		ctx, []model.DeviceID{id}, attrs, scope, etag, i.lastUpdateDurationThreshold,
+		ctx, []model.DeviceID{id}, attrs, scope, etag,
 	)
 	if err != nil {
 		return errors.Wrap(err, "failed to upsert attributes in db")
