@@ -1,4 +1,4 @@
-// Copyright 2023 Northern.tech AS
+// Copyright 2022 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -16,7 +16,6 @@ package model
 
 import (
 	"encoding/json"
-	"fmt"
 	"reflect"
 	"regexp"
 	"strings"
@@ -70,60 +69,6 @@ type DeviceAttribute struct {
 	Timestamp   *time.Time  `json:"timestamp,omitempty" bson:",omitempty"`
 }
 
-func (da DeviceAttributes) GetByName(name string) *DeviceAttribute {
-	for _, attribute := range da {
-		if attribute.Name == name {
-			rc := attribute
-			return &rc
-		}
-	}
-	return nil
-}
-
-func (da DeviceAttributes) ToMap(excludeNames ...string) map[string]DeviceAttribute {
-	rc := make(map[string]DeviceAttribute, len(da))
-	for _, v := range da {
-		exclude := false
-		for _, excluded := range excludeNames {
-			if v.Name == excluded {
-				exclude = true
-				break
-			}
-		}
-		if exclude {
-			continue
-		}
-		rc[v.Scope+"_"+v.Name] = v
-	}
-	return rc
-}
-
-func (da DeviceAttributes) Equal(existingAttributesArray DeviceAttributes) bool {
-	// cannot be equal if they are of different size (the cheapest check first)
-	if len(da)-2 != len(existingAttributesArray) { // -2 comes from updated and created timestamps
-		return false
-	}
-
-	// cannot be equal if any of the values differ (the most common case)
-	attributes := da.ToMap(AttrNameUpdated, AttrNameCreated)
-	existingAttributes := existingAttributesArray.ToMap(AttrNameUpdated, AttrNameCreated)
-	if len(attributes) != len(existingAttributes) {
-		return false
-	}
-	for k, v := range attributes {
-		if e, ok := existingAttributes[k]; ok {
-			if !v.Equal(e) {
-				return false
-			}
-		} else {
-			// cannot be equal if keys differ (the last possibility)
-			return false
-		}
-	}
-
-	return true
-}
-
 func (da DeviceAttribute) Validate() error {
 	return validation.ValidateStruct(&da,
 		validation.Field(&da.Name, validation.Required, validation.Length(1, 1024)),
@@ -131,100 +76,6 @@ func (da DeviceAttribute) Validate() error {
 		validation.Field(&da.Value, validation.By(validateDeviceAttrVal)),
 		validation.Field(&da.Timestamp, validation.Date(time.RFC3339)),
 	)
-}
-
-func allowedType(v reflect.Value) bool {
-	if v.Type().Kind() == reflect.Int {
-		return true
-	}
-	if v.Type().Kind() == reflect.String {
-		return true
-	}
-	if v.Type().Kind() == reflect.Float64 {
-		return true
-	}
-	return false
-}
-
-func reflectValuesEqual(rVal1 reflect.Value, rVal2 reflect.Value) bool {
-	if rVal1.Len() != rVal2.Len() {
-		return false
-	}
-	for i := 0; i < rVal1.Len(); i++ {
-		if rVal1.Index(i).Kind() != rVal2.Index(i).Kind() {
-			return false
-		}
-		if !allowedType(rVal1.Index(i)) || !allowedType(rVal2.Index(i)) {
-			if !reflect.DeepEqual(rVal1.Index(i), rVal2.Index(i)) {
-				return false
-			}
-		} else {
-			if rVal2.Index(i).Kind() == reflect.Int {
-				value1 := rVal1.Index(i).Interface().(int)
-				value2 := rVal2.Index(i).Interface().(int)
-				if value1 != value2 {
-					return false
-				}
-			}
-			if rVal2.Index(i).Kind() == reflect.String {
-				value1 := rVal1.Index(i).Interface().(string)
-				value2 := rVal2.Index(i).Interface().(string)
-				if value1 != value2 {
-					return false
-				}
-			}
-			if rVal2.Index(i).Kind() == reflect.Float64 {
-				floatComparePrecision := "%.8f"
-				floatValue1 := rVal1.Index(i).Interface().(float64)
-				floatValue2 := rVal2.Index(i).Interface().(float64)
-				value1 := fmt.Sprintf(floatComparePrecision, floatValue1)
-				value2 := fmt.Sprintf(floatComparePrecision, floatValue2)
-				if value1 != value2 {
-					return false
-				}
-			}
-		}
-	}
-	return true
-}
-
-func (da DeviceAttribute) Equal(e DeviceAttribute) bool {
-	if (da.Value == nil || e.Value == nil) && !(da.Value == nil && e.Value == nil) {
-		return false
-	}
-	rVal1 := reflect.ValueOf(da.Value)
-	rVal2 := reflect.ValueOf(e.Value)
-	if rVal1.Kind() != rVal2.Kind() {
-		if rVal1.Kind() == reflect.Slice && rVal2.Kind() == reflect.Array ||
-			rVal1.Kind() == reflect.Array && rVal2.Kind() == reflect.Slice {
-		} else {
-			return false
-		}
-	}
-	if rVal1.Kind() == reflect.Slice || rVal1.Kind() == reflect.Array {
-		return reflectValuesEqual(rVal1, rVal2)
-	} else {
-		if da.Value != e.Value {
-			return false
-		}
-		if da.Scope == e.Scope {
-			if da.Name == e.Name {
-				if da.Description == nil && e.Description == nil {
-					// at this point Value, Scope, and Name are equal, and both Descriptions are nil
-					return true
-				}
-				if da.Description == nil || e.Description == nil {
-					// if either is nil while the other is not they are different
-					return false
-				}
-				if *da.Description == *e.Description {
-					// both not nil, we can compare and if equal the attributes are equal
-					return true
-				}
-			}
-		}
-	}
-	return false
 }
 
 func validateDeviceAttrVal(i interface{}) error {
