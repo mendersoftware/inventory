@@ -1,4 +1,4 @@
-// Copyright 2023 Northern.tech AS
+// Copyright 2021 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -25,7 +25,7 @@ import (
 	"github.com/ant0ine/go-json-rest/rest"
 )
 
-// pagination constants
+//pagination constants
 const (
 	PageName       = "page"
 	PerPageName    = "per_page"
@@ -42,7 +42,7 @@ const (
 	DefaultScheme  = "http"
 )
 
-// error msgs
+//error msgs
 func MsgQueryParmInvalid(name string) string {
 	return fmt.Sprintf("Can't parse param %s", name)
 }
@@ -59,7 +59,7 @@ func MsgQueryParmOneOf(name string, allowed []string) string {
 	return fmt.Sprintf("Param %s must be one of %v", name, allowed)
 }
 
-// query param parsing/validation
+//query param parsing/validation
 func ParseQueryParmUInt(
 	r *rest.Request,
 	name string,
@@ -135,7 +135,7 @@ func ParseQueryParmStr(
 	return val, nil
 }
 
-// pagination helpers
+//pagination helpers
 func ParsePagination(r *rest.Request) (uint64, uint64, error) {
 	page, err := ParseQueryParmUInt(r, PageName, false, PageMin, math.MaxUint64, PageDefault)
 	if err != nil {

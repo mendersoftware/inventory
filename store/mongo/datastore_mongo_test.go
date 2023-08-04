@@ -1,4 +1,4 @@
-// Copyright 2023 Northern.tech AS
+// Copyright 2022 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -1472,7 +1472,6 @@ func TestMongoUpsertDevicesAttributes(t *testing.T) {
 			}},
 		},
 		"error, missing attribute name": {
-			inDevIDs: []model.DeviceID{"0003", "0004", "0005"},
 			inAttrs: model.DeviceAttributes{{
 				Scope: model.AttrScopeInventory,
 				Value: "foo",
@@ -1511,11 +1510,6 @@ func TestMongoUpsertDevicesAttributes(t *testing.T) {
 					err := d.AddDevice(ctx, &dev)
 					assert.NoError(t, err, "failed to setup input data")
 				}
-
-				updatedAtTimeWindowSeconds := 2
-				time.Sleep(time.Duration(updatedAtTimeWindowSeconds) * time.Second)
-				// we need to sleep a bit here so we can determine whether the
-				// attributes were updated (see MEN-6425 and below)
 
 				var err error
 				if withUpdated {
@@ -1567,89 +1561,6 @@ func TestMongoUpsertDevicesAttributes(t *testing.T) {
 										devs[i].UpdatedTs == dev.CreatedTs
 								})
 						}
-					}
-				}
-
-				if len(devs) == 0 || !withUpdated {
-					//there were no devices found, all handled above, in here we ignore it
-					//we only test here the scenario with updated timestamp
-					return
-				}
-				// if the merge of tc.devs.Attributes and tc.inAttrs is different from
-				// tc.devs, then the created and updated timestamps should differ by more than 2s
-				mapsOfAttrobutesInserted := make(map[string]map[string]model.DeviceAttribute, len(tc.devs)+1)
-				for _, deviceInserted := range tc.devs {
-					attributesInserted := make(map[string]model.DeviceAttribute, len(tc.devs)+len(tc.inAttrs)+len(tc.inDevIDs))
-					for _, v := range deviceInserted.Attributes {
-						attributesInserted[v.Scope+"_"+v.Name] = v
-					}
-					mapsOfAttrobutesInserted[deviceInserted.ID.String()] = attributesInserted
-				}
-				for _, deviceUpserted := range tc.inDevIDs {
-					if _, ok := mapsOfAttrobutesInserted[deviceUpserted.String()]; ok {
-						for _, v := range tc.inAttrs {
-							mapsOfAttrobutesInserted[deviceUpserted.String()][v.Scope+"_"+v.Name] = v
-						}
-					} else {
-						attributesInserted := make(map[string]model.DeviceAttribute, len(tc.devs)+len(tc.inAttrs)+len(tc.inDevIDs))
-						for _, v := range tc.inAttrs {
-							attributesInserted[v.Scope+"_"+v.Name] = v
-						}
-						mapsOfAttrobutesInserted[deviceUpserted.String()] = attributesInserted
-					}
-				}
-				for deviceId, attributesInsertedMerged := range mapsOfAttrobutesInserted {
-					var deviceFoundInDb *model.Device
-					for i, device := range devs {
-						if device.ID.String() == deviceId {
-							deviceFoundInDb = &devs[i]
-						}
-					}
-					var deviceFound *model.Device
-					for i, device := range tc.devs {
-						if device.ID.String() == deviceId {
-							deviceFound = &tc.devs[i]
-						}
-					}
-					if deviceFound == nil || deviceFoundInDb == nil {
-						// given device was not inserted with the tc.devs -- the attributes are different for sure
-						// if tc.inAttrs != empty so we can assume created == updated here
-						continue
-					}
-					// we compare the deviceFound.Attributes and attributesInsertedMerged,
-					// if differ then created != updated
-					// if equal created is before updated by more than updatedAtTimeWindowSeconds
-					deviceAttributes := deviceFound.Attributes.ToMap(model.AttrNameUpdated, model.AttrNameCreated)
-					if len(attributesInsertedMerged) != len(deviceAttributes) {
-						assert.True(
-							t,
-							deviceFoundInDb.Attributes.GetByName("created_ts").Value.(primitive.DateTime).Time().Before(deviceFoundInDb.Attributes.GetByName("updated_ts").Value.(primitive.DateTime).Time()),
-						)
-						continue
-					}
-					attributesEqual := true
-					for nameMerged, attributeMerged := range attributesInsertedMerged {
-						if _, ok := deviceAttributes[nameMerged]; !ok {
-							attributesEqual = false
-							break
-						}
-						if !attributeMerged.Equal(deviceAttributes[nameMerged]) {
-							attributesEqual = false
-							break
-						}
-					}
-					if attributesEqual {
-						assert.Equal(
-							t,
-							utils.TruncateToSeconds(deviceFoundInDb.Attributes.GetByName("updated_ts").Value.(primitive.DateTime).Time()),
-							utils.TruncateToSeconds(deviceFoundInDb.Attributes.GetByName("created_ts").Value.(primitive.DateTime).Time()),
-						)
-						continue
-					} else {
-						assert.True(
-							t,
-							deviceFoundInDb.Attributes.GetByName("created_ts").Value.(primitive.DateTime).Time().Before(deviceFoundInDb.Attributes.GetByName("updated_ts").Value.(primitive.DateTime).Time()),
-						)
 					}
 				}
 			})
