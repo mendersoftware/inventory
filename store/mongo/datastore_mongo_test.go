@@ -1519,7 +1519,7 @@ func TestMongoUpsertDevicesAttributes(t *testing.T) {
 
 				var err error
 				if withUpdated {
-					_, err = d.UpsertDevicesAttributesWithUpdated(ctx, tc.inDevIDs, tc.inAttrs, "", "", time.Duration(24*60*60))
+					_, err = d.UpsertDevicesAttributesWithUpdated(ctx, tc.inDevIDs, tc.inAttrs, "", "")
 				} else {
 					_, err = d.UpsertDevicesAttributes(ctx, tc.inDevIDs, tc.inAttrs)
 				}
@@ -1639,9 +1639,10 @@ func TestMongoUpsertDevicesAttributes(t *testing.T) {
 						}
 					}
 					if attributesEqual {
-						assert.True(
+						assert.Equal(
 							t,
-							deviceFoundInDb.Attributes.GetByName("updated_ts").Value.(primitive.DateTime).Time().Unix() >= deviceFoundInDb.Attributes.GetByName("created_ts").Value.(primitive.DateTime).Time().Unix(),
+							utils.TruncateToSeconds(deviceFoundInDb.Attributes.GetByName("updated_ts").Value.(primitive.DateTime).Time()),
+							utils.TruncateToSeconds(deviceFoundInDb.Attributes.GetByName("created_ts").Value.(primitive.DateTime).Time()),
 						)
 						continue
 					} else {

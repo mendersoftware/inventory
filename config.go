@@ -39,9 +39,6 @@ const (
 	SettingLimitAttributes        = "limit_attributes"
 	SettingLimitAttributesDefault = 100
 
-	SettingLastUpdateDurationThreshold        = "last_update_duration_threshold"
-	SettingLastUpdateDurationThresholdDefault = "24h"
-
 	SettingLimitTags        = "limit_tags"
 	SettingLimitTagsDefault = 20
 
@@ -63,7 +60,6 @@ var (
 		{Key: SettingDbSSL, Value: SettingDbSSLDefault},
 		{Key: SettingDbSSLSkipVerify, Value: SettingDbSSLSkipVerifyDefault},
 		{Key: SettingLimitAttributes, Value: SettingLimitAttributesDefault},
-		{Key: SettingLastUpdateDurationThreshold, Value: SettingLastUpdateDurationThresholdDefault},
 		{Key: SettingLimitTags, Value: SettingLimitTagsDefault},
 		{Key: SettingDevicemonitorAddr, Value: SettingDevicemonitorAddrDefault},
 		{Key: SettingEnableReporting, Value: SettingEnableReportingDefault},
