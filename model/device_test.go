@@ -1,22 +1,21 @@
-// Copyright 2023 Northern.tech AS
+// Copyright 2020 Northern.tech AS
 //
-//	Licensed under the Apache License, Version 2.0 (the "License");
-//	you may not use this file except in compliance with the License.
-//	You may obtain a copy of the License at
+//    Licensed under the Apache License, Version 2.0 (the "License");
+//    you may not use this file except in compliance with the License.
+//    You may obtain a copy of the License at
 //
-//	    http://www.apache.org/licenses/LICENSE-2.0
+//        http://www.apache.org/licenses/LICENSE-2.0
 //
-//	Unless required by applicable law or agreed to in writing, software
-//	distributed under the License is distributed on an "AS IS" BASIS,
-//	WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-//	See the License for the specific language governing permissions and
-//	limitations under the License.
+//    Unless required by applicable law or agreed to in writing, software
+//    distributed under the License is distributed on an "AS IS" BASIS,
+//    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//    See the License for the specific language governing permissions and
+//    limitations under the License.
 package model
 
 import (
 	"encoding/json"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"go.mongodb.org/mongo-driver/bson"
@@ -44,23 +43,6 @@ func TestDeviceAttributesUnmarshal(t *testing.T) {
 	}
 
 	assert.ObjectsAreEqualValues(exp, da)
-	assert.True(t, exp[0].Equal(exp[0]))
-	assert.True(t, exp[1].Equal(exp[1]))
-	assert.True(t, !exp[0].Equal(exp[1]))
-	assert.True(t, !exp[1].Equal(exp[0]))
-	withUpdatedCreated := DeviceAttributes{
-		exp[0],
-		exp[1],
-		{
-			Name:  "created_ts",
-			Value: time.Now(),
-		},
-		{
-			Name:  "updated_ts",
-			Value: time.Now(),
-		},
-	}
-	assert.True(t, withUpdatedCreated.Equal(exp))
 }
 
 func TestDeviceAttributesMarshal(t *testing.T) {
@@ -93,50 +75,6 @@ func TestDeviceAttributesMarshal(t *testing.T) {
 	data, err = json.Marshal(&daEmpty)
 	assert.NoError(t, err)
 	assert.Equal(t, "[]", string(data))
-
-	da = DeviceAttributes{
-		{
-			Name:  "foo",
-			Scope: "inventory",
-			Value: "bar",
-		},
-		{
-			Name:  "bar",
-			Scope: "inventory",
-			Value: []int{1, 2, 3},
-		},
-	}
-	assert.True(t, da[0].Equal(da[0]))
-	assert.True(t, da[1].Equal(da[1]))
-	assert.True(t, !da[1].Equal(da[0]))
-	assert.True(t, !da[0].Equal(da[1]))
-
-	withUpdatedCreated := DeviceAttributes{
-		da[0],
-		da[1],
-		{
-			Name:  "created_ts",
-			Value: time.Now(),
-		},
-		{
-			Name:  "updated_ts",
-			Value: time.Now(),
-		},
-	}
-	emptyWithUpdatedCreated := DeviceAttributes{
-		{
-			Name:  "created_ts",
-			Value: time.Now(),
-		},
-		{
-			Name:  "updated_ts",
-			Value: time.Now(),
-		},
-	}
-	assert.True(t, withUpdatedCreated.Equal(da))
-	assert.True(t, emptyWithUpdatedCreated.Equal(daEmpty))
-	assert.True(t, !withUpdatedCreated.Equal(daEmpty))
-	assert.True(t, !daEmpty.Equal(withUpdatedCreated))
 }
 
 func TestMarshalMarshalBSON(t *testing.T) {
@@ -321,48 +259,6 @@ func TestValidateDeviceAttributes(t *testing.T) {
 				}
 			} else {
 				assert.NoError(t, err)
-				withUpdatedCreated := DeviceAttributes{
-					{
-						Name:  "created_ts",
-						Value: time.Now(),
-					},
-					{
-						Name:  "updated_ts",
-						Value: time.Now(),
-					},
-				}
-				for i, _ := range tc.Attributes {
-					withUpdatedCreated = append(withUpdatedCreated, tc.Attributes[i])
-				}
-				if !withUpdatedCreated.Equal(tc.Attributes) {
-					i := 1
-					if i > 1 {
-					}
-				}
-				assert.True(t, withUpdatedCreated.Equal(tc.Attributes))
-
-				withUpdatedCreated = DeviceAttributes{
-					{
-						Name:  "created_ts",
-						Value: time.Now(),
-					},
-					{
-						Name:  "updated_ts",
-						Value: time.Now(),
-					},
-				}
-				for i, _ := range tc.Attributes {
-					withUpdatedCreated = append(withUpdatedCreated, tc.Attributes[i])
-					break
-				}
-				if len(tc.Attributes) > 1 {
-					if withUpdatedCreated.Equal(tc.Attributes) {
-						i := 1
-						if i > 1 {
-						}
-					}
-					assert.True(t, !withUpdatedCreated.Equal(tc.Attributes))
-				}
 			}
 		})
 	}
@@ -381,112 +277,4 @@ func TestValidateGroupName(t *testing.T) {
 	assert.EqualError(t, group3.Validate(), "Group name cannot be blank")
 	group4 := GroupName("test")
 	assert.NoError(t, group4.Validate())
-}
-
-func TestDeviceAttributesEqual(t *testing.T) {
-	createdUpdated := DeviceAttributes{
-		{
-			Name:  "created_ts",
-			Value: time.Now(),
-		},
-		{
-			Name:  "updated_ts",
-			Value: time.Now(),
-		},
-	}
-	attributes := DeviceAttributes{
-		{
-			Name:  "bar",
-			Scope: "inventory",
-			Value: []int{1, 2, 3},
-		},
-		{
-			Name:  "bar",
-			Scope: "inventory",
-			Value: []int{1, 2, 3},
-		},
-	}
-	databaseAttributes := DeviceAttributes{
-		attributes[0],
-		attributes[1],
-		createdUpdated[0],
-		createdUpdated[1],
-	}
-	rc := databaseAttributes.Equal(attributes)
-	assert.True(t, rc, "these attributes are equal, and so should Equal note it")
-
-	attributes = DeviceAttributes{
-		{
-			Name:  "bar",
-			Scope: "inventory",
-			Value: []int{1, 2, 3},
-		},
-		{
-			Name:  "bar",
-			Scope: "inventory",
-			Value: []int{1, 2, 3},
-		},
-	}
-	databaseAttributes = DeviceAttributes{
-		attributes[0],
-		{
-			Name:  "bar",
-			Scope: "inventory",
-			Value: []int{1, 2, 4},
-		},
-		createdUpdated[0],
-		createdUpdated[1],
-	}
-	rc = databaseAttributes.Equal(attributes)
-	assert.False(t, rc, "these attributes are not equal, and so should Equal note it")
-
-	attributes = DeviceAttributes{
-		{
-			Name:  "bar",
-			Scope: "inventory",
-			Value: []int{1, 2, 3},
-		},
-		{
-			Name:  "bar",
-			Scope: "inventory",
-			Value: []int{1, 2, 3},
-		},
-	}
-	databaseAttributes = DeviceAttributes{
-		attributes[0],
-		{
-			Name:  "baar",
-			Scope: "inventory",
-			Value: []int{1, 2, 3},
-		},
-		createdUpdated[0],
-		createdUpdated[1],
-	}
-	rc = databaseAttributes.Equal(attributes)
-	assert.False(t, rc, "these attributes are not equal, and so should Equal note it")
-
-	attributes = DeviceAttributes{
-		{
-			Name:  "bar",
-			Scope: "inventory",
-			Value: []int{1, 2, 3},
-		},
-		{
-			Name:  "bar",
-			Scope: "inventory",
-			Value: [3]int{1, 2, 3},
-		},
-	}
-	databaseAttributes = DeviceAttributes{
-		attributes[0],
-		{
-			Name:  "bar",
-			Scope: "inventory",
-			Value: []int{1, 2, 3},
-		},
-		createdUpdated[0],
-		createdUpdated[1],
-	}
-	rc = databaseAttributes.Equal(attributes)
-	assert.True(t, rc, "these attributes are equal, and so should Equal note it")
 }

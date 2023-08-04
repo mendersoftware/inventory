@@ -1,4 +1,4 @@
-// Copyright 2023 Northern.tech AS
+// Copyright 2022 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -215,29 +215,6 @@ func (_m *DataStore) GetDevicesByGroup(ctx context.Context, group model.GroupNam
 	}
 
 	return r0, r1, r2
-}
-
-// GetDevicesById provides a mock function with given fields: ctx, id
-func (_m *DataStore) GetDevicesById(ctx context.Context, id []model.DeviceID) ([]model.Device, error) {
-	ret := _m.Called(ctx, id)
-
-	var r0 []model.Device
-	if rf, ok := ret.Get(0).(func(context.Context, []model.DeviceID) []model.Device); ok {
-		r0 = rf(ctx, id)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]model.Device)
-		}
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, []model.DeviceID) error); ok {
-		r1 = rf(ctx, id)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
 }
 
 // GetFiltersAttributes provides a mock function with given fields: ctx
