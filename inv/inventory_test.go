@@ -362,11 +362,10 @@ func TestInventoryUpsertAttributesWithUpdated(t *testing.T) {
 	const devID = model.DeviceID("devid")
 
 	testCases := map[string]struct {
-		getDevice       *model.Device
-		getDeviceErr    error
-		limitAttributes int
-		limitTags       int
-		attributes      model.DeviceAttributes
+		getDevice    *model.Device
+		getDeviceErr error
+		limit        int
+		attributes   model.DeviceAttributes
 
 		noUpdate       bool
 		datastoreError error
@@ -410,6 +409,7 @@ func TestInventoryUpsertAttributesWithUpdated(t *testing.T) {
 					Value: 5.4,
 					Scope: model.AttrScopeInventory,
 				}},
+				UpdatedTs: time.Now(),
 			},
 			noUpdate: true,
 			outError: nil,
@@ -455,7 +455,7 @@ func TestInventoryUpsertAttributesWithUpdated(t *testing.T) {
 		},
 		"limits ko, getDevice error": {
 			getDeviceErr:    errors.New("datastore error"),
-			limitAttributes: 1,
+			limit:           1,
 			datastoreResult: nil,
 			datastoreError:  nil,
 			outError:        errors.New("failed to get the device: datastore error"),
@@ -478,7 +478,7 @@ func TestInventoryUpsertAttributesWithUpdated(t *testing.T) {
 					Scope: model.AttrScopeInventory,
 				},
 			},
-			limitAttributes: 1,
+			limit:           1,
 			datastoreResult: &dsResultsuccess,
 			datastoreError:  nil,
 			outError:        nil,
@@ -495,7 +495,7 @@ func TestInventoryUpsertAttributesWithUpdated(t *testing.T) {
 					Scope: model.AttrScopeTags,
 				},
 			},
-			limitTags:       1,
+			limit:           1,
 			datastoreResult: &dsResultsuccess,
 			datastoreError:  nil,
 			outError:        nil,
@@ -518,10 +518,9 @@ func TestInventoryUpsertAttributesWithUpdated(t *testing.T) {
 					Scope: model.AttrScopeInventory,
 				},
 			},
-			limitAttributes: 1,
+			limit:           1,
 			datastoreResult: nil,
 			datastoreError:  nil,
-			outError:        ErrTooManyAttributes,
 			scope:           model.AttrScopeInventory,
 		},
 		"limits ko, tags": {
@@ -541,10 +540,9 @@ func TestInventoryUpsertAttributesWithUpdated(t *testing.T) {
 					Scope: model.AttrScopeTags,
 				},
 			},
-			limitTags:       1,
+			limit:           1,
 			datastoreResult: nil,
 			datastoreError:  nil,
-			outError:        ErrTooManyAttributes,
 			scope:           model.AttrScopeTags,
 		},
 		"limits ko, tags with multiple existing attributes": {
@@ -569,10 +567,9 @@ func TestInventoryUpsertAttributesWithUpdated(t *testing.T) {
 					Scope: model.AttrScopeTags,
 				},
 			},
-			limitTags:       1,
+			limit:           1,
 			datastoreResult: nil,
 			datastoreError:  nil,
-			outError:        ErrTooManyAttributes,
 			scope:           model.AttrScopeTags,
 		},
 		"limits ko, tags with multiple attributes": {
@@ -597,10 +594,9 @@ func TestInventoryUpsertAttributesWithUpdated(t *testing.T) {
 					Scope: model.AttrScopeTags,
 				},
 			},
-			limitTags:       1,
+			limit:           1,
 			datastoreResult: nil,
 			datastoreError:  nil,
-			outError:        ErrTooManyAttributes,
 			scope:           model.AttrScopeTags,
 		},
 	}
@@ -608,6 +604,9 @@ func TestInventoryUpsertAttributesWithUpdated(t *testing.T) {
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			t.Logf("test case: %s", name)
+			if tc.limit == 0 {
+				tc.limit = 100
+			}
 
 			ctx := context.Background()
 
@@ -616,7 +615,6 @@ func TestInventoryUpsertAttributesWithUpdated(t *testing.T) {
 				ctx,
 				devID,
 			).Return(tc.getDevice, tc.getDeviceErr)
-
 			if !tc.noUpdate {
 				db.On("UpsertDevicesAttributesWithUpdated",
 					ctx,
@@ -634,7 +632,9 @@ func TestInventoryUpsertAttributesWithUpdated(t *testing.T) {
 				}
 			}
 
-			i := invForTest(db).WithLimits(tc.limitAttributes, tc.limitTags)
+			i := invForTest(db).
+				WithLimits(tc.limit, tc.limit).
+				WithForceUpdate(time.Hour)
 
 			err := i.UpsertAttributesWithUpdated(ctx, devID, tc.attributes, tc.scope, tc.etag)
 
@@ -672,10 +672,8 @@ func TestReplaceAttributes(t *testing.T) {
 		getDeviceErr    error
 		dataStoreResult *model.UpdateResult
 		datastoreError  error
-		limitAttributes int
-		limitTags       int
+		limit           int
 
-		updateAfter time.Duration
 		noUpdate    bool
 		upsertAttrs model.DeviceAttributes
 		removeAttrs model.DeviceAttributes
@@ -736,93 +734,18 @@ func TestReplaceAttributes(t *testing.T) {
 
 			scope: model.AttrScopeInventory,
 		},
-		"ok/no update": {
-			deviceID: "1",
-			getDevice: &model.Device{
-				Attributes: model.DeviceAttributes{
-					model.DeviceAttribute{
-						Name:  "ip_address",
-						Value: "127.0.0.1",
-						Scope: model.AttrScopeInventory,
-					},
-					model.DeviceAttribute{
-						Name:  "name",
-						Value: "foo",
-						Scope: model.AttrScopeInventory,
-					},
-				},
-			},
-			getDeviceErr: nil,
-
-			upsertAttrs: model.DeviceAttributes{
-				model.DeviceAttribute{
-					Name:  "name",
-					Value: "foo",
-					Scope: model.AttrScopeInventory,
-				},
-				model.DeviceAttribute{
-					Name:  "ip_address",
-					Value: "127.0.0.1",
-					Scope: model.AttrScopeInventory,
-				},
-			},
-			removeAttrs: model.DeviceAttributes{},
-
-			noUpdate: true,
-			outError: nil,
-
-			scope: model.AttrScopeInventory,
-		},
-		"ok/forced update": {
-			deviceID: "1",
-			getDevice: &model.Device{
-				Attributes: model.DeviceAttributes{
-					model.DeviceAttribute{
-						Name:  "ip_address",
-						Value: "127.0.0.1",
-						Scope: model.AttrScopeInventory,
-					},
-					model.DeviceAttribute{
-						Name:  "name",
-						Value: "foo",
-						Scope: model.AttrScopeInventory,
-					},
-				},
-				UpdatedTs: time.Now().Add(-time.Hour),
-			},
-			getDeviceErr: nil,
-
-			upsertAttrs: model.DeviceAttributes{
-				model.DeviceAttribute{
-					Name:  "name",
-					Value: "foo",
-					Scope: model.AttrScopeInventory,
-				},
-				model.DeviceAttribute{
-					Name:  "ip_address",
-					Value: "127.0.0.1",
-					Scope: model.AttrScopeInventory,
-				},
-			},
-			removeAttrs: model.DeviceAttributes{},
-			updateAfter: time.Minute,
-
-			outError: nil,
-
-			scope: model.AttrScopeInventory,
-		},
 		"ok, device found, replace attributes": {
 			deviceID: "1",
 			getDevice: &model.Device{
 				Attributes: model.DeviceAttributes{
 					model.DeviceAttribute{
 						Name:  "name",
-						Value: "foo",
+						Value: "bar",
 						Scope: model.AttrScopeInventory,
 					},
 					model.DeviceAttribute{
 						Name:  "custom",
-						Value: "bar",
+						Value: "baz",
 						Scope: model.AttrScopeInventory,
 					},
 				},
@@ -844,12 +767,51 @@ func TestReplaceAttributes(t *testing.T) {
 			removeAttrs: model.DeviceAttributes{
 				model.DeviceAttribute{
 					Name:  "custom",
-					Value: "bar",
+					Value: "baz",
 					Scope: model.AttrScopeInventory,
 				},
 			},
 
 			dataStoreResult: updateResult,
+			datastoreError:  nil,
+			outError:        nil,
+
+			scope: model.AttrScopeInventory,
+		},
+		"ok, device found, no update": {
+			deviceID: "1",
+			getDevice: &model.Device{
+				Attributes: model.DeviceAttributes{
+					model.DeviceAttribute{
+						Name:  "custom",
+						Value: "bar",
+						Scope: model.AttrScopeInventory,
+					},
+					model.DeviceAttribute{
+						Name:  "name",
+						Value: "foo",
+						Scope: model.AttrScopeInventory,
+					},
+				},
+				UpdatedTs: time.Now(),
+			},
+			getDeviceErr: nil,
+
+			noUpdate: true,
+			upsertAttrs: model.DeviceAttributes{
+				model.DeviceAttribute{
+					Name:  "custom",
+					Value: "bar",
+					Scope: model.AttrScopeInventory,
+				},
+				model.DeviceAttribute{
+					Name:  "name",
+					Value: "foo",
+					Scope: model.AttrScopeInventory,
+				},
+			},
+
+			dataStoreResult: nil,
 			datastoreError:  nil,
 			outError:        nil,
 
@@ -1048,10 +1010,10 @@ func TestReplaceAttributes(t *testing.T) {
 			outError:       ErrETagDoesntMatch,
 		},
 		"ok, inventory, limits ok": {
-			deviceID:        "1",
-			getDevice:       nil,
-			getDeviceErr:    store.ErrDevNotFound,
-			limitAttributes: 2,
+			deviceID:     "1",
+			getDevice:    nil,
+			getDeviceErr: store.ErrDevNotFound,
+			limit:        2,
 
 			upsertAttrs: model.DeviceAttributes{
 				model.DeviceAttribute{
@@ -1074,10 +1036,10 @@ func TestReplaceAttributes(t *testing.T) {
 			scope: model.AttrScopeInventory,
 		},
 		"ko, inventory, limits ko": {
-			deviceID:        "1",
-			getDevice:       nil,
-			getDeviceErr:    store.ErrDevNotFound,
-			limitAttributes: 1,
+			deviceID:     "1",
+			getDevice:    nil,
+			getDeviceErr: store.ErrDevNotFound,
+			limit:        1,
 
 			upsertAttrs: model.DeviceAttributes{
 				model.DeviceAttribute{
@@ -1094,7 +1056,6 @@ func TestReplaceAttributes(t *testing.T) {
 			removeAttrs: model.DeviceAttributes{},
 
 			datastoreError: nil,
-			outError:       ErrTooManyAttributes,
 
 			scope: model.AttrScopeInventory,
 		},
@@ -1102,7 +1063,7 @@ func TestReplaceAttributes(t *testing.T) {
 			deviceID:     "1",
 			getDevice:    nil,
 			getDeviceErr: store.ErrDevNotFound,
-			limitTags:    2,
+			limit:        2,
 
 			upsertAttrs: model.DeviceAttributes{
 				model.DeviceAttribute{
@@ -1128,7 +1089,7 @@ func TestReplaceAttributes(t *testing.T) {
 			deviceID:     "1",
 			getDevice:    nil,
 			getDeviceErr: store.ErrDevNotFound,
-			limitTags:    1,
+			limit:        1,
 
 			upsertAttrs: model.DeviceAttributes{
 				model.DeviceAttribute{
@@ -1146,7 +1107,6 @@ func TestReplaceAttributes(t *testing.T) {
 
 			dataStoreResult: updateResult,
 			datastoreError:  nil,
-			outError:        ErrTooManyAttributes,
 
 			scope: model.AttrScopeTags,
 		},
@@ -1155,22 +1115,28 @@ func TestReplaceAttributes(t *testing.T) {
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			ctx := context.Background()
+			if tc.limit == 0 {
+				tc.limit = 100
+			}
 
 			db := &mstore.DataStore{}
 			defer db.AssertExpectations(t)
+			tc.upsertAttrs.Initialize()
 
-			if tc.outError != ErrTooManyAttributes {
-				db.On("GetDevice",
-					ctx,
-					tc.deviceID,
-				).Return(tc.getDevice, tc.getDeviceErr)
-			}
+			db.On("GetDevice",
+				ctx,
+				tc.deviceID,
+			).Return(tc.getDevice, tc.getDeviceErr)
 
-			if (tc.getDeviceErr == nil || tc.getDeviceErr == store.ErrDevNotFound) && tc.outError != ErrTooManyAttributes && !tc.noUpdate {
+			if (tc.getDeviceErr == nil || tc.getDeviceErr == store.ErrDevNotFound) && !tc.noUpdate {
+				attrArg := tc.upsertAttrs
+				if tc.limit > 0 && len(tc.upsertAttrs) > tc.limit {
+					attrArg = attrArg[:tc.limit]
+				}
 				db.On("UpsertRemoveDeviceAttributes",
 					ctx,
 					tc.deviceID,
-					tc.upsertAttrs,
+					attrArg,
 					tc.removeAttrs,
 					tc.scope,
 					tc.etag,
@@ -1186,9 +1152,11 @@ func TestReplaceAttributes(t *testing.T) {
 				}
 			}
 
-			i := invForTest(db).
-				WithLimits(tc.limitAttributes, tc.limitTags).
-				WithForceUpdate(tc.updateAfter)
+			i := &inventory{
+				db:          db,
+				updateAfter: time.Hour * 24,
+			}
+			i.WithLimits(tc.limit, tc.limit)
 			err := i.ReplaceAttributes(ctx, tc.deviceID, tc.upsertAttrs, tc.scope, tc.etag)
 
 			if tc.outError != nil {

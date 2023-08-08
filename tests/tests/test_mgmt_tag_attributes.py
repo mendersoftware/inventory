@@ -174,20 +174,20 @@ class TestTagAttributes:
         else:
             raise Exception("did not raise expected exception")
 
-    def test_set_tags_fails_because_of_limits(
+    def test_set_tags_truncates_because_of_limits(
         self, management_client, internal_client, inventory_attributes
     ):
         did = "some-device-id"
         internal_client.create_device(did, inventory_attributes)
         tags_body = [
-            {"name": "n_%d" % i, "value": "v_%d" % i} for i in range(LIMIT_TAGS + 1)
+            {"name": "n_%03d" % i, "value": "v_%d" % i} for i in range(2 * LIMIT_TAGS)
         ]
-        with pytest.raises(bravado.exception.HTTPBadRequest):
-            management_client.updateTagAttributes(did, tags_body)
+        management_client.updateTagAttributes(did, tags_body)
 
         res = management_client.getDevice(did)
-        tags_attributes = []
+        tag_names = []
         for attr in res["attributes"]:
             if attr["scope"] == "tags":
-                tags_attributes.append(attr)
-        assert len(tags_attributes) == 0
+                tag_names.append(attr["name"])
+        assert len(tag_names) == LIMIT_TAGS
+        assert tag_names == [t["name"] for t in tags_body[:LIMIT_TAGS]]
