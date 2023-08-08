@@ -16,6 +16,8 @@ package inv
 
 import (
 	"context"
+	"reflect"
+	"time"
 
 	"github.com/pkg/errors"
 
@@ -37,9 +39,9 @@ var (
 )
 
 // this inventory service interface
+//
 //go:generate ../utils/mockgen.sh
 type InventoryApp interface {
-	WithReporting(c workflows.Client) InventoryApp
 	HealthCheck(ctx context.Context) error
 	ListDevices(ctx context.Context, q store.ListQuery) ([]model.Device, int, error)
 	GetDevice(ctx context.Context, id model.DeviceID) (*model.Device, error)
@@ -94,8 +96,6 @@ type InventoryApp interface {
 	CreateTenant(ctx context.Context, tenant model.NewTenant) error
 	SearchDevices(ctx context.Context, searchParams model.SearchParams) ([]model.Device, int, error)
 	CheckAlerts(ctx context.Context, deviceId string) (int, error)
-	WithLimits(attributes, tags int) InventoryApp
-	WithDevicemonitor(client devicemonitor.Client) InventoryApp
 }
 
 type inventory struct {
@@ -105,26 +105,34 @@ type inventory struct {
 	dmClient        devicemonitor.Client
 	enableReporting bool
 	wfClient        workflows.Client
+	updateAfter     time.Duration
 }
 
-func NewInventory(d store.DataStore) InventoryApp {
+func NewInventory(d store.DataStore) *inventory {
 	return &inventory{db: d}
 }
 
-func (i *inventory) WithDevicemonitor(client devicemonitor.Client) InventoryApp {
+var _ InventoryApp = &inventory{}
+
+func (i *inventory) WithDevicemonitor(client devicemonitor.Client) *inventory {
 	i.dmClient = client
 	return i
 }
 
-func (i *inventory) WithLimits(limitAttributes, limitTags int) InventoryApp {
+func (i *inventory) WithLimits(limitAttributes, limitTags int) *inventory {
 	i.limitAttributes = limitAttributes
 	i.limitTags = limitTags
 	return i
 }
 
-func (i *inventory) WithReporting(client workflows.Client) InventoryApp {
+func (i *inventory) WithReporting(client workflows.Client) *inventory {
 	i.enableReporting = true
 	i.wfClient = client
+	return i
+}
+
+func (i *inventory) WithForceUpdate(after time.Duration) *inventory {
+	i.updateAfter = after
 	return i
 }
 
@@ -227,13 +235,15 @@ func (i *inventory) UpsertAttributes(
 	}
 	return nil
 }
-
 func (i *inventory) checkAttributesLimits(
 	ctx context.Context,
-	id model.DeviceID,
+	device *model.Device,
 	attrs model.DeviceAttributes,
 	scope string,
 ) error {
+	if device == nil {
+		return nil
+	}
 	limit := 0
 	switch scope {
 	case model.AttrScopeInventory:
@@ -242,12 +252,6 @@ func (i *inventory) checkAttributesLimits(
 		limit = i.limitTags
 	}
 	if limit == 0 {
-		return nil
-	}
-	device, err := i.db.GetDevice(ctx, id)
-	if err != nil && err != store.ErrDevNotFound {
-		return errors.Wrap(err, "failed to get the device")
-	} else if device == nil {
 		return nil
 	}
 	count := 0
@@ -279,6 +283,71 @@ func (i *inventory) checkAttributesLimits(
 	return nil
 }
 
+// computeAttributesUpdate computes the result of applying update on device.Attributes
+// and reports whether an update must be performed. If removeAttr is present
+// it is called for every attribute that should remove on replace semantics.
+func (app *inventory) computeAttributesUpdate(
+	device *model.Device,
+	update *model.DeviceAttributes,
+	scope string,
+	removeAttr func(model.DeviceAttribute),
+) (attrsChanged bool) {
+	if update == nil {
+		return false
+	}
+	update.MaybeInitialize()
+	updateAttrs := *update
+	var deviceAttrs model.DeviceAttributes
+	if device != nil {
+		deviceAttrs = device.Attributes.InScope(scope)
+		deviceAttrs.MaybeInitialize()
+	}
+	i, j := 0, 0
+	for i < len(updateAttrs) && j < len(deviceAttrs) {
+		if updateAttrs[i].Name < deviceAttrs[j].Name {
+			// Added attribute
+			attrsChanged = true
+			i++
+		} else if updateAttrs[i].Name > deviceAttrs[j].Name {
+			// deviceAttrs[j] not in updateAttrs
+			if removeAttr != nil {
+				removeAttr(deviceAttrs[j])
+				attrsChanged = true
+			}
+			j++
+		} else {
+			// Same scope and name: compare value
+			if !reflect.DeepEqual(updateAttrs[i].Value, deviceAttrs[j].Value) {
+				attrsChanged = true
+			}
+			i++
+			j++
+		}
+	}
+
+	// Complete the loop for i and j
+	if i < len(updateAttrs) {
+		attrsChanged = true
+	} else if j < len(deviceAttrs) {
+		// Only replace cares about dangling items
+		if removeAttr != nil {
+			attrsChanged = true
+			// deviceAttrs[j] not in update
+			for j < len(deviceAttrs) {
+				removeAttr(deviceAttrs[j])
+				j++
+			}
+		}
+	}
+	if app.updateAfter > 0 {
+		// Forced update
+		attrsChanged = attrsChanged ||
+			time.Since(device.UpdatedTs) > app.updateAfter
+	}
+
+	return attrsChanged
+}
+
 func (i *inventory) UpsertAttributesWithUpdated(
 	ctx context.Context,
 	id model.DeviceID,
@@ -286,8 +355,18 @@ func (i *inventory) UpsertAttributesWithUpdated(
 	scope string,
 	etag string,
 ) error {
-	if err := i.checkAttributesLimits(ctx, id, attrs, scope); err != nil {
+	device, err := i.db.GetDevice(ctx, id)
+	if err != nil && err != store.ErrDevNotFound {
+		return errors.Wrap(err, "failed to get the device")
+	} else if device != nil && scope == model.AttrScopeTags &&
+		etag != "" && etag != device.TagsEtag {
+		return ErrETagDoesntMatch
+	}
+	if err := i.checkAttributesLimits(ctx, device, attrs, scope); err != nil {
 		return err
+	}
+	if !i.computeAttributesUpdate(device, &attrs, scope, nil) {
+		return nil
 	}
 	res, err := i.db.UpsertDevicesAttributesWithUpdated(
 		ctx, []model.DeviceID{id}, attrs, scope, etag,
@@ -325,28 +404,23 @@ func (i *inventory) ReplaceAttributes(
 	if limit > 0 && len(upsertAttrs) > limit {
 		return ErrTooManyAttributes
 	}
-
 	device, err := i.db.GetDevice(ctx, id)
 	if err != nil && err != store.ErrDevNotFound {
 		return errors.Wrap(err, "failed to get the device")
+	} else if device != nil && scope == model.AttrScopeTags &&
+		etag != "" && etag != device.TagsEtag {
+		return ErrETagDoesntMatch
 	}
-
 	removeAttrs := model.DeviceAttributes{}
-	if device != nil {
-		for _, attr := range device.Attributes {
-			if attr.Scope == scope {
-				update := false
-				for _, upsertAttr := range upsertAttrs {
-					if upsertAttr.Name == attr.Name {
-						update = true
-						break
-					}
-				}
-				if !update {
-					removeAttrs = append(removeAttrs, attr)
-				}
-			}
-		}
+	attrsChanged := i.computeAttributesUpdate(
+		device, &upsertAttrs, scope,
+		func(attr model.DeviceAttribute) {
+			removeAttrs = append(removeAttrs, attr)
+		},
+	)
+	if !attrsChanged {
+		// No update happened
+		return nil
 	}
 
 	res, err := i.db.UpsertRemoveDeviceAttributes(ctx, id, upsertAttrs, removeAttrs, scope, etag)
