@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -34,7 +35,7 @@ import (
 	"github.com/mendersoftware/inventory/utils"
 )
 
-func invForTest(d store.DataStore) InventoryApp {
+func invForTest(d store.DataStore) *inventory {
 	return &inventory{db: d}
 }
 
@@ -367,6 +368,7 @@ func TestInventoryUpsertAttributesWithUpdated(t *testing.T) {
 		limitTags       int
 		attributes      model.DeviceAttributes
 
+		noUpdate       bool
 		datastoreError error
 		outError       error
 
@@ -387,6 +389,31 @@ func TestInventoryUpsertAttributesWithUpdated(t *testing.T) {
 			datastoreError:  nil,
 			outError:        nil,
 			scope:           model.AttrScopeInventory,
+		},
+		"ok/no update": {
+			attributes: model.DeviceAttributes{{
+				Name:  "epicness",
+				Value: 5.4,
+				Scope: model.AttrScopeInventory,
+			}, {
+				Name:  "name",
+				Value: "foo",
+				Scope: model.AttrScopeInventory,
+			}},
+			getDevice: &model.Device{
+				Attributes: model.DeviceAttributes{{
+					Name:  "name",
+					Value: "foo",
+					Scope: model.AttrScopeInventory,
+				}, {
+					Name:  "epicness",
+					Value: 5.4,
+					Scope: model.AttrScopeInventory,
+				}},
+			},
+			noUpdate: true,
+			outError: nil,
+			scope:    model.AttrScopeInventory,
 		},
 		"datastore error": {
 			attributes: model.DeviceAttributes{
@@ -585,27 +612,26 @@ func TestInventoryUpsertAttributesWithUpdated(t *testing.T) {
 			ctx := context.Background()
 
 			db := &mstore.DataStore{}
-			if tc.limitAttributes > 0 || tc.limitTags > 0 {
-				db.On("GetDevice",
-					ctx,
-					devID,
-				).Return(tc.getDevice, tc.getDeviceErr)
-			}
-
-			db.On("UpsertDevicesAttributesWithUpdated",
+			db.On("GetDevice",
 				ctx,
-				mock.AnythingOfType("[]model.DeviceID"),
-				mock.AnythingOfType("model.DeviceAttributes"),
-				tc.scope,
-				tc.etag,
-			).Return(tc.datastoreResult, tc.datastoreError)
+				devID,
+			).Return(tc.getDevice, tc.getDeviceErr)
 
-			if tc.datastoreError == nil && tc.datastoreResult != nil {
-				db.On("UpdateDeviceText",
+			if !tc.noUpdate {
+				db.On("UpsertDevicesAttributesWithUpdated",
 					ctx,
-					tc.datastoreResult.Devices[0].ID,
-					utils.GetTextField(tc.datastoreResult.Devices[0]),
-				).Return(nil)
+					mock.AnythingOfType("[]model.DeviceID"),
+					mock.AnythingOfType("model.DeviceAttributes"),
+					tc.scope,
+					tc.etag,
+				).Return(tc.datastoreResult, tc.datastoreError)
+				if tc.datastoreError == nil && tc.datastoreResult != nil {
+					db.On("UpdateDeviceText",
+						ctx,
+						tc.datastoreResult.Devices[0].ID,
+						utils.GetTextField(tc.datastoreResult.Devices[0]),
+					).Return(nil)
+				}
 			}
 
 			i := invForTest(db).WithLimits(tc.limitAttributes, tc.limitTags)
@@ -649,6 +675,8 @@ func TestReplaceAttributes(t *testing.T) {
 		limitAttributes int
 		limitTags       int
 
+		updateAfter time.Duration
+		noUpdate    bool
 		upsertAttrs model.DeviceAttributes
 		removeAttrs model.DeviceAttributes
 		outError    error
@@ -705,6 +733,81 @@ func TestReplaceAttributes(t *testing.T) {
 			dataStoreResult: updateResult,
 			datastoreError:  nil,
 			outError:        nil,
+
+			scope: model.AttrScopeInventory,
+		},
+		"ok/no update": {
+			deviceID: "1",
+			getDevice: &model.Device{
+				Attributes: model.DeviceAttributes{
+					model.DeviceAttribute{
+						Name:  "ip_address",
+						Value: "127.0.0.1",
+						Scope: model.AttrScopeInventory,
+					},
+					model.DeviceAttribute{
+						Name:  "name",
+						Value: "foo",
+						Scope: model.AttrScopeInventory,
+					},
+				},
+			},
+			getDeviceErr: nil,
+
+			upsertAttrs: model.DeviceAttributes{
+				model.DeviceAttribute{
+					Name:  "name",
+					Value: "foo",
+					Scope: model.AttrScopeInventory,
+				},
+				model.DeviceAttribute{
+					Name:  "ip_address",
+					Value: "127.0.0.1",
+					Scope: model.AttrScopeInventory,
+				},
+			},
+			removeAttrs: model.DeviceAttributes{},
+
+			noUpdate: true,
+			outError: nil,
+
+			scope: model.AttrScopeInventory,
+		},
+		"ok/forced update": {
+			deviceID: "1",
+			getDevice: &model.Device{
+				Attributes: model.DeviceAttributes{
+					model.DeviceAttribute{
+						Name:  "ip_address",
+						Value: "127.0.0.1",
+						Scope: model.AttrScopeInventory,
+					},
+					model.DeviceAttribute{
+						Name:  "name",
+						Value: "foo",
+						Scope: model.AttrScopeInventory,
+					},
+				},
+				UpdatedTs: time.Now().Add(-time.Hour),
+			},
+			getDeviceErr: nil,
+
+			upsertAttrs: model.DeviceAttributes{
+				model.DeviceAttribute{
+					Name:  "name",
+					Value: "foo",
+					Scope: model.AttrScopeInventory,
+				},
+				model.DeviceAttribute{
+					Name:  "ip_address",
+					Value: "127.0.0.1",
+					Scope: model.AttrScopeInventory,
+				},
+			},
+			removeAttrs: model.DeviceAttributes{},
+			updateAfter: time.Minute,
+
+			outError: nil,
 
 			scope: model.AttrScopeInventory,
 		},
@@ -924,6 +1027,7 @@ func TestReplaceAttributes(t *testing.T) {
 				},
 				TagsEtag: "f7238315-062d-4440-875a-676006f84c34",
 			},
+			noUpdate: true,
 			upsertAttrs: model.DeviceAttributes{
 				model.DeviceAttribute{
 					Name:  "name",
@@ -941,7 +1045,7 @@ func TestReplaceAttributes(t *testing.T) {
 			scope:          model.AttrScopeTags,
 			etag:           "e5f05b31-398a-4df9-a0fd-52c38ef77123",
 			datastoreError: errors.New("failed to replace attributes in db: failed to replace attributes in db: get device error"),
-			outError:       errors.New("failed to replace attributes in db: failed to replace attributes in db: failed to replace attributes in db: get device error"),
+			outError:       ErrETagDoesntMatch,
 		},
 		"ok, inventory, limits ok": {
 			deviceID:        "1",
@@ -1062,7 +1166,7 @@ func TestReplaceAttributes(t *testing.T) {
 				).Return(tc.getDevice, tc.getDeviceErr)
 			}
 
-			if (tc.getDeviceErr == nil || tc.getDeviceErr == store.ErrDevNotFound) && tc.outError != ErrTooManyAttributes {
+			if (tc.getDeviceErr == nil || tc.getDeviceErr == store.ErrDevNotFound) && tc.outError != ErrTooManyAttributes && !tc.noUpdate {
 				db.On("UpsertRemoveDeviceAttributes",
 					ctx,
 					tc.deviceID,
@@ -1082,7 +1186,9 @@ func TestReplaceAttributes(t *testing.T) {
 				}
 			}
 
-			i := invForTest(db).WithLimits(tc.limitAttributes, tc.limitTags)
+			i := invForTest(db).
+				WithLimits(tc.limitAttributes, tc.limitTags).
+				WithForceUpdate(tc.updateAfter)
 			err := i.ReplaceAttributes(ctx, tc.deviceID, tc.upsertAttrs, tc.scope, tc.etag)
 
 			if tc.outError != nil {

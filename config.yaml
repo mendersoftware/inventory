@@ -58,3 +58,9 @@ mongo: mongo-inventory:27017
 # Defaults to: http://mender-workflows-server:8080
 # Overwrite with environment variable: INVENTORY_ORCHESTRATOR_ADDR
 # orchestrator_addr: http://mender-workflows-server:8080
+
+# force_update_after sets the duration for an inventory update with the same
+# data should trigger a forced update to the database.
+# Defaults to: 24h
+# Overwrite with environment variable: INVENTORY_FORCE_UPDATE_AFTER
+# force_update_after: "24h"

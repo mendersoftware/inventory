@@ -18,6 +18,7 @@ import (
 	"encoding/json"
 	"reflect"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -236,6 +237,63 @@ func (gn GroupName) Validate() error {
 // wrapper for device attributes names and values
 type DeviceAttributes []DeviceAttribute
 
+func (d DeviceAttributes) Len() int {
+	return len(d)
+}
+
+func (d DeviceAttributes) Less(i, j int) bool {
+	return d[i].Scope <= d[j].Scope && d[i].Name < d[j].Name
+}
+
+func (d DeviceAttributes) Swap(i, j int) {
+	d[i], d[j] = d[j], d[i]
+}
+
+func (d DeviceAttributes) InScope(scope string) DeviceAttributes {
+	d.MaybeInitialize()
+	n := len(d)
+	// Find boundary indexes for attributes in the inventory scope
+	idxFirst := sort.Search(n, func(i int) bool {
+		return d[i].Scope >= scope
+	})
+	idxLast := sort.Search(n, func(i int) bool {
+		return d[i].Scope > scope
+	})
+	return d[idxFirst:idxLast]
+}
+
+func (d *DeviceAttributes) MaybeInitialize() {
+	n := len(*d)
+	for i := 1; i < n; i++ {
+		if !d.Less(i-1, i) {
+			d.Initialize()
+			return
+		}
+	}
+}
+
+func (d *DeviceAttributes) Initialize() {
+	if len(*d) <= 1 {
+		return
+	}
+	sort.Stable(*d)
+	// Deduplication, keep last entry
+	i, j, k := 0, 0, 1
+	for k < len(*d) {
+		for (*d)[j].Name == (*d)[k].Name &&
+			(*d)[j].Scope == (*d)[k].Scope {
+			j = k
+			k++
+			if k >= len((*d)) {
+				break
+			}
+		}
+		(*d)[i] = (*d)[j]
+		i++
+		j++
+	}
+}
+
 func (d *DeviceAttributes) UnmarshalJSON(b []byte) error {
 	err := json.Unmarshal(b, (*[]DeviceAttribute)(d))
 	if err != nil {
@@ -246,7 +304,7 @@ func (d *DeviceAttributes) UnmarshalJSON(b []byte) error {
 			(*d)[i].Scope = AttrScopeInventory
 		}
 	}
-
+	d.Initialize()
 	return nil
 }
 

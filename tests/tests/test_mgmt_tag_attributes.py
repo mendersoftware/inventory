@@ -1,4 +1,4 @@
-# Copyright 2021 Northern.tech AS
+# Copyright 2023 Northern.tech AS
 #
 #    Licensed under the Apache License, Version 2.0 (the "License");
 #    you may not use this file except in compliance with the License.
@@ -86,16 +86,16 @@ class TestTagAttributes:
         self, management_client, internal_client, inventory_attributes
     ):
         did = "some-device-id"
-        tags = {"n_4": {"name": "n_4", "value": "v_4", "description": "desc_4"}}
-        tags_body = [tags["n_4"]]
+        tags = [{"name": "n_4", "value": "v_4", "description": "desc_4"}]
         internal_client.create_device(did, inventory_attributes)
-        management_client.updateTagAttributes(did, tags_body)
+        management_client.updateTagAttributes(did, tags)
 
         res = requests.get(
             management_client.client.swagger_spec.api_url + "/devices/" + did
         )
         etag_one = res.headers["Etag"]
-        management_client.setTagAttributes(did, tags_body, eTag=etag_one)
+        tags += [{"name": "n_5", "value": 1.0}]
+        management_client.updateTagAttributes(did, tags, eTag=etag_one)
         res = requests.get(
             management_client.client.swagger_spec.api_url + "/devices/" + did
         )
@@ -104,26 +104,27 @@ class TestTagAttributes:
 
         res = management_client.getDevice(did)
         tags_attributes = []
+        tag_names = [tag["name"] for tag in tags]
         for attr in res["attributes"]:
             if attr["scope"] == "tags":
-                assert attr["name"] in tags
+                assert attr["name"] in tag_names
                 tags_attributes.append(attr)
-        assert len(tags_attributes) == len(tags_body)
+        assert len(tags_attributes) == len(tags)
 
     def test_replace_tag_attributes_with_etag(
         self, management_client, internal_client, inventory_attributes
     ):
         did = "some-device-id"
-        tags = {"n_4": {"name": "n_4", "value": "v_4", "description": "desc_4"}}
-        tags_body = [tags["n_4"]]
+        tags = [{"name": "n_4", "value": "v_4", "description": "desc_4"}]
         internal_client.create_device(did, inventory_attributes)
-        management_client.setTagAttributes(did, tags_body)
+        management_client.setTagAttributes(did, tags)
 
         res = requests.get(
             management_client.client.swagger_spec.api_url + "/devices/" + did
         )
         etag_one = res.headers["Etag"]
-        management_client.setTagAttributes(did, tags_body, eTag=etag_one)
+        tags += [{"name": "n_5", "value": 1.0}]
+        management_client.setTagAttributes(did, tags, eTag=etag_one)
         res = requests.get(
             management_client.client.swagger_spec.api_url + "/devices/" + did
         )
@@ -132,11 +133,12 @@ class TestTagAttributes:
 
         res = management_client.getDevice(did)
         tags_attributes = []
+        tag_names = [tag["name"] for tag in tags]
         for attr in res["attributes"]:
             if attr["scope"] == "tags":
-                assert attr["name"] in tags
+                assert attr["name"] in tag_names
                 tags_attributes.append(attr)
-        assert len(tags_attributes) == len(tags_body)
+        assert len(tags_attributes) == len(tags)
 
     def test_update_tag_attributes_with_wrong_etag(
         self, management_client, internal_client, inventory_attributes
