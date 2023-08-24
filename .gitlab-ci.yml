@@ -6,6 +6,7 @@ stages:
   - test
   - build
   - publish
+  - alvaldi-version-bump
 
 include:
   - project: 'Northern.tech/Mender/mendertesting'
@@ -35,3 +36,43 @@ test:acceptance_tests:
       for cover in $@; do
         tail -n +2 $cover >> tests/coverage-acceptance.txt;
       done
+
+#
+# Alvaldi Helm Rolling release
+#
+.trigger:alvaldi-helm-version-bump:
+  stage: alvaldi-version-bump
+  trigger:
+    project: Northern.tech/NorthernTechHQ/alvaldi-helm
+    strategy: depend
+  variables:
+    SYNC_CONTAINER_NAME: $CONTAINER_NAME
+    SYNC_IMAGE_TAG: $DOCKER_PUBLISH_COMMIT_TAG
+    CONTAINER: inventory
+    DOCKER_PUBLISH_COMMIT_TAG: ${CI_COMMIT_REF_NAME}_${CI_COMMIT_SHA}
+    GITHUB_HELM_REPO: "github.com/NorthernTechHQ/alvaldi-helm.git"
+    CHART_DIR: "alvaldi"
+
+trigger:alvaldi-helm-version-bump:staging:
+  extends:
+    - .trigger:alvaldi-helm-version-bump
+  rules:
+    - if: '$CI_COMMIT_BRANCH =~ /^(master|staging)$/'
+  needs:
+    - job: publish:image
+  variables:
+    SYNC_ENVIRONMENT: staging
+    HELM_PATCH_VERSION: ${CI_PIPELINE_ID}-staging # pre-release version for trigger staging only deploy
+
+trigger:alvaldi-helm-version-bump:prod:
+  extends:
+    - .trigger:alvaldi-helm-version-bump
+  rules:
+    - if: $CI_COMMIT_BRANCH =~ /^v[0-9]{4}-[0-9]{2}-[0-9]{2}(-[a-z0-9]*)?$/
+      when: manual
+  variables:
+    SYNC_ENVIRONMENT: prod
+    HELM_PATCH_VERSION: ${CI_PIPELINE_ID}
+    DOCKER_PUBLISH_COMMIT_TAG: ${CI_COMMIT_BRANCH}
+  needs:
+    - trigger:alvaldi-helm-version-bump:staging
