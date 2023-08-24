@@ -1,4 +1,5 @@
-FROM golang:1.20.2-alpine3.16 as builder
+FROM --platform=$BUILDPLATFORM golang:1.20.2-alpine3.16 as builder
+ARG TARGETARCH
 WORKDIR /go/src/github.com/mendersoftware/inventory
 RUN mkdir -p /etc_extra
 RUN echo "nobody:x:65534:" > /etc_extra/group
@@ -8,7 +9,7 @@ RUN mkdir -p /tmp_extra && chown nobody:nobody /tmp_extra
 RUN chown -R nobody:nobody /etc_extra
 RUN apk add --no-cache ca-certificates
 COPY ./ .
-RUN CGO_ENABLED=0 go build -o inventory .
+RUN CGO_ENABLED=0 GOARCH=$TARGETARCH go build -o inventory .
 
 FROM scratch
 EXPOSE 8080
