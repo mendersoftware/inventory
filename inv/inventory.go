@@ -292,11 +292,13 @@ func (app *inventory) computeAttributesUpdate(
 	scope string,
 	removeAttr func(model.DeviceAttribute),
 ) (attrsChanged bool) {
-	if update == nil {
-		return false
+	var updateAttrs model.DeviceAttributes
+	if update != nil {
+		update.MaybeInitialize()
+		updateAttrs = *update
+	} else {
+		updateAttrs = model.DeviceAttributes{}
 	}
-	update.MaybeInitialize()
-	updateAttrs := *update
 	var deviceAttrs model.DeviceAttributes
 	if device != nil {
 		deviceAttrs = device.Attributes.InScope(scope)
