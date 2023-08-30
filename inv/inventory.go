@@ -236,14 +236,9 @@ func (i *inventory) UpsertAttributes(
 	return nil
 }
 func (i *inventory) checkAttributesLimits(
-	ctx context.Context,
-	device *model.Device,
-	attrs model.DeviceAttributes,
+	count int,
 	scope string,
 ) error {
-	if device == nil {
-		return nil
-	}
 	limit := 0
 	switch scope {
 	case model.AttrScopeInventory:
@@ -253,29 +248,6 @@ func (i *inventory) checkAttributesLimits(
 	}
 	if limit == 0 {
 		return nil
-	}
-	count := 0
-	for _, attr := range device.Attributes {
-		if attr.Scope == scope {
-			count += 1
-			if count > limit {
-				break
-			}
-		}
-	}
-	for _, attr := range attrs {
-		if count > limit {
-			break
-		}
-		found := false
-		for _, devAttr := range device.Attributes {
-			if attr.Scope == scope && attr.Name == devAttr.Name {
-				found = true
-			}
-		}
-		if !found {
-			count++
-		}
 	}
 	if count > limit {
 		return ErrTooManyAttributes
@@ -291,15 +263,17 @@ func (app *inventory) computeAttributesUpdate(
 	update *model.DeviceAttributes,
 	scope string,
 	removeAttr func(model.DeviceAttribute),
-) (attrsChanged bool) {
-	var updateAttrs model.DeviceAttributes
+) (n int, attrsChanged bool) {
+	var (
+		updateAttrs model.DeviceAttributes
+		deviceAttrs model.DeviceAttributes
+	)
 	if update != nil {
 		update.MaybeInitialize()
 		updateAttrs = *update
 	} else {
 		updateAttrs = model.DeviceAttributes{}
 	}
-	var deviceAttrs model.DeviceAttributes
 	if device != nil {
 		deviceAttrs = device.Attributes.InScope(scope)
 		deviceAttrs.MaybeInitialize()
@@ -313,23 +287,25 @@ func (app *inventory) computeAttributesUpdate(
 		} else if updateAttrs[i].Name > deviceAttrs[j].Name {
 			// deviceAttrs[j] not in updateAttrs
 			if removeAttr != nil {
+				n -= 2
 				removeAttr(deviceAttrs[j])
 				attrsChanged = true
 			}
 			j++
 		} else {
 			// Same scope and name: compare value
-			if !reflect.DeepEqual(updateAttrs[i].Value, deviceAttrs[j].Value) {
-				attrsChanged = true
-			}
+			attrsChanged = attrsChanged ||
+				!reflect.DeepEqual(updateAttrs[i].Value, deviceAttrs[j].Value)
 			i++
 			j++
 		}
+		n++
 	}
 
 	// Complete the loop for i and j
 	if i < len(updateAttrs) {
 		attrsChanged = true
+		n += len(updateAttrs) - i
 	} else if j < len(deviceAttrs) {
 		// Only replace cares about dangling items
 		if removeAttr != nil {
@@ -338,6 +314,7 @@ func (app *inventory) computeAttributesUpdate(
 			for j < len(deviceAttrs) {
 				removeAttr(deviceAttrs[j])
 				j++
+				n--
 			}
 		}
 	}
@@ -347,7 +324,7 @@ func (app *inventory) computeAttributesUpdate(
 			time.Since(device.UpdatedTs) > app.updateAfter
 	}
 
-	return attrsChanged
+	return n, attrsChanged
 }
 
 func (i *inventory) UpsertAttributesWithUpdated(
@@ -364,11 +341,10 @@ func (i *inventory) UpsertAttributesWithUpdated(
 		etag != "" && etag != device.TagsEtag {
 		return ErrETagDoesntMatch
 	}
-	if err := i.checkAttributesLimits(ctx, device, attrs, scope); err != nil {
-		return err
-	}
-	if !i.computeAttributesUpdate(device, &attrs, scope, nil) {
+	if n, changed := i.computeAttributesUpdate(device, &attrs, scope, nil); !changed {
 		return nil
+	} else if err = i.checkAttributesLimits(n, scope); err != nil {
+		return err
 	}
 	res, err := i.db.UpsertDevicesAttributesWithUpdated(
 		ctx, []model.DeviceID{id}, attrs, scope, etag,
@@ -396,15 +372,8 @@ func (i *inventory) ReplaceAttributes(
 	scope string,
 	etag string,
 ) error {
-	limit := 0
-	switch scope {
-	case model.AttrScopeInventory:
-		limit = i.limitAttributes
-	case model.AttrScopeTags:
-		limit = i.limitTags
-	}
-	if limit > 0 && len(upsertAttrs) > limit {
-		return ErrTooManyAttributes
+	if err := i.checkAttributesLimits(len(upsertAttrs), scope); err != nil {
+		return err
 	}
 	device, err := i.db.GetDevice(ctx, id)
 	if err != nil && err != store.ErrDevNotFound {
@@ -414,7 +383,7 @@ func (i *inventory) ReplaceAttributes(
 		return ErrETagDoesntMatch
 	}
 	removeAttrs := model.DeviceAttributes{}
-	attrsChanged := i.computeAttributesUpdate(
+	_, attrsChanged := i.computeAttributesUpdate(
 		device, &upsertAttrs, scope,
 		func(attr model.DeviceAttribute) {
 			removeAttrs = append(removeAttrs, attr)
