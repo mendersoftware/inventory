@@ -1,4 +1,4 @@
-// Copyright 2022 Northern.tech AS
+// Copyright 2023 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -16,6 +16,8 @@ package inv
 
 import (
 	"context"
+	"reflect"
+	"time"
 
 	"github.com/pkg/errors"
 
@@ -37,6 +39,7 @@ var (
 )
 
 // this inventory service interface
+//
 //go:generate ../utils/mockgen.sh
 type InventoryApp interface {
 	WithReporting(c workflows.Client) InventoryApp
@@ -279,6 +282,56 @@ func (i *inventory) checkAttributesLimits(
 	return nil
 }
 
+const oneDay = 24 * time.Hour
+
+func (i *inventory) needsUpsert(
+	device *model.Device,
+	upsertAttrs model.DeviceAttributes,
+	removeAttrs model.DeviceAttributes,
+) bool {
+	needsUpsert := true
+	if device != nil {
+		// we update the inventory attributes at least once every (calendar) day
+		if !device.UpdatedTs.IsZero() &&
+			device.UpdatedTs.Truncate(oneDay) != time.Now().Truncate(oneDay) {
+			return true
+		}
+		needsUpsert = false
+		for _, attribute := range upsertAttrs {
+			if attribute.Scope != model.AttrScopeInventory {
+				needsUpsert = true
+				break
+			}
+			attributeChanged := true
+			for _, deviceAttribute := range device.Attributes {
+				if !(attribute.Scope == deviceAttribute.Scope &&
+					attribute.Name == deviceAttribute.Name) {
+					continue
+				}
+				attributeChanged = !reflect.DeepEqual(attribute.Value, deviceAttribute.Value)
+				break
+			}
+			if attributeChanged {
+				needsUpsert = true
+				break
+			}
+		}
+		if !needsUpsert && len(removeAttrs) > 0 {
+		OuterLoop:
+			for _, attribute := range removeAttrs {
+				for _, deviceAttribute := range device.Attributes {
+					if attribute.Scope == deviceAttribute.Scope &&
+						attribute.Name == deviceAttribute.Name {
+						needsUpsert = true
+						break OuterLoop
+					}
+				}
+			}
+		}
+	}
+	return needsUpsert
+}
+
 func (i *inventory) UpsertAttributesWithUpdated(
 	ctx context.Context,
 	id model.DeviceID,
@@ -289,6 +342,14 @@ func (i *inventory) UpsertAttributesWithUpdated(
 	if err := i.checkAttributesLimits(ctx, id, attrs, scope); err != nil {
 		return err
 	}
+
+	device, err := i.db.GetDevice(ctx, id)
+	if err != nil && err != store.ErrDevNotFound {
+		return errors.Wrap(err, "failed to get the device")
+	} else if !i.needsUpsert(device, attrs, nil) {
+		return nil
+	}
+
 	res, err := i.db.UpsertDevicesAttributesWithUpdated(
 		ctx, []model.DeviceID{id}, attrs, scope, etag,
 	)
@@ -306,6 +367,31 @@ func (i *inventory) UpsertAttributesWithUpdated(
 		i.maybeTriggerReindex(ctx, []model.DeviceID{id})
 	}
 	return nil
+}
+
+func getRemoveAttrs(
+	device *model.Device,
+	scope string,
+	upsertAttrs model.DeviceAttributes,
+) model.DeviceAttributes {
+	removeAttrs := model.DeviceAttributes{}
+	if device != nil {
+		for _, attr := range device.Attributes {
+			if attr.Scope == scope {
+				update := false
+				for _, upsertAttr := range upsertAttrs {
+					if upsertAttr.Name == attr.Name {
+						update = true
+						break
+					}
+				}
+				if !update {
+					removeAttrs = append(removeAttrs, attr)
+				}
+			}
+		}
+	}
+	return removeAttrs
 }
 
 func (i *inventory) ReplaceAttributes(
@@ -331,22 +417,9 @@ func (i *inventory) ReplaceAttributes(
 		return errors.Wrap(err, "failed to get the device")
 	}
 
-	removeAttrs := model.DeviceAttributes{}
-	if device != nil {
-		for _, attr := range device.Attributes {
-			if attr.Scope == scope {
-				update := false
-				for _, upsertAttr := range upsertAttrs {
-					if upsertAttr.Name == attr.Name {
-						update = true
-						break
-					}
-				}
-				if !update {
-					removeAttrs = append(removeAttrs, attr)
-				}
-			}
-		}
+	removeAttrs := getRemoveAttrs(device, scope, upsertAttrs)
+	if !i.needsUpsert(device, upsertAttrs, removeAttrs) {
+		return nil
 	}
 
 	res, err := i.db.UpsertRemoveDeviceAttributes(ctx, id, upsertAttrs, removeAttrs, scope, etag)

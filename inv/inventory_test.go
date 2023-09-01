@@ -1,4 +1,4 @@
-// Copyright 2022 Northern.tech AS
+// Copyright 2023 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -376,6 +377,55 @@ func TestInventoryUpsertAttributesWithUpdated(t *testing.T) {
 		etag  string
 	}{
 		"datastore success": {
+			getDevice: &model.Device{
+				Attributes: model.DeviceAttributes{},
+			},
+			attributes: model.DeviceAttributes{
+				model.DeviceAttribute{
+					Name:  "name",
+					Value: "foo",
+					Scope: model.AttrScopeInventory,
+				},
+			},
+			datastoreResult: &dsResultsuccess,
+			datastoreError:  nil,
+			outError:        nil,
+			scope:           model.AttrScopeInventory,
+		},
+		"no upsert needed": {
+			getDevice: &model.Device{
+				Attributes: model.DeviceAttributes{
+					model.DeviceAttribute{
+						Name:  "name",
+						Value: "foo",
+						Scope: model.AttrScopeInventory,
+					},
+				},
+			},
+			attributes: model.DeviceAttributes{
+				model.DeviceAttribute{
+					Name:  "name",
+					Value: "foo",
+					Scope: model.AttrScopeInventory,
+				},
+			},
+			datastoreResult: nil,
+			datastoreError:  nil,
+			outError:        nil,
+			scope:           model.AttrScopeInventory,
+		},
+		"upsert needed, at least once a day": {
+			getDevice: &model.Device{
+				Attributes: model.DeviceAttributes{
+					model.DeviceAttribute{
+						Name:  "name",
+						Value: "foo",
+						Scope: model.AttrScopeInventory,
+					},
+				},
+				// yesterday
+				UpdatedTs: time.Now().Add(-25 * time.Hour),
+			},
 			attributes: model.DeviceAttributes{
 				model.DeviceAttribute{
 					Name:  "name",
@@ -389,6 +439,9 @@ func TestInventoryUpsertAttributesWithUpdated(t *testing.T) {
 			scope:           model.AttrScopeInventory,
 		},
 		"datastore error": {
+			getDevice: &model.Device{
+				Attributes: model.DeviceAttributes{},
+			},
 			attributes: model.DeviceAttributes{
 				model.DeviceAttribute{
 					Name:  "name",
@@ -401,6 +454,9 @@ func TestInventoryUpsertAttributesWithUpdated(t *testing.T) {
 			scope:          model.AttrScopeInventory,
 		},
 		"incorrect etag": {
+			getDevice: &model.Device{
+				Attributes: model.DeviceAttributes{},
+			},
 			attributes: model.DeviceAttributes{
 				model.DeviceAttribute{
 					Name:  "name",
@@ -414,6 +470,9 @@ func TestInventoryUpsertAttributesWithUpdated(t *testing.T) {
 			etag:            "f7238315-062d-4440-875a-676006f84c34",
 		},
 		"correct etag": {
+			getDevice: &model.Device{
+				Attributes: model.DeviceAttributes{},
+			},
 			attributes: model.DeviceAttributes{
 				model.DeviceAttribute{
 					Name:  "name",
@@ -447,7 +506,7 @@ func TestInventoryUpsertAttributesWithUpdated(t *testing.T) {
 			attributes: model.DeviceAttributes{
 				model.DeviceAttribute{
 					Name:  "name",
-					Value: "foo",
+					Value: "bar",
 					Scope: model.AttrScopeInventory,
 				},
 			},
@@ -585,20 +644,24 @@ func TestInventoryUpsertAttributesWithUpdated(t *testing.T) {
 			ctx := context.Background()
 
 			db := &mstore.DataStore{}
-			if tc.limitAttributes > 0 || tc.limitTags > 0 {
+			defer db.AssertExpectations(t)
+
+			if tc.getDevice != nil || tc.getDeviceErr != nil {
 				db.On("GetDevice",
 					ctx,
 					devID,
 				).Return(tc.getDevice, tc.getDeviceErr)
 			}
 
-			db.On("UpsertDevicesAttributesWithUpdated",
-				ctx,
-				mock.AnythingOfType("[]model.DeviceID"),
-				mock.AnythingOfType("model.DeviceAttributes"),
-				tc.scope,
-				tc.etag,
-			).Return(tc.datastoreResult, tc.datastoreError)
+			if tc.datastoreResult != nil || tc.datastoreError != nil {
+				db.On("UpsertDevicesAttributesWithUpdated",
+					ctx,
+					mock.AnythingOfType("[]model.DeviceID"),
+					mock.AnythingOfType("model.DeviceAttributes"),
+					tc.scope,
+					tc.etag,
+				).Return(tc.datastoreResult, tc.datastoreError)
+			}
 
 			if tc.datastoreError == nil && tc.datastoreResult != nil {
 				db.On("UpdateDeviceText",
