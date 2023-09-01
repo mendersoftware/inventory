@@ -28,8 +28,6 @@ import (
 
 	store "github.com/mendersoftware/inventory/store"
 
-	time "time"
-
 	workflows "github.com/mendersoftware/inventory/client/workflows"
 )
 
@@ -487,22 +485,6 @@ func (_m *InventoryApp) WithDevicemonitor(client devicemonitor.Client) inv.Inven
 	var r0 inv.InventoryApp
 	if rf, ok := ret.Get(0).(func(devicemonitor.Client) inv.InventoryApp); ok {
 		r0 = rf(client)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(inv.InventoryApp)
-		}
-	}
-
-	return r0
-}
-
-// WithLastUpdateDurationThreshold provides a mock function with given fields: threshold
-func (_m *InventoryApp) WithLastUpdateDurationThreshold(threshold time.Duration) inv.InventoryApp {
-	ret := _m.Called(threshold)
-
-	var r0 inv.InventoryApp
-	if rf, ok := ret.Get(0).(func(time.Duration) inv.InventoryApp); ok {
-		r0 = rf(threshold)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(inv.InventoryApp)

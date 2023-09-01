@@ -16,6 +16,7 @@ package inv
 
 import (
 	"context"
+	"reflect"
 	"time"
 
 	"github.com/pkg/errors"
@@ -98,17 +99,15 @@ type InventoryApp interface {
 	CheckAlerts(ctx context.Context, deviceId string) (int, error)
 	WithLimits(attributes, tags int) InventoryApp
 	WithDevicemonitor(client devicemonitor.Client) InventoryApp
-	WithLastUpdateDurationThreshold(threshold time.Duration) InventoryApp
 }
 
 type inventory struct {
-	db                          store.DataStore
-	limitAttributes             int
-	limitTags                   int
-	dmClient                    devicemonitor.Client
-	enableReporting             bool
-	wfClient                    workflows.Client
-	lastUpdateDurationThreshold time.Duration
+	db              store.DataStore
+	limitAttributes int
+	limitTags       int
+	dmClient        devicemonitor.Client
+	enableReporting bool
+	wfClient        workflows.Client
 }
 
 func NewInventory(d store.DataStore) InventoryApp {
@@ -123,11 +122,6 @@ func (i *inventory) WithDevicemonitor(client devicemonitor.Client) InventoryApp 
 func (i *inventory) WithLimits(limitAttributes, limitTags int) InventoryApp {
 	i.limitAttributes = limitAttributes
 	i.limitTags = limitTags
-	return i
-}
-
-func (i *inventory) WithLastUpdateDurationThreshold(threshold time.Duration) InventoryApp {
-	i.lastUpdateDurationThreshold = threshold
 	return i
 }
 
@@ -288,6 +282,56 @@ func (i *inventory) checkAttributesLimits(
 	return nil
 }
 
+const oneDay = 24 * time.Hour
+
+func (i *inventory) needsUpsert(
+	device *model.Device,
+	upsertAttrs model.DeviceAttributes,
+	removeAttrs model.DeviceAttributes,
+) bool {
+	needsUpsert := true
+	if device != nil {
+		// we update the inventory attributes at least once every (calendar) day
+		if !device.UpdatedTs.IsZero() &&
+			device.UpdatedTs.Truncate(oneDay) != time.Now().Truncate(oneDay) {
+			return true
+		}
+		needsUpsert = false
+		for _, attribute := range upsertAttrs {
+			if attribute.Scope != model.AttrScopeInventory {
+				needsUpsert = true
+				break
+			}
+			attributeChanged := true
+			for _, deviceAttribute := range device.Attributes {
+				if !(attribute.Scope == deviceAttribute.Scope &&
+					attribute.Name == deviceAttribute.Name) {
+					continue
+				}
+				attributeChanged = !reflect.DeepEqual(attribute.Value, deviceAttribute.Value)
+				break
+			}
+			if attributeChanged {
+				needsUpsert = true
+				break
+			}
+		}
+		if !needsUpsert && len(removeAttrs) > 0 {
+		OuterLoop:
+			for _, attribute := range removeAttrs {
+				for _, deviceAttribute := range device.Attributes {
+					if attribute.Scope == deviceAttribute.Scope &&
+						attribute.Name == deviceAttribute.Name {
+						needsUpsert = true
+						break OuterLoop
+					}
+				}
+			}
+		}
+	}
+	return needsUpsert
+}
+
 func (i *inventory) UpsertAttributesWithUpdated(
 	ctx context.Context,
 	id model.DeviceID,
@@ -298,8 +342,16 @@ func (i *inventory) UpsertAttributesWithUpdated(
 	if err := i.checkAttributesLimits(ctx, id, attrs, scope); err != nil {
 		return err
 	}
+
+	device, err := i.db.GetDevice(ctx, id)
+	if err != nil && err != store.ErrDevNotFound {
+		return errors.Wrap(err, "failed to get the device")
+	} else if !i.needsUpsert(device, attrs, nil) {
+		return nil
+	}
+
 	res, err := i.db.UpsertDevicesAttributesWithUpdated(
-		ctx, []model.DeviceID{id}, attrs, scope, etag, i.lastUpdateDurationThreshold,
+		ctx, []model.DeviceID{id}, attrs, scope, etag,
 	)
 	if err != nil {
 		return errors.Wrap(err, "failed to upsert attributes in db")
@@ -315,6 +367,31 @@ func (i *inventory) UpsertAttributesWithUpdated(
 		i.maybeTriggerReindex(ctx, []model.DeviceID{id})
 	}
 	return nil
+}
+
+func getRemoveAttrs(
+	device *model.Device,
+	scope string,
+	upsertAttrs model.DeviceAttributes,
+) model.DeviceAttributes {
+	removeAttrs := model.DeviceAttributes{}
+	if device != nil {
+		for _, attr := range device.Attributes {
+			if attr.Scope == scope {
+				update := false
+				for _, upsertAttr := range upsertAttrs {
+					if upsertAttr.Name == attr.Name {
+						update = true
+						break
+					}
+				}
+				if !update {
+					removeAttrs = append(removeAttrs, attr)
+				}
+			}
+		}
+	}
+	return removeAttrs
 }
 
 func (i *inventory) ReplaceAttributes(
@@ -340,22 +417,9 @@ func (i *inventory) ReplaceAttributes(
 		return errors.Wrap(err, "failed to get the device")
 	}
 
-	removeAttrs := model.DeviceAttributes{}
-	if device != nil {
-		for _, attr := range device.Attributes {
-			if attr.Scope == scope {
-				update := false
-				for _, upsertAttr := range upsertAttrs {
-					if upsertAttr.Name == attr.Name {
-						update = true
-						break
-					}
-				}
-				if !update {
-					removeAttrs = append(removeAttrs, attr)
-				}
-			}
-		}
+	removeAttrs := getRemoveAttrs(device, scope, upsertAttrs)
+	if !i.needsUpsert(device, upsertAttrs, removeAttrs) {
+		return nil
 	}
 
 	res, err := i.db.UpsertRemoveDeviceAttributes(ctx, id, upsertAttrs, removeAttrs, scope, etag)

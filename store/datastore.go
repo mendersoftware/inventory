@@ -17,7 +17,6 @@ package store
 import (
 	"context"
 	"errors"
-	"time"
 
 	"github.com/mendersoftware/inventory/model"
 )
@@ -46,11 +45,6 @@ type DataStore interface {
 	// if device was not found, error and returned device are nil
 	GetDevice(ctx context.Context, id model.DeviceID) (*model.Device, error)
 
-	GetDevicesById(
-		ctx context.Context,
-		id []model.DeviceID,
-	) ([]model.Device, error)
-
 	// insert device into data store
 	//
 	// ds.AddDevice(&model.Device{
@@ -74,7 +68,6 @@ type DataStore interface {
 		attrs model.DeviceAttributes,
 		scope string,
 		etag string,
-		lastUpdateDurationThreshold time.Duration,
 	) (*model.UpdateResult, error)
 
 	// UpsertDevicesAttributes provides an interface to apply the same
