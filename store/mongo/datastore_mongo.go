@@ -1076,8 +1076,16 @@ func (db *DataStoreMongo) GetAllAttributeNames(ctx context.Context) ([]string, e
 			return make([]string, 0), nil
 		}
 	}
-	m := elem.Map()
-	results := m["allkeys"].(primitive.A)
+	bsonValue, err := bson.Marshal(elem)
+	if err != nil {
+		return make([]string, 0), nil
+	}
+	var mapValue bson.M
+	err = bson.Unmarshal(bsonValue, &mapValue)
+	if err != nil {
+		return make([]string, 0), nil
+	}
+	results := mapValue["allkeys"].(primitive.A)
 	attributeNames := make([]string, len(results))
 	for i, d := range results {
 		attributeNames[i] = d.(string)

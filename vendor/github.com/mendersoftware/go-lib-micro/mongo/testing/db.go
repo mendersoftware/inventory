@@ -11,6 +11,7 @@
 //	WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //	See the License for the specific language governing permissions and
 //	limitations under the License.
+
 package testing
 
 import (
@@ -20,6 +21,7 @@ import (
 
 	"github.com/mendersoftware/go-lib-micro/mongo/dbtest"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 // TestDBRunner exports selected calls of dbtest.DBServer API, just the ones
@@ -34,12 +36,26 @@ type TestDBRunner interface {
 // `dbtest`. Once `f()` is finished, the DB will be cleaned up. Value returned
 // from `f()` is obtained as return status of a call to WithDB().
 func WithDB(f func(dbtest TestDBRunner) int) int {
-	dbdir, _ := ioutil.TempDir("", "dbsetup-test")
-	db := &dbtest.DBServer{}
-	db.SetPath(dbdir)
+	var runner TestDBRunner
+	if url, ok := os.LookupEnv("TEST_MONGO_URL"); ok {
+		clientOpts := options.Client().
+			ApplyURI(url)
+		client, err := mongo.Connect(context.Background(), clientOpts)
+		if err != nil {
+			panic(err)
+		}
+		runner = (*dbClientFromEnv)(client)
+	} else {
+		// Fallback to running mongod on host
+		dbdir, _ := ioutil.TempDir("", "dbsetup-test")
+		db := &dbtest.DBServer{}
+		db.SetPath(dbdir)
+		runner = db
 
-	defer os.RemoveAll(dbdir)
-	defer db.Stop()
+		defer os.RemoveAll(dbdir)
+		defer db.Stop()
 
-	return f(db)
+	}
+
+	return f(runner)
 }
