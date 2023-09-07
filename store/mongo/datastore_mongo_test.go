@@ -1,4 +1,4 @@
-// Copyright 2022 Northern.tech AS
+// Copyright 2023 Northern.tech AS
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -789,6 +789,7 @@ func TestMongoUpsertDevicesAttributes(t *testing.T) {
 
 		inDevIDs []model.DeviceID
 		inAttrs  model.DeviceAttributes
+		inScope  string
 
 		tenant string
 
@@ -831,6 +832,7 @@ func TestMongoUpsertDevicesAttributes(t *testing.T) {
 					Value:       "0003-newsn",
 				},
 			},
+			inScope: model.AttrScopeInventory,
 
 			outDevs: []model.Device{
 				{
@@ -889,6 +891,7 @@ func TestMongoUpsertDevicesAttributes(t *testing.T) {
 					Value:       "0003-newsn",
 				},
 			},
+			inScope: model.AttrScopeInventory,
 
 			outDevs: []model.Device{{
 				ID: model.DeviceID("0003"),
@@ -902,6 +905,57 @@ func TestMongoUpsertDevicesAttributes(t *testing.T) {
 					{
 						Description: strPtr("sn description"),
 						Scope:       model.AttrScopeInventory,
+						Name:        "sn",
+						Value:       "0003-newsn",
+					},
+				},
+				CreatedTs: createdTs,
+			}},
+		},
+		"dev exists, attributes exist, update one attr (descr + val), scope tags": {
+			devs: []model.Device{
+				{
+					ID: model.DeviceID("0003"),
+					Attributes: model.DeviceAttributes{
+						{
+							Name:        "mac",
+							Value:       "0003-mac",
+							Description: strPtr("descr"),
+							Scope:       model.AttrScopeTags,
+						},
+						{
+							Name:        "sn",
+							Value:       "0003-sn",
+							Description: strPtr("AttrScopeTags"),
+							Scope:       model.AttrScopeTags,
+						},
+					},
+					CreatedTs: createdTs,
+				},
+			},
+			inDevIDs: []model.DeviceID{"0003"},
+			inAttrs: model.DeviceAttributes{
+				{
+					Description: strPtr("sn description"),
+					Scope:       model.AttrScopeTags,
+					Name:        "sn",
+					Value:       "0003-newsn",
+				},
+			},
+			inScope: model.AttrScopeTags,
+
+			outDevs: []model.Device{{
+				ID: model.DeviceID("0003"),
+				Attributes: model.DeviceAttributes{
+					{
+						Description: strPtr("descr"),
+						Scope:       model.AttrScopeTags,
+						Name:        "mac",
+						Value:       "0003-mac",
+					},
+					{
+						Description: strPtr("sn description"),
+						Scope:       model.AttrScopeTags,
 						Name:        "sn",
 						Value:       "0003-newsn",
 					},
@@ -939,6 +993,7 @@ func TestMongoUpsertDevicesAttributes(t *testing.T) {
 					Value:       "0003-newsn",
 				},
 			},
+			inScope: model.AttrScopeInventory,
 
 			outDevs: []model.Device{{
 				ID: model.DeviceID("0003"),
@@ -988,6 +1043,7 @@ func TestMongoUpsertDevicesAttributes(t *testing.T) {
 					Name:        "sn",
 				},
 			},
+			inScope: model.AttrScopeInventory,
 
 			outDevs: []model.Device{{
 				ID: model.DeviceID("0003"),
@@ -1037,6 +1093,7 @@ func TestMongoUpsertDevicesAttributes(t *testing.T) {
 					Value: "0003-newsn",
 				},
 			},
+			inScope: model.AttrScopeInventory,
 
 			outDevs: []model.Device{{
 				ID: model.DeviceID("0003"),
@@ -1086,6 +1143,7 @@ func TestMongoUpsertDevicesAttributes(t *testing.T) {
 					Name:  "sn",
 				},
 			},
+			inScope: model.AttrScopeInventory,
 
 			outDevs: []model.Device{{
 				ID: model.DeviceID("0003"),
@@ -1141,6 +1199,7 @@ func TestMongoUpsertDevicesAttributes(t *testing.T) {
 					Description: strPtr("foo"),
 				},
 			},
+			inScope: model.AttrScopeInventory,
 
 			outDevs: []model.Device{{
 				ID: model.DeviceID("0003"),
@@ -1210,6 +1269,7 @@ func TestMongoUpsertDevicesAttributes(t *testing.T) {
 					Description: strPtr("foo"),
 				},
 			},
+			inScope: model.AttrScopeInventory,
 
 			outDevs: []model.Device{{
 				ID: model.DeviceID("0003"),
@@ -1263,6 +1323,7 @@ func TestMongoUpsertDevicesAttributes(t *testing.T) {
 					Description: strPtr("mac addr"),
 				},
 			},
+			inScope: model.AttrScopeInventory,
 
 			outDevs: []model.Device{{
 				ID: model.DeviceID("0003"),
@@ -1305,6 +1366,7 @@ func TestMongoUpsertDevicesAttributes(t *testing.T) {
 					Description: strPtr("mac addr"),
 				},
 			},
+			inScope: model.AttrScopeInventory,
 
 			outDevs: []model.Device{{
 				ID: model.DeviceID("0003"),
@@ -1336,6 +1398,7 @@ func TestMongoUpsertDevicesAttributes(t *testing.T) {
 					Value:       primitive.A{"1.2.3.4", "1.2.3.5"},
 				},
 			},
+			inScope: model.AttrScopeInventory,
 
 			outDevs: []model.Device{{
 				ID: model.DeviceID("0099"),
@@ -1360,6 +1423,7 @@ func TestMongoUpsertDevicesAttributes(t *testing.T) {
 					Value: primitive.A{"1.2.3.4", "1.2.3.5"},
 				},
 			},
+			inScope: model.AttrScopeInventory,
 
 			outDevs: []model.Device{{
 				ID: model.DeviceID("0099"),
@@ -1389,6 +1453,7 @@ func TestMongoUpsertDevicesAttributes(t *testing.T) {
 					Description: strPtr("mac addr"),
 				},
 			},
+			inScope: model.AttrScopeInventory,
 
 			outDevs: []model.Device{{
 				ID: model.DeviceID("0099"),
@@ -1429,6 +1494,8 @@ func TestMongoUpsertDevicesAttributes(t *testing.T) {
 				Value:       "accepted",
 				Description: strPtr("deviceauth status"),
 			}},
+			inScope: model.AttrScopeIdentity,
+
 			outDevs: []model.Device{{
 				ID: model.DeviceID("0003"),
 				Attributes: model.DeviceAttributes{{
@@ -1513,7 +1580,7 @@ func TestMongoUpsertDevicesAttributes(t *testing.T) {
 
 				var err error
 				if withUpdated {
-					_, err = d.UpsertDevicesAttributesWithUpdated(ctx, tc.inDevIDs, tc.inAttrs, "", "")
+					_, err = d.UpsertDevicesAttributesWithUpdated(ctx, tc.inDevIDs, tc.inAttrs, tc.inScope, "")
 				} else {
 					_, err = d.UpsertDevicesAttributes(ctx, tc.inDevIDs, tc.inAttrs)
 				}
@@ -1552,14 +1619,14 @@ func TestMongoUpsertDevicesAttributes(t *testing.T) {
 							)
 						}
 						if withUpdated {
-							// check timestamp validity
-							// note that mongo stores time with lower
-							// precision- custom comparison
+							// check timestamp validity; new devices (len(tc.devs) == 0) or different scope than inventory
+							// won't update the update_ts attribute; updating attributes in the inventory scope will do.
 							assert.Condition(t,
 								func() bool {
-									return devs[i].UpdatedTs.After(dev.CreatedTs) ||
-										devs[i].UpdatedTs == dev.CreatedTs
-								})
+									return (tc.inScope != model.AttrScopeInventory || len(tc.devs) == 0) && devs[i].UpdatedTs == devs[i].CreatedTs ||
+										(tc.inScope == model.AttrScopeInventory && len(tc.devs) > 0) && devs[i].UpdatedTs.After(devs[i].CreatedTs)
+
+								}, devs[i])
 						}
 					}
 				}
