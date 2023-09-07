@@ -318,7 +318,8 @@ func (db *DataStoreMongo) UpsertDevicesAttributesWithUpdated(
 	scope string,
 	etag string,
 ) (*model.UpdateResult, error) {
-	return db.upsertAttributes(ctx, makeDevsWithIds(ids), attrs, true, false, scope, etag)
+	withUpdated := scope == model.AttrScopeInventory
+	return db.upsertAttributes(ctx, makeDevsWithIds(ids), attrs, withUpdated, false, scope, etag)
 }
 
 func (db *DataStoreMongo) UpsertDevicesAttributes(
