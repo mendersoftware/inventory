@@ -85,7 +85,7 @@ trigger:alvaldi-helm-version-bump:prod:
   extends:
     - .trigger:alvaldi-helm-version-bump
   rules:
-    - if: $CI_COMMIT_BRANCH =~ /^v[0-9]{4}-[0-9]{2}-[0-9]{2}(-[a-z0-9]*)?$/
+    - if: $CI_COMMIT_BRANCH =~ /^(saas-)?v[0-9]{4}\.[0-9]{2}\.[0-9]{2}(\.[a-z0-9]*)?$/
       when: manual
   variables:
     SYNC_ENVIRONMENT: prod
