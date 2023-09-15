@@ -25,6 +25,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 
 	mdm "github.com/mendersoftware/inventory/client/devicemonitor/mocks"
 	mworkflows "github.com/mendersoftware/inventory/client/workflows/mocks"
@@ -406,6 +407,28 @@ func TestInventoryUpsertAttributesWithUpdated(t *testing.T) {
 				model.DeviceAttribute{
 					Name:  "name",
 					Value: "foo",
+					Scope: model.AttrScopeInventory,
+				},
+			},
+			datastoreResult: nil,
+			datastoreError:  nil,
+			outError:        nil,
+			scope:           model.AttrScopeInventory,
+		},
+		"no upsert needed with slices": {
+			getDevice: &model.Device{
+				Attributes: model.DeviceAttributes{
+					model.DeviceAttribute{
+						Name:  "name",
+						Value: primitive.A{"foo", "bar"},
+						Scope: model.AttrScopeInventory,
+					},
+				},
+			},
+			attributes: model.DeviceAttributes{
+				model.DeviceAttribute{
+					Name:  "name",
+					Value: []interface{}{"foo", "bar"},
 					Scope: model.AttrScopeInventory,
 				},
 			},
