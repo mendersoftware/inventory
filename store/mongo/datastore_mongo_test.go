@@ -4134,6 +4134,7 @@ func TestMongoSearchDevices(t *testing.T) {
 	}
 
 	now := time.Now()
+	before := now.Add(-time.Hour)
 	inputDevs := []model.Device{
 		{
 			ID: model.DeviceID("0"),
@@ -4142,6 +4143,7 @@ func TestMongoSearchDevices(t *testing.T) {
 				{Name: "SN", Value: float64(100), Description: strPtr("SN"), Scope: model.AttrScopeInventory},
 				{Name: "group", Value: "foo", Description: strPtr("group"), Scope: model.AttrScopeInventory},
 				{Name: "ip.address", Value: "1.2.3.4", Scope: model.AttrScopeInventory},
+				{Name: "name", Value: "device0", Scope: model.AttrScopeTags, Timestamp: &now},
 			},
 			Group:     "foo",
 			CreatedTs: now,
@@ -4153,6 +4155,7 @@ func TestMongoSearchDevices(t *testing.T) {
 				{Name: "MAC", Value: "001", Description: strPtr("MAC"), Scope: model.AttrScopeInventory},
 				{Name: "SN", Value: float64(111), Description: strPtr("SN"), Scope: model.AttrScopeInventory},
 				{Name: "group", Value: "foo", Description: strPtr("group"), Scope: model.AttrScopeInventory},
+				{Name: "name", Value: "device1", Scope: model.AttrScopeTags, Timestamp: &before},
 			},
 			Group:     "foo",
 			CreatedTs: now,
@@ -4164,6 +4167,7 @@ func TestMongoSearchDevices(t *testing.T) {
 				{Name: "MAC", Value: "002", Description: strPtr("MAC"), Scope: model.AttrScopeInventory},
 				{Name: "SN", Value: float64(122), Description: strPtr("SN"), Scope: model.AttrScopeInventory},
 				{Name: "group", Value: "foo", Description: strPtr("group"), Scope: model.AttrScopeInventory},
+				{Name: "name", Value: "device2", Scope: model.AttrScopeTags, Timestamp: &now},
 			},
 			Group:     "foo",
 			CreatedTs: now,
@@ -4175,6 +4179,7 @@ func TestMongoSearchDevices(t *testing.T) {
 				{Name: "MAC", Value: "003", Description: strPtr("MAC"), Scope: model.AttrScopeInventory},
 				{Name: "SN", Value: float64(133), Description: strPtr("SN"), Scope: model.AttrScopeInventory},
 				{Name: "group", Value: "bar", Description: strPtr("group"), Scope: model.AttrScopeInventory},
+				{Name: "name", Value: "device3", Scope: model.AttrScopeTags, Timestamp: &now},
 			},
 			Group:     "bar",
 			CreatedTs: now,
@@ -4187,6 +4192,7 @@ func TestMongoSearchDevices(t *testing.T) {
 				{Name: "SN", Value: float64(144), Description: strPtr("SN"), Scope: model.AttrScopeInventory},
 				{Name: "group", Value: "bar", Description: strPtr("group"), Scope: model.AttrScopeInventory},
 				{Name: "text", Value: "this is a free-text searchable attribute", Scope: model.AttrScopeInventory},
+				{Name: "name", Value: "device4", Scope: model.AttrScopeTags, Timestamp: &now},
 			},
 			Group:     "bar",
 			CreatedTs: now,
@@ -4491,6 +4497,27 @@ func TestMongoSearchDevices(t *testing.T) {
 				},
 			},
 		},
+		"no filter, sort by name desc": {
+			expected: []model.Device{
+				inputDevs[4],
+				inputDevs[3],
+				inputDevs[2],
+				inputDevs[1],
+				inputDevs[0],
+			},
+			devTotal: 5,
+			searchParams: model.SearchParams{
+				Page:    1,
+				PerPage: 5,
+				Sort: []model.SortCriteria{
+					{
+						Scope:     "tags",
+						Attribute: "name",
+						Order:     "desc",
+					},
+				},
+			},
+		},
 		"free text search": {
 			expected: []model.Device{inputDevs[4]},
 			devTotal: 1,
@@ -4522,12 +4549,12 @@ func TestMongoSearchDevices(t *testing.T) {
 			})
 		}
 
+		mongoStore := NewDataStoreMongoWithSession(client)
+
 		for _, d := range inputDevs {
-			_, err := client.Database(mstore.DbFromContext(ctx, DbName)).Collection(DbDevicesColl).InsertOne(ctx, d)
+			err := mongoStore.AddDevice(ctx, &d)
 			assert.NoError(t, err, "failed to setup input data")
 		}
-
-		mongoStore := NewDataStoreMongoWithSession(client)
 
 		//we need the $text index when testing the full-text search; apply migrations
 		if tc.searchParams.Text != "" {
@@ -4552,7 +4579,10 @@ func TestMongoSearchDevices(t *testing.T) {
 			}
 			if len(tc.searchParams.Attributes) > 0 {
 				for _, dev := range devs {
-					assert.Equal(t, tc.expectedAttributes, dev.Attributes)
+					// the extra attribute is `updated_ts`, automatically set by `AddDevice`
+					// and always selected and returned by `SearchDevices`
+					assert.Equal(t, len(tc.expectedAttributes)+1, len(dev.Attributes))
+					assert.Equal(t, tc.expectedAttributes, dev.Attributes[:len(tc.expectedAttributes)])
 				}
 			}
 		}

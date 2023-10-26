@@ -1175,7 +1175,7 @@ func (db *DataStoreMongo) SearchDevices(
 					sortQ.Scope,
 					model.GetDeviceAttributeNameReplacer().Replace(sortQ.Attribute),
 				)
-				field = fmt.Sprintf("%s.%s", DbDevAttributes, name)
+				field = fmt.Sprintf("%s.%s.value", DbDevAttributes, name)
 			}
 			sortField[i] = bson.E{Key: field, Value: 1}
 			if sortQ.Order == "desc" {
