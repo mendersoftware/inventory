@@ -5,7 +5,7 @@ go 1.18
 require (
 	github.com/ant0ine/go-json-rest v3.3.3-0.20170913041208-ebb33769ae01+incompatible
 	github.com/go-ozzo/ozzo-validation/v4 v4.3.0
-	github.com/google/uuid v1.3.1
+	github.com/google/uuid v1.4.0
 	github.com/mendersoftware/go-lib-micro v0.0.0-20230808081028-48c0b853fd99
 	github.com/pkg/errors v0.9.1
 	github.com/spf13/viper v1.16.0
