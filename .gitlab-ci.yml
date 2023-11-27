@@ -12,6 +12,7 @@ stages:
 
 include:
   - project: 'Northern.tech/Mender/mendertesting'
+    ref: 'QA-505-poc-multi-project-pipeline'
     file:
       - '.gitlab-ci-check-golang-lint.yml'
       - '.gitlab-ci-check-golang-unittests.yml'
