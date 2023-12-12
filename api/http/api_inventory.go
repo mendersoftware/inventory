@@ -108,6 +108,13 @@ func NewInventoryApiHandlers(i inventory.InventoryApp) ApiHandler {
 	}
 }
 
+func wrapRoutes(middleware rest.Middleware, routes ...*rest.Route) []*rest.Route {
+	for _, route := range routes {
+		route.Func = middleware.MiddlewareFunc(route.Func)
+	}
+	return routes
+}
+
 func (i *inventoryHandlers) Build() (http.Handler, error) {
 	//this will override the framework's error resp to the desired one:
 	// {"error": "msg"}
@@ -132,15 +139,24 @@ func (i *inventoryHandlers) Build() (http.Handler, error) {
 				return false
 			},
 		},
-		&identity.IdentityMiddleware{
-			UpdateLogger: true,
-		},
 		&rest.ContentTypeCheckerMiddleware{},
 	)
-	routes := []*rest.Route{
+	internalRoutes := []*rest.Route{
 		rest.Get(uriInternalAlive, i.LivelinessHandler),
 		rest.Get(uriInternalHealth, i.HealthCheckHandler),
 
+		rest.Patch(urlInternalAttributes, i.PatchDeviceAttributesInternalHandler),
+		rest.Post(urlInternalReindex, i.ReindexDeviceDataHandler),
+
+		rest.Post(uriInternalTenants, i.CreateTenantHandler),
+		rest.Post(uriInternalDevices, i.AddDeviceHandler),
+		rest.Delete(uriInternalDeviceDetails, i.DeleteDeviceHandler),
+		rest.Post(urlInternalDevicesStatus, i.InternalDevicesStatusHandler),
+		rest.Get(uriInternalDeviceGroups, i.GetDeviceGroupsInternalHandler),
+		rest.Post(urlInternalFiltersSearch, i.InternalFiltersSearchHandler),
+	}
+
+	publicRoutes := AutogenOptionsRoutes([]*rest.Route{
 		rest.Get(uriDevices, i.GetDevicesHandler),
 		rest.Get(uriDevice, i.GetDeviceHandler),
 		rest.Delete(uriDevice, i.DeleteDeviceInventoryHandler),
@@ -149,8 +165,6 @@ func (i *inventoryHandlers) Build() (http.Handler, error) {
 		rest.Delete(uriGroupsDevices, i.ClearDevicesGroupHandler),
 		rest.Patch(uriAttributes, i.UpdateDeviceAttributesHandler),
 		rest.Put(uriAttributes, i.UpdateDeviceAttributesHandler),
-		rest.Patch(urlInternalAttributes, i.PatchDeviceAttributesInternalHandler),
-		rest.Post(urlInternalReindex, i.ReindexDeviceDataHandler),
 		rest.Put(uriDeviceGroups, i.AddDeviceToGroupHandler),
 		rest.Patch(uriGroupsDevices, i.AppendDevicesToGroup),
 		rest.Put(uriDeviceTags, i.UpdateDeviceTagsHandler),
@@ -160,21 +174,15 @@ func (i *inventoryHandlers) Build() (http.Handler, error) {
 		rest.Get(uriGroups, i.GetGroupsHandler),
 		rest.Get(uriGroupsDevices, i.GetDevicesByGroupHandler),
 
-		rest.Post(uriInternalTenants, i.CreateTenantHandler),
-		rest.Post(uriInternalDevices, i.AddDeviceHandler),
-		rest.Delete(uriInternalDeviceDetails, i.DeleteDeviceHandler),
-		rest.Post(urlInternalDevicesStatus, i.InternalDevicesStatusHandler),
-		rest.Get(uriInternalDeviceGroups, i.GetDeviceGroupsInternalHandler),
 		rest.Get(urlFiltersAttributes, i.FiltersAttributesHandler),
 		rest.Post(urlFiltersSearch, i.FiltersSearchHandler),
+	}, AllowHeaderOptionsGenerator)
+	publicRoutes = wrapRoutes(&identity.IdentityMiddleware{
+		UpdateLogger: true,
+	}, publicRoutes...)
+	routes := append(internalRoutes, publicRoutes...)
 
-		rest.Post(urlInternalFiltersSearch, i.InternalFiltersSearchHandler),
-	}
-
-	app, err := rest.MakeRouter(
-		// augment routes with OPTIONS handler
-		AutogenOptionsRoutes(routes, AllowHeaderOptionsGenerator)...,
-	)
+	app, err := rest.MakeRouter(routes...)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create router")
 	}
