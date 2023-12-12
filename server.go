@@ -16,7 +16,6 @@ package main
 import (
 	"net/http"
 
-	"github.com/ant0ine/go-json-rest/rest"
 	"github.com/pkg/errors"
 
 	"github.com/mendersoftware/go-lib-micro/log"
@@ -28,21 +27,6 @@ import (
 	inventory "github.com/mendersoftware/inventory/inv"
 	"github.com/mendersoftware/inventory/store/mongo"
 )
-
-func SetupAPI(stacktype string) (*rest.Api, error) {
-	api := rest.NewApi()
-	if err := SetupMiddleware(api, stacktype); err != nil {
-		return nil, errors.Wrap(err, "failed to setup middleware")
-	}
-
-	//this will override the framework's error resp to the desired one:
-	// {"error": "msg"}
-	// instead of:
-	// {"Error": "msg"}
-	rest.ErrorFieldName = "error"
-
-	return api, nil
-}
 
 func RunServer(c config.Reader) error {
 
@@ -68,22 +52,15 @@ func RunServer(c config.Reader) error {
 		return err
 	}
 
-	api, err := SetupAPI(c.GetString(SettingMiddleware))
-	if err != nil {
-		return errors.Wrap(err, "API setup failed")
-	}
-
 	invapi := api_http.NewInventoryApiHandlers(inv)
-	apph, err := invapi.GetApp()
+	handler, err := invapi.Build()
 	if err != nil {
 		return errors.Wrap(err, "inventory API handlers setup failed")
 	}
-	api.SetApp(apph)
-
 	addr := c.GetString(SettingListen)
 	l.Printf("listening on %s", addr)
 
-	return http.ListenAndServe(addr, api.MakeHandler())
+	return http.ListenAndServe(addr, handler)
 }
 
 func maybeWithInventory(

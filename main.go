@@ -145,14 +145,7 @@ func makeDataStoreConfig() mongo.DataStoreMongoConfig {
 }
 
 func cmdServer(args *cli.Context) error {
-	devSetup := args.GlobalBool("dev")
-
 	l := log.New(log.Ctx{})
-
-	if devSetup {
-		l.Infof("setting up development configuration")
-		config.Config.Set(SettingMiddleware, EnvDev)
-	}
 
 	db, err := mongo.NewDataStoreMongo(makeDataStoreConfig())
 	if err != nil {

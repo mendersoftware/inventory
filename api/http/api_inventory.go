@@ -25,8 +25,12 @@ import (
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/pkg/errors"
 
+	"github.com/mendersoftware/go-lib-micro/accesslog"
+	"github.com/mendersoftware/go-lib-micro/identity"
 	midentity "github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/log"
+	"github.com/mendersoftware/go-lib-micro/requestid"
+	"github.com/mendersoftware/go-lib-micro/requestlog"
 	"github.com/mendersoftware/go-lib-micro/rest_utils"
 	u "github.com/mendersoftware/go-lib-micro/rest_utils"
 
@@ -34,7 +38,6 @@ import (
 	"github.com/mendersoftware/inventory/model"
 	"github.com/mendersoftware/inventory/store"
 	"github.com/mendersoftware/inventory/utils"
-	"github.com/mendersoftware/inventory/utils/identity"
 )
 
 const (
@@ -105,7 +108,35 @@ func NewInventoryApiHandlers(i inventory.InventoryApp) ApiHandler {
 	}
 }
 
-func (i *inventoryHandlers) GetApp() (rest.App, error) {
+func (i *inventoryHandlers) Build() (http.Handler, error) {
+	//this will override the framework's error resp to the desired one:
+	// {"error": "msg"}
+	// instead of:
+	// {"Error": "msg"}
+	rest.ErrorFieldName = "error"
+
+	api := rest.NewApi()
+
+	api.Use(
+		&requestlog.RequestLogMiddleware{},
+		&requestid.RequestIdMiddleware{},
+		&accesslog.AccessLogMiddleware{
+			Format: accesslog.SimpleLogFormat,
+			DisableLog: func(statusCode int, r *rest.Request) bool {
+				if r.URL.Path == uriInternalAlive ||
+					r.URL.Path == uriInternalHealth &&
+						statusCode < 300 {
+					// Skips the health/liveliness probes
+					return true
+				}
+				return false
+			},
+		},
+		&identity.IdentityMiddleware{
+			UpdateLogger: true,
+		},
+		&rest.ContentTypeCheckerMiddleware{},
+	)
 	routes := []*rest.Route{
 		rest.Get(uriInternalAlive, i.LivelinessHandler),
 		rest.Get(uriInternalHealth, i.HealthCheckHandler),
@@ -147,8 +178,9 @@ func (i *inventoryHandlers) GetApp() (rest.App, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create router")
 	}
+	api.SetApp(app)
 
-	return app, nil
+	return api.MakeHandler(), nil
 
 }
 
@@ -445,10 +477,9 @@ func (i *inventoryHandlers) AddDeviceHandler(w rest.ResponseWriter, r *rest.Requ
 func (i *inventoryHandlers) UpdateDeviceAttributesHandler(w rest.ResponseWriter, r *rest.Request) {
 	ctx := r.Context()
 	l := log.FromContext(ctx)
-	//get device ID from JWT token
-	idata, err := identity.ExtractIdentityFromHeaders(r.Header)
-	if err != nil {
-		u.RestErrWithLogMsg(w, r, l, err, http.StatusUnauthorized, "unauthorized")
+	var idata *identity.Identity
+	if idata = identity.FromContext(ctx); idata == nil || !idata.IsDevice {
+		u.RestErrWithLog(w, r, l, errors.New("unauthorized"), http.StatusUnauthorized)
 		return
 	}
 	deviceID := model.DeviceID(idata.Subject)
