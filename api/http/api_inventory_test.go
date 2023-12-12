@@ -33,7 +33,6 @@ import (
 
 	"github.com/mendersoftware/go-lib-micro/mongo/oid"
 	"github.com/mendersoftware/go-lib-micro/requestid"
-	"github.com/mendersoftware/go-lib-micro/requestlog"
 	"github.com/mendersoftware/go-lib-micro/rest_utils"
 	mt "github.com/mendersoftware/go-lib-micro/testing"
 
@@ -93,18 +92,11 @@ func makeMockApiHandler(t *testing.T, i inventory.InventoryApp) http.Handler {
 	handlers := NewInventoryApiHandlers(i)
 	assert.NotNil(t, handlers)
 
-	app, err := handlers.GetApp()
-	assert.NotNil(t, app)
+	handler, err := handlers.Build()
+	assert.NotNil(t, handler)
 	assert.NoError(t, err)
 
-	api := rest.NewApi()
-	api.Use(
-		&requestlog.RequestLogMiddleware{},
-		&requestid.RequestIdMiddleware{},
-	)
-	api.SetApp(app)
-
-	return api.MakeHandler()
+	return handler
 }
 
 func mockListDevices(num int) []model.Device {
@@ -999,7 +991,7 @@ func TestApiInventoryUpsertAttributes(t *testing.T) {
 				"http://1.2.3.4/api/0.1.0/attributes",
 				nil),
 			inHdrs: map[string]string{
-				"Authorization": makeDeviceAuthHeader(`{"sub": "fakeid"}`),
+				"Authorization": makeDeviceAuthHeader(`{"sub":"fakeid","mender.device":true}`),
 			},
 			inventoryErr: nil,
 			resp: JSONResponseParams{
@@ -1014,7 +1006,7 @@ func TestApiInventoryUpsertAttributes(t *testing.T) {
 				"http://1.2.3.4/api/0.1.0/attributes",
 				`{"foo": "bar"}`),
 			inHdrs: map[string]string{
-				"Authorization": makeDeviceAuthHeader(`{"sub": "fakeid"}`),
+				"Authorization": makeDeviceAuthHeader(`{"sub":"fakeid","mender.device":true}`),
 			},
 			inventoryErr: nil,
 			resp: JSONResponseParams{
@@ -1040,7 +1032,7 @@ func TestApiInventoryUpsertAttributes(t *testing.T) {
 				},
 			),
 			inHdrs: map[string]string{
-				"Authorization": makeDeviceAuthHeader(`{"sub": "fakeid"}`),
+				"Authorization": makeDeviceAuthHeader(`{"sub":"fakeid","mender.device":true}`),
 			},
 			inventoryErr: nil,
 			resp: JSONResponseParams{
@@ -1061,7 +1053,7 @@ func TestApiInventoryUpsertAttributes(t *testing.T) {
 				},
 			),
 			inHdrs: map[string]string{
-				"Authorization": makeDeviceAuthHeader(`{"sub": "fakeid"}`),
+				"Authorization": makeDeviceAuthHeader(`{"sub":"fakeid","mender.device":true}`),
 			},
 			inventoryErr: nil,
 			resp: JSONResponseParams{
@@ -1088,7 +1080,7 @@ func TestApiInventoryUpsertAttributes(t *testing.T) {
 				},
 			),
 			inHdrs: map[string]string{
-				"Authorization": makeDeviceAuthHeader(`{"sub": "fakeid"}`),
+				"Authorization": makeDeviceAuthHeader(`{"sub":"fakeid","mender.device":true}`),
 			},
 			inventoryErr: nil,
 			resp: JSONResponseParams{
@@ -1121,7 +1113,7 @@ func TestApiInventoryUpsertAttributes(t *testing.T) {
 				},
 			),
 			inHdrs: map[string]string{
-				"Authorization": makeDeviceAuthHeader(`{"sub": "fakeid"}`),
+				"Authorization": makeDeviceAuthHeader(`{"sub":"fakeid","mender.device":true}`),
 			},
 			inventoryErr: nil,
 			resp: JSONResponseParams{
@@ -1152,7 +1144,7 @@ func TestApiInventoryUpsertAttributes(t *testing.T) {
 				},
 			),
 			inHdrs: map[string]string{
-				"Authorization": makeDeviceAuthHeader(`{"sub": "fakeid"}`),
+				"Authorization": makeDeviceAuthHeader(`{"sub":"fakeid","mender.device":true}`),
 			},
 			inventoryErr: nil,
 			resp: JSONResponseParams{
@@ -1177,7 +1169,7 @@ func TestApiInventoryUpsertAttributes(t *testing.T) {
 				},
 			),
 			inHdrs: map[string]string{
-				"Authorization": makeDeviceAuthHeader(`{"sub": "fakeid"}`),
+				"Authorization": makeDeviceAuthHeader(`{"sub":"fakeid","mender.device":true}`),
 			},
 			inventoryErr: nil,
 			resp: JSONResponseParams{
@@ -1202,7 +1194,7 @@ func TestApiInventoryUpsertAttributes(t *testing.T) {
 				},
 			),
 			inHdrs: map[string]string{
-				"Authorization": makeDeviceAuthHeader(`{"sub": "fakeid"}`),
+				"Authorization": makeDeviceAuthHeader(`{"sub":"fakeid","mender.device":true}`),
 			},
 			inventoryErr: nil,
 			resp: JSONResponseParams{
@@ -1229,7 +1221,7 @@ func TestApiInventoryUpsertAttributes(t *testing.T) {
 				},
 			),
 			inHdrs: map[string]string{
-				"Authorization": makeDeviceAuthHeader(`{"sub": "fakeid"}`),
+				"Authorization": makeDeviceAuthHeader(`{"sub":"fakeid","mender.device":true}`),
 			},
 			inventoryErr: errors.New("internal error"),
 			resp: JSONResponseParams{
@@ -1254,7 +1246,7 @@ func TestApiInventoryUpsertAttributes(t *testing.T) {
 				},
 			),
 			inHdrs: map[string]string{
-				"Authorization": makeDeviceAuthHeader(`{"sub": "fakeid"}`),
+				"Authorization": makeDeviceAuthHeader(`{"sub":"fakeid","mender.device":true}`),
 			},
 			inventoryErr: nil,
 			resp: JSONResponseParams{
@@ -1266,62 +1258,63 @@ func TestApiInventoryUpsertAttributes(t *testing.T) {
 	}
 
 	for name, tc := range testCases {
-		t.Logf("test case: %s", name)
-		inv := minventory.InventoryApp{}
+		t.Run(name, func(t *testing.T) {
+			inv := minventory.InventoryApp{}
 
-		ctx := contextMatcher()
+			ctx := contextMatcher()
 
-		if tc.inReq.Method == http.MethodPatch {
-			inv.On("UpsertAttributesWithUpdated",
-				ctx,
-				mock.AnythingOfType("model.DeviceID"),
-				mock.MatchedBy(
-					func(attrs model.DeviceAttributes) bool {
-						if tc.deviceAttributes != nil {
-							if !reflect.DeepEqual(tc.deviceAttributes, attrs) {
-								assert.FailNow(t, "", "attributes not equal: %v \n%v\n", tc.deviceAttributes, attrs)
+			if tc.inReq.Method == http.MethodPatch {
+				inv.On("UpsertAttributesWithUpdated",
+					ctx,
+					mock.AnythingOfType("model.DeviceID"),
+					mock.MatchedBy(
+						func(attrs model.DeviceAttributes) bool {
+							if tc.deviceAttributes != nil {
+								if !reflect.DeepEqual(tc.deviceAttributes, attrs) {
+									assert.FailNow(t, "", "attributes not equal: %v \n%v\n", tc.deviceAttributes, attrs)
+								}
 							}
-						}
-						return true
-					},
-				),
-				tc.scope,
-				tc.etag,
-			).Return(tc.inventoryErr)
-		} else {
-			inv.On("ReplaceAttributes",
-				ctx,
-				mock.AnythingOfType("model.DeviceID"),
-				mock.MatchedBy(
-					func(attrs model.DeviceAttributes) bool {
-						if tc.deviceAttributes != nil {
-							if !reflect.DeepEqual(tc.deviceAttributes, attrs) {
-								assert.FailNow(t, "", "attributes not equal: %v \n%v\n", tc.deviceAttributes, attrs)
+							return true
+						},
+					),
+					tc.scope,
+					tc.etag,
+				).Return(tc.inventoryErr)
+			} else {
+				inv.On("ReplaceAttributes",
+					ctx,
+					mock.AnythingOfType("model.DeviceID"),
+					mock.MatchedBy(
+						func(attrs model.DeviceAttributes) bool {
+							if tc.deviceAttributes != nil {
+								if !reflect.DeepEqual(tc.deviceAttributes, attrs) {
+									assert.FailNow(t, "", "attributes not equal: %v \n%v\n", tc.deviceAttributes, attrs)
+								}
 							}
-						}
-						return true
-					},
-				),
-				tc.scope,
-				tc.etag,
-			).Return(tc.inventoryErr)
-		}
+							return true
+						},
+					),
+					tc.scope,
+					tc.etag,
+				).Return(tc.inventoryErr)
+			}
 
-		apih := makeMockApiHandler(t, &inv)
+			apih := makeMockApiHandler(t, &inv)
 
-		rest.ErrorFieldName = "error"
+			rest.ErrorFieldName = "error"
 
-		for k, v := range tc.inHdrs {
-			tc.inReq.Header.Set(k, v)
-		}
+			for k, v := range tc.inHdrs {
+				tc.inReq.Header.Set(k, v)
+			}
 
-		runTestRequest(t, apih, tc.inReq, tc.resp)
+			runTestRequest(t, apih, tc.inReq, tc.resp)
+		})
 	}
 }
 
 func makeDeviceAuthHeader(claim string) string {
-	return fmt.Sprintf("Bearer foo.%s.bar",
-		base64.StdEncoding.EncodeToString([]byte(claim)))
+	return fmt.Sprintf("Bearer base.%s.sign",
+		base64.RawURLEncoding.EncodeToString([]byte(claim)))
 }
 
 func strPtr(s string) *string {
@@ -1352,7 +1345,7 @@ func TestApiInventoryUpsertAttributesInternal(t *testing.T) {
 			scope:    "inventory",
 
 			inHdrs: map[string]string{
-				"Authorization": makeDeviceAuthHeader(`{"sub": "fakeid"}`),
+				"Authorization": makeDeviceAuthHeader(`{"sub":"fakeid","mender.device":true}`),
 			},
 			inventoryErr: nil,
 			resp: JSONResponseParams{
@@ -1378,7 +1371,7 @@ func TestApiInventoryUpsertAttributesInternal(t *testing.T) {
 			},
 
 			inHdrs: map[string]string{
-				"Authorization": makeDeviceAuthHeader(`{"sub": "fakeid"}`),
+				"Authorization": makeDeviceAuthHeader(`{"sub":"fakeid","mender.device":true}`),
 			},
 			inventoryErr: nil,
 			resp: JSONResponseParams{
@@ -1394,7 +1387,7 @@ func TestApiInventoryUpsertAttributesInternal(t *testing.T) {
 
 			payload: `{"foo": "bar"}`,
 			inHdrs: map[string]string{
-				"Authorization": makeDeviceAuthHeader(`{"sub": "fakeid"}`),
+				"Authorization": makeDeviceAuthHeader(`{"sub":"fakeid","mender.device":true}`),
 			},
 			inventoryErr: nil,
 			resp: JSONResponseParams{
@@ -1420,7 +1413,7 @@ func TestApiInventoryUpsertAttributesInternal(t *testing.T) {
 				},
 			},
 			inHdrs: map[string]string{
-				"Authorization": makeDeviceAuthHeader(`{"sub": "fakeid"}`),
+				"Authorization": makeDeviceAuthHeader(`{"sub":"fakeid","mender.device":true}`),
 			},
 			inventoryErr: nil,
 			resp: JSONResponseParams{
@@ -1441,7 +1434,7 @@ func TestApiInventoryUpsertAttributesInternal(t *testing.T) {
 				},
 			},
 			inHdrs: map[string]string{
-				"Authorization": makeDeviceAuthHeader(`{"sub": "fakeid"}`),
+				"Authorization": makeDeviceAuthHeader(`{"sub":"fakeid","mender.device":true}`),
 			},
 			inventoryErr: nil,
 			resp: JSONResponseParams{
@@ -1468,7 +1461,7 @@ func TestApiInventoryUpsertAttributesInternal(t *testing.T) {
 				},
 			},
 			inHdrs: map[string]string{
-				"Authorization": makeDeviceAuthHeader(`{"sub": "fakeid"}`),
+				"Authorization": makeDeviceAuthHeader(`{"sub":"fakeid","mender.device":true}`),
 			},
 			inventoryErr: nil,
 			resp: JSONResponseParams{
@@ -1501,7 +1494,7 @@ func TestApiInventoryUpsertAttributesInternal(t *testing.T) {
 				},
 			},
 			inHdrs: map[string]string{
-				"Authorization": makeDeviceAuthHeader(`{"sub": "fakeid"}`),
+				"Authorization": makeDeviceAuthHeader(`{"sub":"fakeid","mender.device":true}`),
 			},
 			inventoryErr: nil,
 			resp: JSONResponseParams{
@@ -1532,7 +1525,7 @@ func TestApiInventoryUpsertAttributesInternal(t *testing.T) {
 				},
 			},
 			inHdrs: map[string]string{
-				"Authorization": makeDeviceAuthHeader(`{"sub": "fakeid"}`),
+				"Authorization": makeDeviceAuthHeader(`{"sub":"fakeid","mender.device":true}`),
 			},
 			inventoryErr: nil,
 			resp: JSONResponseParams{
@@ -1557,7 +1550,7 @@ func TestApiInventoryUpsertAttributesInternal(t *testing.T) {
 				},
 			},
 			inHdrs: map[string]string{
-				"Authorization": makeDeviceAuthHeader(`{"sub": "fakeid"}`),
+				"Authorization": makeDeviceAuthHeader(`{"sub":"fakeid","mender.device":true}`),
 			},
 			inventoryErr: nil,
 			resp: JSONResponseParams{
@@ -1582,7 +1575,7 @@ func TestApiInventoryUpsertAttributesInternal(t *testing.T) {
 				},
 			},
 			inHdrs: map[string]string{
-				"Authorization": makeDeviceAuthHeader(`{"sub": "fakeid"}`),
+				"Authorization": makeDeviceAuthHeader(`{"sub":"fakeid","mender.device":true}`),
 			},
 			inventoryErr: nil,
 			resp: JSONResponseParams{
@@ -1609,7 +1602,7 @@ func TestApiInventoryUpsertAttributesInternal(t *testing.T) {
 				},
 			},
 			inHdrs: map[string]string{
-				"Authorization": makeDeviceAuthHeader(`{"sub": "fakeid"}`),
+				"Authorization": makeDeviceAuthHeader(`{"sub":"fakeid","mender.device":true}`),
 			},
 			inventoryErr: errors.New("internal error"),
 			resp: JSONResponseParams{
