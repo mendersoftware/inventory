@@ -25,8 +25,12 @@ import (
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/pkg/errors"
 
+	"github.com/mendersoftware/go-lib-micro/accesslog"
+	"github.com/mendersoftware/go-lib-micro/identity"
 	midentity "github.com/mendersoftware/go-lib-micro/identity"
 	"github.com/mendersoftware/go-lib-micro/log"
+	"github.com/mendersoftware/go-lib-micro/requestid"
+	"github.com/mendersoftware/go-lib-micro/requestlog"
 	"github.com/mendersoftware/go-lib-micro/rest_utils"
 	u "github.com/mendersoftware/go-lib-micro/rest_utils"
 
@@ -34,7 +38,6 @@ import (
 	"github.com/mendersoftware/inventory/model"
 	"github.com/mendersoftware/inventory/store"
 	"github.com/mendersoftware/inventory/utils"
-	"github.com/mendersoftware/inventory/utils/identity"
 )
 
 const (
@@ -105,11 +108,55 @@ func NewInventoryApiHandlers(i inventory.InventoryApp) ApiHandler {
 	}
 }
 
-func (i *inventoryHandlers) GetApp() (rest.App, error) {
-	routes := []*rest.Route{
+func wrapRoutes(middleware rest.Middleware, routes ...*rest.Route) []*rest.Route {
+	for _, route := range routes {
+		route.Func = middleware.MiddlewareFunc(route.Func)
+	}
+	return routes
+}
+
+func (i *inventoryHandlers) Build() (http.Handler, error) {
+	//this will override the framework's error resp to the desired one:
+	// {"error": "msg"}
+	// instead of:
+	// {"Error": "msg"}
+	rest.ErrorFieldName = "error"
+
+	api := rest.NewApi()
+
+	api.Use(
+		&requestlog.RequestLogMiddleware{},
+		&requestid.RequestIdMiddleware{},
+		&accesslog.AccessLogMiddleware{
+			Format: accesslog.SimpleLogFormat,
+			DisableLog: func(statusCode int, r *rest.Request) bool {
+				if r.URL.Path == uriInternalAlive ||
+					r.URL.Path == uriInternalHealth &&
+						statusCode < 300 {
+					// Skips the health/liveliness probes
+					return true
+				}
+				return false
+			},
+		},
+		&rest.ContentTypeCheckerMiddleware{},
+	)
+	internalRoutes := []*rest.Route{
 		rest.Get(uriInternalAlive, i.LivelinessHandler),
 		rest.Get(uriInternalHealth, i.HealthCheckHandler),
 
+		rest.Patch(urlInternalAttributes, i.PatchDeviceAttributesInternalHandler),
+		rest.Post(urlInternalReindex, i.ReindexDeviceDataHandler),
+
+		rest.Post(uriInternalTenants, i.CreateTenantHandler),
+		rest.Post(uriInternalDevices, i.AddDeviceHandler),
+		rest.Delete(uriInternalDeviceDetails, i.DeleteDeviceHandler),
+		rest.Post(urlInternalDevicesStatus, i.InternalDevicesStatusHandler),
+		rest.Get(uriInternalDeviceGroups, i.GetDeviceGroupsInternalHandler),
+		rest.Post(urlInternalFiltersSearch, i.InternalFiltersSearchHandler),
+	}
+
+	publicRoutes := AutogenOptionsRoutes([]*rest.Route{
 		rest.Get(uriDevices, i.GetDevicesHandler),
 		rest.Get(uriDevice, i.GetDeviceHandler),
 		rest.Delete(uriDevice, i.DeleteDeviceInventoryHandler),
@@ -118,8 +165,6 @@ func (i *inventoryHandlers) GetApp() (rest.App, error) {
 		rest.Delete(uriGroupsDevices, i.ClearDevicesGroupHandler),
 		rest.Patch(uriAttributes, i.UpdateDeviceAttributesHandler),
 		rest.Put(uriAttributes, i.UpdateDeviceAttributesHandler),
-		rest.Patch(urlInternalAttributes, i.PatchDeviceAttributesInternalHandler),
-		rest.Post(urlInternalReindex, i.ReindexDeviceDataHandler),
 		rest.Put(uriDeviceGroups, i.AddDeviceToGroupHandler),
 		rest.Patch(uriGroupsDevices, i.AppendDevicesToGroup),
 		rest.Put(uriDeviceTags, i.UpdateDeviceTagsHandler),
@@ -129,26 +174,21 @@ func (i *inventoryHandlers) GetApp() (rest.App, error) {
 		rest.Get(uriGroups, i.GetGroupsHandler),
 		rest.Get(uriGroupsDevices, i.GetDevicesByGroupHandler),
 
-		rest.Post(uriInternalTenants, i.CreateTenantHandler),
-		rest.Post(uriInternalDevices, i.AddDeviceHandler),
-		rest.Delete(uriInternalDeviceDetails, i.DeleteDeviceHandler),
-		rest.Post(urlInternalDevicesStatus, i.InternalDevicesStatusHandler),
-		rest.Get(uriInternalDeviceGroups, i.GetDeviceGroupsInternalHandler),
 		rest.Get(urlFiltersAttributes, i.FiltersAttributesHandler),
 		rest.Post(urlFiltersSearch, i.FiltersSearchHandler),
+	}, AllowHeaderOptionsGenerator)
+	publicRoutes = wrapRoutes(&identity.IdentityMiddleware{
+		UpdateLogger: true,
+	}, publicRoutes...)
+	routes := append(internalRoutes, publicRoutes...)
 
-		rest.Post(urlInternalFiltersSearch, i.InternalFiltersSearchHandler),
-	}
-
-	app, err := rest.MakeRouter(
-		// augment routes with OPTIONS handler
-		AutogenOptionsRoutes(routes, AllowHeaderOptionsGenerator)...,
-	)
+	app, err := rest.MakeRouter(routes...)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create router")
 	}
+	api.SetApp(app)
 
-	return app, nil
+	return api.MakeHandler(), nil
 
 }
 
@@ -445,10 +485,9 @@ func (i *inventoryHandlers) AddDeviceHandler(w rest.ResponseWriter, r *rest.Requ
 func (i *inventoryHandlers) UpdateDeviceAttributesHandler(w rest.ResponseWriter, r *rest.Request) {
 	ctx := r.Context()
 	l := log.FromContext(ctx)
-	//get device ID from JWT token
-	idata, err := identity.ExtractIdentityFromHeaders(r.Header)
-	if err != nil {
-		u.RestErrWithLogMsg(w, r, l, err, http.StatusUnauthorized, "unauthorized")
+	var idata *identity.Identity
+	if idata = identity.FromContext(ctx); idata == nil || !idata.IsDevice {
+		u.RestErrWithLog(w, r, l, errors.New("unauthorized"), http.StatusUnauthorized)
 		return
 	}
 	deviceID := model.DeviceID(idata.Subject)

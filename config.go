@@ -21,9 +21,6 @@ const (
 	SettingListen        = "listen"
 	SettingListenDefault = ":8080"
 
-	SettingMiddleware        = "middleware"
-	SettingMiddlewareDefault = EnvProd
-
 	SettingDb        = "mongo"
 	SettingDbDefault = "mongo-inventory:27017"
 
@@ -55,7 +52,6 @@ const (
 var (
 	configDefaults = []config.Default{
 		{Key: SettingListen, Value: SettingListenDefault},
-		{Key: SettingMiddleware, Value: SettingMiddlewareDefault},
 		{Key: SettingDb, Value: SettingDbDefault},
 		{Key: SettingDbSSL, Value: SettingDbSSLDefault},
 		{Key: SettingDbSSLSkipVerify, Value: SettingDbSSLSkipVerifyDefault},

@@ -30,15 +30,6 @@ mongo: mongo-inventory:27017
 # Defaults to: none
 # mongo_password: secret
 
-# HTTP Server middleware environment
-# Available values:
-#   dev
-#       development environment
-#   prod
-#       production environment
-# Defaults to: prod
-# middleware: dev
-
 # Maximum number of inventory attributes per device
 # Defaults to: 100
 # Overwrite with environment variable: INVENTORY_LIMIT_ATTRIBUTES

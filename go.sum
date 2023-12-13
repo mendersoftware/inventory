@@ -193,6 +193,8 @@ github.com/mattn/go-isatty v0.0.20 h1:xfD0iDuEKnDkl03q4limB+vH+GxLEtL/jb4xVJSWWE
 github.com/mattn/go-isatty v0.0.20/go.mod h1:W+V8PltTTMOvKvAeJH7IuucS94S2C6jfK/D7dTCTo3Y=
 github.com/mendersoftware/go-lib-micro v0.0.0-20231031082957-e2bce6ff3edd h1:j+ah/5x3ScyGMbXiD985MGKdvUFmOhpbutY9pnVvZB4=
 github.com/mendersoftware/go-lib-micro v0.0.0-20231031082957-e2bce6ff3edd/go.mod h1:tTQbJ4BunBfobw43wCIVdGxdGCDFxYe0jrHT9rHvOaQ=
+github.com/mendersoftware/go-lib-micro v0.0.0-20231212090330-dbd92a22bbee h1:W1waVlzagOPmWrKp+Jv+Q5XQAmIXA8QP2ccYFb2BUGE=
+github.com/mendersoftware/go-lib-micro v0.0.0-20231212090330-dbd92a22bbee/go.mod h1:CTBdjfUmBqzAbPWn7f0i3kl+7kFkcttLYbBnYFOOnDo=
 github.com/mitchellh/mapstructure v1.5.0 h1:jeMsZIYE/09sWLaz43PL7Gy6RuMjD2eJVyuac5Z2hdY=
 github.com/mitchellh/mapstructure v1.5.0/go.mod h1:bFUtVrKA4DC2yAKiSyO/QUcy7e+RRV2QTWOzhPopBRo=
 github.com/modern-go/concurrent v0.0.0-20180228061459-e0a39a4cb421/go.mod h1:6dJC0mAP4ikYIbvyc7fijjWJddQyLn8Ig3JB5CqoB9Q=

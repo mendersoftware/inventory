@@ -23,17 +23,6 @@ import (
 	mstore "github.com/mendersoftware/inventory/store/mocks"
 )
 
-func TestSetupApi(t *testing.T) {
-	// expecting an error
-	api, err := SetupAPI("foo")
-	assert.Nil(t, api)
-	assert.Error(t, err)
-
-	api, err = SetupAPI(EnvDev)
-	assert.NotNil(t, api)
-	assert.Nil(t, err)
-}
-
 func TestMaybeWithInventory(t *testing.T) {
 	db := &mstore.DataStore{}
 	inv := inventory.NewInventory(db)
