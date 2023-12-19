@@ -63,7 +63,8 @@ const (
 
 	DbScopeInventory = "inventory"
 
-	FiltersAttributesLimit = 500
+	FiltersAttributesMaxDevices = 5000
+	FiltersAttributesLimit      = 500
 
 	attrIdentityStatus = "identity-status"
 )
@@ -743,6 +744,10 @@ func (db *DataStoreMongo) GetFiltersAttributes(
 	const DbCount = "count"
 
 	cur, err := collDevs.Aggregate(ctx, []bson.M{
+		// Sample up to 5,000 devices to get a representative sample
+		{
+			"$limit": FiltersAttributesMaxDevices,
+		},
 		{
 			"$project": bson.M{
 				"attributes": bson.M{
