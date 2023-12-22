@@ -8,7 +8,9 @@ RUN mkdir -p /tmp_extra && chown nobody:nobody /tmp_extra
 RUN chown -R nobody:nobody /etc_extra
 RUN apk add --no-cache ca-certificates
 COPY ./ .
-RUN env CGO_ENABLED=0 go test -c -o inventory -tags main \
+RUN --mount=type=cache,target=/go/pkg/mod/ \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 go test -c -o inventory -tags main \
     -cover -covermode atomic \
     -coverpkg $(go list ./... | grep -v vendor | grep -v mocks | grep -v test | tr  '\n' ,)
 
