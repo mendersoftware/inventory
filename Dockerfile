@@ -9,7 +9,7 @@ RUN mkdir -p /tmp_extra && chown nobody:nobody /tmp_extra
 RUN chown -R nobody:nobody /etc_extra
 RUN apk add --no-cache ca-certificates
 COPY ./ .
-RUN CGO_ENABLED=0 GOARCH=$TARGETARCH go build -o inventory .
+RUN CGO_ENABLED=0 GOARCH=$TARGETARCH go build -trimpath -o inventory .
 
 FROM scratch
 EXPOSE 8080
