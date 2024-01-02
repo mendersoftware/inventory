@@ -750,6 +750,7 @@ func (db *DataStoreMongo) GetFiltersAttributes(
 		},
 		{
 			"$project": bson.M{
+				"_id": 0,
 				"attributes": bson.M{
 					"$objectToArray": "$" + DbDevAttributes,
 				},
@@ -759,16 +760,10 @@ func (db *DataStoreMongo) GetFiltersAttributes(
 			"$unwind": "$" + DbDevAttributes,
 		},
 		{
-			"$project": bson.M{
-				DbDevAttributesName:  "$" + DbDevAttributes + ".v." + DbDevAttributesName,
-				DbDevAttributesScope: "$" + DbDevAttributes + ".v." + DbDevAttributesScope,
-			},
-		},
-		{
 			"$group": bson.M{
 				DbDevId: bson.M{
-					DbDevAttributesName:  "$" + DbDevAttributesName,
-					DbDevAttributesScope: "$" + DbDevAttributesScope,
+					DbDevAttributesName:  "$" + DbDevAttributes + ".v." + DbDevAttributesName,
+					DbDevAttributesScope: "$" + DbDevAttributes + ".v." + DbDevAttributesScope,
 				},
 				DbCount: bson.M{
 					"$sum": 1,
@@ -776,22 +771,14 @@ func (db *DataStoreMongo) GetFiltersAttributes(
 			},
 		},
 		{
-			"$project": bson.M{
-				DbDevId:              0,
-				DbDevAttributesName:  "$" + DbDevId + "." + DbDevAttributesName,
-				DbDevAttributesScope: "$" + DbDevId + "." + DbDevAttributesScope,
-				DbCount:              "$" + DbCount,
-			},
+			"$limit": FiltersAttributesLimit,
 		},
 		{
 			"$sort": bson.D{
 				{Key: DbCount, Value: -1},
-				{Key: DbDevAttributesScope, Value: 1},
-				{Key: DbDevAttributesName, Value: 1},
+				{Key: DbDevId + "." + DbDevAttributesScope, Value: 1},
+				{Key: DbDevId + "." + DbDevAttributesName, Value: 1},
 			},
-		},
-		{
-			"$limit": FiltersAttributesLimit,
 		},
 	})
 	if err != nil {
@@ -800,9 +787,24 @@ func (db *DataStoreMongo) GetFiltersAttributes(
 	defer cur.Close(ctx)
 
 	var attributes []model.FilterAttribute
-	err = cur.All(ctx, &attributes)
-	if err != nil {
-		return nil, err
+	type Result struct {
+		Group struct {
+			Name  string `bson:"name"`
+			Scope string `bson:"scope"`
+		} `bson:"_id"`
+		Count int32 `bson:"count"`
+	}
+	for cur.Next(ctx) {
+		var elem Result
+		err = cur.Decode(&elem)
+		if err != nil {
+			break
+		}
+		attributes = append(attributes, model.FilterAttribute{
+			Name:  elem.Group.Name,
+			Scope: elem.Group.Scope,
+			Count: elem.Count,
+		})
 	}
 
 	return attributes, nil
