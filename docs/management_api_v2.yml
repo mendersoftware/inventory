@@ -45,6 +45,10 @@ paths:
 
         The list is sorted in descending order by the count of occurrences of the
         attribute in the inventory database, then in ascending order by scope and name.
+
+        Limitations:
+         * The API considers up to a sample of 5,000 devices when aggregating the number of attributes.
+         * The API returns up to 500 unique attributes.
       responses:
         200:
           description: Successful response.
@@ -58,7 +62,7 @@ paths:
           description: Internal error.
           schema:
             $ref: '#/definitions/Error'
-    
+
   /filters/search:
     post:
       operationId: Search Device Inventories
