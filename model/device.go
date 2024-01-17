@@ -174,8 +174,10 @@ func (d *Device) UnmarshalBSON(b []byte) error {
 				group := attr.Value.(string)
 				d.Group = GroupName(group)
 			case AttrNameUpdated:
-				dateTime := attr.Value.(primitive.DateTime)
-				d.UpdatedTs = dateTime.Time()
+				if attr.Value != nil {
+					dateTime := attr.Value.(primitive.DateTime)
+					d.UpdatedTs = dateTime.Time()
+				}
 			case AttrNameCreated:
 				dateTime := attr.Value.(primitive.DateTime)
 				d.CreatedTs = dateTime.Time()

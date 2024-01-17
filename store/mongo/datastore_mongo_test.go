@@ -326,7 +326,7 @@ func TestMongoGetAllAttributeNames(t *testing.T) {
 					},
 				},
 			},
-			outAttrs: []string{"mac", "sn", "updated_ts", "created_ts"},
+			outAttrs: []string{"mac", "sn", "created_ts"},
 		},
 		"two devs, non-overlapping attrs": {
 			inDevs: []model.Device{
@@ -345,7 +345,7 @@ func TestMongoGetAllAttributeNames(t *testing.T) {
 					},
 				},
 			},
-			outAttrs: []string{"mac", "sn", "foo", "bar", "updated_ts", "created_ts"},
+			outAttrs: []string{"mac", "sn", "foo", "bar", "created_ts"},
 		},
 		"two devs, overlapping attrs": {
 			inDevs: []model.Device{
@@ -365,7 +365,7 @@ func TestMongoGetAllAttributeNames(t *testing.T) {
 					},
 				},
 			},
-			outAttrs: []string{"mac", "sn", "foo", "bar", "updated_ts", "created_ts"},
+			outAttrs: []string{"mac", "sn", "foo", "bar", "created_ts"},
 		},
 		"single dev, tenant": {
 			inDevs: []model.Device{
@@ -377,7 +377,7 @@ func TestMongoGetAllAttributeNames(t *testing.T) {
 					},
 				},
 			},
-			outAttrs: []string{"mac", "sn", "updated_ts", "created_ts"},
+			outAttrs: []string{"mac", "sn", "created_ts"},
 			tenant:   "tenant1",
 		},
 		"no devs": {
@@ -1623,7 +1623,7 @@ func TestMongoUpsertDevicesAttributes(t *testing.T) {
 							// won't update the update_ts attribute; updating attributes in the inventory scope will do.
 							assert.Condition(t,
 								func() bool {
-									return (tc.inScope != model.AttrScopeInventory || len(tc.devs) == 0) && devs[i].UpdatedTs == devs[i].CreatedTs ||
+									return (tc.inScope != model.AttrScopeInventory || len(tc.devs) == 0) ||
 										(tc.inScope == model.AttrScopeInventory && len(tc.devs) > 0) && devs[i].UpdatedTs.After(devs[i].CreatedTs)
 
 								}, devs[i])
@@ -2608,7 +2608,7 @@ func TestMongoUpsertRemoveDeviceAttributes(t *testing.T) {
 					assert.Condition(t,
 						func() bool {
 							return devs[i].UpdatedTs.After(dev.CreatedTs) ||
-								devs[i].UpdatedTs == dev.CreatedTs
+								devs[i].UpdatedTs == time.Time{}
 						})
 				}
 			}
@@ -2671,11 +2671,6 @@ func TestGetFiltersAttributes(t *testing.T) {
 					Count: 2,
 				},
 				{
-					Name:  "updated_ts",
-					Scope: model.AttrScopeSystem,
-					Count: 2,
-				},
-				{
 					Name:  "sn",
 					Scope: model.AttrScopeInventory,
 					Count: 1,
@@ -2725,10 +2720,6 @@ func TestGetFiltersAttributes(t *testing.T) {
 					Count: 2,
 				},
 				{
-					Name:  "updated_ts",
-					Scope: model.AttrScopeSystem,
-					Count: 2,
-				}, {
 					Name:  "sn",
 					Scope: model.AttrScopeInventory,
 					Count: 1,
@@ -4579,9 +4570,7 @@ func TestMongoSearchDevices(t *testing.T) {
 			}
 			if len(tc.searchParams.Attributes) > 0 {
 				for _, dev := range devs {
-					// the extra attribute is `updated_ts`, automatically set by `AddDevice`
-					// and always selected and returned by `SearchDevices`
-					assert.Equal(t, len(tc.expectedAttributes)+1, len(dev.Attributes))
+					assert.Equal(t, len(tc.expectedAttributes), len(dev.Attributes))
 					assert.Equal(t, tc.expectedAttributes, dev.Attributes[:len(tc.expectedAttributes)])
 				}
 			}
