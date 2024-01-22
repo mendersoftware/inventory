@@ -385,12 +385,6 @@ func (db *DataStoreMongo) upsertAttributes(
 			Name:  model.AttrNameUpdated,
 			Value: now,
 		}
-	} else {
-		oninsert[updatedField] = model.DeviceAttribute{
-			Scope: model.AttrScopeSystem,
-			Name:  model.AttrNameUpdated,
-			Value: now,
-		}
 	}
 
 	switch len(devices) {
