@@ -57,7 +57,7 @@ func TestMigration_1_0_2(t *testing.T) {
 				model.Device{
 					ID:        model.DeviceID("1"),
 					Revision:  1,
-					UpdatedTs: testTimestamp,
+					UpdatedTs: &testTimestamp,
 					CreatedTs: testTimestamp,
 				},
 			},

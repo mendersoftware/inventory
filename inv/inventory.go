@@ -293,7 +293,7 @@ func (i *inventory) needsUpsert(
 	needsUpsert := true
 	if device != nil {
 		// we update the inventory attributes at least once every (calendar) day
-		if !device.UpdatedTs.IsZero() &&
+		if device.UpdatedTs != nil &&
 			device.UpdatedTs.Truncate(oneDay) != time.Now().Truncate(oneDay) {
 			return true
 		}

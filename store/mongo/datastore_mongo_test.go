@@ -2607,8 +2607,11 @@ func TestMongoUpsertRemoveDeviceAttributes(t *testing.T) {
 					// precision- custom comparison
 					assert.Condition(t,
 						func() bool {
-							return devs[i].UpdatedTs.After(dev.CreatedTs) ||
-								devs[i].UpdatedTs == time.Time{}
+							if devs[i].UpdatedTs == nil {
+								return true
+							} else {
+								return devs[i].UpdatedTs.After(dev.CreatedTs)
+							}
 						})
 				}
 			}
@@ -4138,7 +4141,7 @@ func TestMongoSearchDevices(t *testing.T) {
 			},
 			Group:     "foo",
 			CreatedTs: now,
-			UpdatedTs: now,
+			UpdatedTs: &now,
 		},
 		{
 			ID: model.DeviceID("1"),
@@ -4150,7 +4153,7 @@ func TestMongoSearchDevices(t *testing.T) {
 			},
 			Group:     "foo",
 			CreatedTs: now,
-			UpdatedTs: now,
+			UpdatedTs: &now,
 		},
 		{
 			ID: model.DeviceID("2"),
@@ -4162,7 +4165,7 @@ func TestMongoSearchDevices(t *testing.T) {
 			},
 			Group:     "foo",
 			CreatedTs: now,
-			UpdatedTs: now,
+			UpdatedTs: &now,
 		},
 		{
 			ID: model.DeviceID("3"),
@@ -4174,7 +4177,7 @@ func TestMongoSearchDevices(t *testing.T) {
 			},
 			Group:     "bar",
 			CreatedTs: now,
-			UpdatedTs: now,
+			UpdatedTs: &now,
 		},
 		{
 			ID: model.DeviceID("4"),
@@ -4187,7 +4190,7 @@ func TestMongoSearchDevices(t *testing.T) {
 			},
 			Group:     "bar",
 			CreatedTs: now,
-			UpdatedTs: now,
+			UpdatedTs: &now,
 		},
 	}
 
