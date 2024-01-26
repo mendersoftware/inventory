@@ -44,6 +44,10 @@ func boolPtr(value bool) *bool {
 	return &value
 }
 
+func timePtr(value time.Time) *time.Time {
+	return &value
+}
+
 func TestHealthCheck(t *testing.T) {
 	t.Parallel()
 
@@ -447,7 +451,7 @@ func TestInventoryUpsertAttributesWithUpdated(t *testing.T) {
 					},
 				},
 				// yesterday
-				UpdatedTs: time.Now().Add(-25 * time.Hour),
+				UpdatedTs: timePtr(time.Now().Add(-25 * time.Hour)),
 			},
 			attributes: model.DeviceAttributes{
 				model.DeviceAttribute{

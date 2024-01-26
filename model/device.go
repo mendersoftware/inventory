@@ -147,7 +147,7 @@ type Device struct {
 
 	CreatedTs time.Time `json:"-" bson:"created_ts,omitempty"`
 	//Timestamp of the last attribute update.
-	UpdatedTs time.Time `json:"updated_ts" bson:"updated_ts,omitempty"`
+	UpdatedTs *time.Time `json:"updated_ts,omitempty" bson:"updated_ts,omitempty"`
 
 	//device object revision
 	Revision uint `json:"-" bson:"revision,omitempty"`
@@ -175,8 +175,10 @@ func (d *Device) UnmarshalBSON(b []byte) error {
 				d.Group = GroupName(group)
 			case AttrNameUpdated:
 				if attr.Value != nil {
-					dateTime := attr.Value.(primitive.DateTime)
-					d.UpdatedTs = dateTime.Time()
+					dateTime := attr.Value.(primitive.DateTime).Time()
+					d.UpdatedTs = &dateTime
+				} else {
+					d.UpdatedTs = nil
 				}
 			case AttrNameCreated:
 				dateTime := attr.Value.(primitive.DateTime)
