@@ -1595,7 +1595,7 @@ func TestMongoUpsertDevicesAttributes(t *testing.T) {
 				cur, err := s.Database(DbName).
 					Collection(DbDevicesColl).
 					Find(
-						nil,
+						context.Background(),
 						bson.M{},
 						mopts.Find().SetSort(bson.M{"_id": 1}),
 					)
@@ -2555,7 +2555,7 @@ func TestMongoUpsertRemoveDeviceAttributes(t *testing.T) {
 					cur, err := s.Database(DbName).
 						Collection(DbDevicesColl).
 						Find(
-							nil,
+							context.Background(),
 							bson.M{},
 							mopts.Find().SetSort(bson.M{"_id": 1}),
 						)
@@ -2579,7 +2579,7 @@ func TestMongoUpsertRemoveDeviceAttributes(t *testing.T) {
 			cur, err := s.Database(DbName).
 				Collection(DbDevicesColl).
 				Find(
-					nil,
+					context.Background(),
 					bson.M{},
 					mopts.Find().SetSort(bson.M{"_id": 1}),
 				)
@@ -5058,7 +5058,7 @@ func TestMongoUpsertDevicesAttributesWithRevision(t *testing.T) {
 			cur, err := s.Database(DbName).
 				Collection(DbDevicesColl).
 				Find(
-					nil,
+					context.Background(),
 					bson.M{},
 					mopts.Find().SetSort(bson.M{"_id": 1}),
 				)
