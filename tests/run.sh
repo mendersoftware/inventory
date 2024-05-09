@@ -29,6 +29,7 @@ HOST=${HOST="mender-inventory:8080"}
 }
 
 py.test -s --tb=short --host $HOST \
+          --mongo-url "mongodb://mender-mongo" \
           --internal-spec $DIR/internal_api.yml \
           --management-spec $DIR/management_api.yml \
           --management-v2-spec $DIR/management_api_v2.yml \

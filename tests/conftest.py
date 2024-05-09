@@ -26,6 +26,12 @@ def pytest_addoption(parser):
         "--host", action="store", default="inventory", help="host running API"
     )
     parser.addoption(
+        "--mongo-url",
+        action="store",
+        default="mongodb://mongo",
+        help="Mongo URL (connection string)",
+    )
+    parser.addoption(
         "--devices", action="store", default="1001", help="# of devices to test with"
     )
     parser.addoption(
