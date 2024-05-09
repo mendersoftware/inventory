@@ -23,7 +23,7 @@ def pytest_addoption(parser):
         help="API version used in HTTP requests",
     )
     parser.addoption(
-        "--host", action="store", default="localhost", help="host running API"
+        "--host", action="store", default="inventory", help="host running API"
     )
     parser.addoption(
         "--devices", action="store", default="1001", help="# of devices to test with"
