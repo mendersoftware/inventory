@@ -16,6 +16,7 @@ package http
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -86,6 +87,11 @@ const (
 
 const (
 	DefaultTimeout = time.Second * 10
+)
+
+const (
+	checkInTimeParamName  = "check_in_time"
+	checkInTimeParamScope = "system"
 )
 
 // model of device's group name response at /devices/:id/group endpoint
@@ -593,8 +599,16 @@ func (i *inventoryHandlers) PatchDeviceAttributesInternalHandler(
 		u.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
 		return
 	}
-	for _, a := range attrs {
+	for i, a := range attrs {
 		a.Scope = r.PathParam("scope")
+		if a.Name == checkInTimeParamName && a.Scope == checkInTimeParamScope {
+			t, err := time.Parse(time.RFC3339, fmt.Sprintf("%v", a.Value))
+			if err != nil {
+				u.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
+				return
+			}
+			attrs[i].Value = t
+		}
 	}
 
 	//upsert the attributes
