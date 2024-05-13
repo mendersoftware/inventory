@@ -599,10 +599,10 @@ func (i *inventoryHandlers) PatchDeviceAttributesInternalHandler(
 		u.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
 		return
 	}
-	for i, a := range attrs {
-		a.Scope = r.PathParam("scope")
-		if a.Name == checkInTimeParamName && a.Scope == checkInTimeParamScope {
-			t, err := time.Parse(time.RFC3339, fmt.Sprintf("%v", a.Value))
+	for i := range attrs {
+		attrs[i].Scope = r.PathParam("scope")
+		if attrs[i].Name == checkInTimeParamName && attrs[i].Scope == checkInTimeParamScope {
+			t, err := time.Parse(time.RFC3339, fmt.Sprintf("%v", attrs[i].Value))
 			if err != nil {
 				u.RestErrWithLog(w, r, l, err, http.StatusBadRequest)
 				return
