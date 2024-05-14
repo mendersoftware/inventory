@@ -177,7 +177,7 @@ class ManagementClientV2:
 class CliClient:
     exec_path = "/usr/bin/inventory"
 
-    def __init__(self):
+    def __init__(self, service="inventory"):
         self.docker = docker.from_env()
         # HACK: Find docker-compose project by identifying the container
         # we're running inside. The hostname equals the container id.
@@ -188,7 +188,7 @@ class CliClient:
             filters={
                 "label": [
                     f"com.docker.compose.project={project}",
-                    "com.docker.compose.service=mender-inventory",
+                    f"com.docker.compose.service={service}",
                 ]
             },
             limit=1,
